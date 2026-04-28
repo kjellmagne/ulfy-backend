@@ -190,6 +190,14 @@ docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma db seed
 ```
 
+The Kvasetech/APISIX deployment serves Ulfy at `https://kvasetech.com/backend/`. In this setup the admin app consistently owns `/backend`, while APISIX strips `/backend` only for API requests:
+
+```bash
+docker compose --env-file .env -f docker-compose.yml pull
+docker compose --env-file .env -f docker-compose.yml up -d
+APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-backend-routes.sh
+```
+
 ## GitHub Docker Images
 
 GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0.0`, manual workflow runs, and pull requests. Pull requests build images for verification only. Pushes to `main` and tags publish images to GitHub Container Registry:
