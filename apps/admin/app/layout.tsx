@@ -15,8 +15,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="brand">Ulfy Admin</div>
             <div className="nav-links">
               <a href={appPath("/")}><LayoutDashboard size={17} /> Overview</a>
-              <a href={appPath("/keys")}><KeyRound size={17} /> Keys</a>
               <a href={appPath("/tenants")}><Building2 size={17} /> Tenants</a>
+              <a href={appPath("/keys")}><KeyRound size={17} /> Keys</a>
               <a href={appPath("/configs")}><Settings size={17} /> Configs</a>
               <a href={appPath("/templates")}><ScrollText size={17} /> Templates</a>
               <a href={appPath("/users")}><Users size={17} /> Users</a>
