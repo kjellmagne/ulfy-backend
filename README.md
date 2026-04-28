@@ -178,6 +178,18 @@ ULFY_HOST='ulfy.example.com' \
 bash infra/apisix/ulfy-routes.sh
 ```
 
+To pull prebuilt app images from GitHub Container Registry instead of building on the server, use:
+
+```bash
+cp infra/.env.server.example infra/.env.server
+sudo mkdir -p /opt/ulfy-data/postgres
+sudo chown -R "$USER:$USER" /opt/ulfy-data
+docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml pull
+docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d
+docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma migrate deploy
+docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma db seed
+```
+
 ## GitHub Docker Images
 
 GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0.0`, manual workflow runs, and pull requests. Pull requests build images for verification only. Pushes to `main` and tags publish images to GitHub Container Registry:

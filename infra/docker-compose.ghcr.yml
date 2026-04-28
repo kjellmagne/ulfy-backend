@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ulfy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-ulfy}
+    volumes:
+      - ${POSTGRES_DATA_DIR:-/opt/ulfy-data/postgres}:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ulfy} -d ${POSTGRES_DB:-ulfy}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: ${ULFY_API_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-api:latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ulfy}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ulfy}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ACTIVATION_TOKEN_SECRET: ${ACTIVATION_TOKEN_SECRET:?ACTIVATION_TOKEN_SECRET is required}
+      PORT: 4000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:4000:4000"
+
+  admin:
+    image: ${ULFY_ADMIN_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-admin:latest}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:3000:3000"
