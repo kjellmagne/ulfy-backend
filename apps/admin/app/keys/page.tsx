@@ -71,7 +71,16 @@ export default function KeysPage() {
 
   return (
     <RequireAuth>
-      <PageHeader title="License keys" description="Generate, inspect, revoke, and reset activation keys. Full keys are shown once after generation." />
+      <PageHeader
+        title="License keys"
+        description="Generate, inspect, revoke, and reset activation keys. Full keys are shown once after generation."
+        meta={(
+          <>
+            <button type="button" className="button" onClick={() => setSingleModalOpen(true)}><Plus size={16} /> Single-user key</button>
+            <button type="button" className="button secondary" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><Plus size={16} /> Enterprise key</button>
+          </>
+        )}
+      />
       {error && <Alert tone="danger">{error}</Alert>}
       {generated && (
         <div className="panel" style={{ marginBottom: 16, borderColor: "var(--accent)" }}>
@@ -86,28 +95,6 @@ export default function KeysPage() {
       {loading ? <LoadingPanel label="Loading license keys" /> : (
         <>
           <div className="page-stack">
-            <div className="panel">
-              <PanelHeader
-                title="Create activation keys"
-                description="Generate keys in a focused dialog. Full keys are still shown once only."
-                actions={(
-                  <>
-                    <button type="button" className="button" onClick={() => setSingleModalOpen(true)}><Plus size={16} /> Single-user key</button>
-                    <button type="button" className="button secondary" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><Plus size={16} /> Enterprise key</button>
-                  </>
-                )}
-              />
-              <div className="grid two">
-                <div className="empty-state">
-                  <strong>Single-user</strong>
-                  <span>One purchaser, one device binding in v1.</span>
-                </div>
-                <div className="empty-state">
-                  <strong>Enterprise</strong>
-                  <span>Tenant-linked key with config profile and device allowance.</span>
-                </div>
-              </div>
-            </div>
             <div className="panel">
               <PanelHeader title="Single-user keys" description="Double-click a row to view all associated details. Full activation keys are hashed and cannot be recovered later." />
               {!single.length ? <EmptyState title="No single-user keys" message="Generate a key above to make it available for activation." /> : (
