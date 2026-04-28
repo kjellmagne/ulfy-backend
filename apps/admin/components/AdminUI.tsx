@@ -1,7 +1,7 @@
 "use client";
 
-import { ReactNode } from "react";
-import { Info, Loader2 } from "lucide-react";
+import { ReactNode, useEffect, useId } from "react";
+import { Info, Loader2, X } from "lucide-react";
 
 export function PageHeader({ title, description, meta }: { title: string; description?: string; meta?: ReactNode }) {
   return (
@@ -70,4 +70,61 @@ export function LoadingPanel({ label = "Loading" }: { label?: string }) {
 
 export function Alert({ tone = "info", children }: { tone?: "info" | "success" | "danger"; children: ReactNode }) {
   return <div className={`alert ${tone}`}>{children}</div>;
+}
+
+export function Modal({
+  open,
+  title,
+  description,
+  children,
+  footer,
+  onClose,
+  wide = false
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  onClose: () => void;
+  wide?: boolean;
+}) {
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <section className={`modal${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="modal-header">
+          <div>
+            <h2 id={titleId}>{title}</h2>
+            {description && <p>{description}</p>}
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close dialog">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-footer">{footer}</div>}
+      </section>
+    </div>
+  );
 }
