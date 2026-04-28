@@ -69,6 +69,12 @@ export default function TemplatesPage() {
       {error && <Alert tone="danger">{error}</Alert>}
       {loading ? <LoadingPanel label="Loading templates" /> : (
       <div className="page-stack">
+        <div className="panel">
+          <PanelHeader title="Library" description="Published versions are available in the mobile manifest and download endpoint." />
+          {!templates.length ? <EmptyState title="No templates yet" message="Create a template draft below, then publish a version." /> : (
+            <div className="table-wrap"><table className="table"><thead><tr><th>Template</th><th>Versions</th><th className="actions">Actions</th></tr></thead><tbody>{templates.map((t) => <tr key={t.id}><td><b>{t.title}</b><br /><span className="muted">{t.shortDescription}</span></td><td className="row">{t.versions?.map((v: any) => <span key={v.id} className={`badge status-${v.state}`}>{v.version} {v.state}</span>)}</td><td className="row actions"><button className="button secondary" onClick={() => edit(t)}>Edit</button>{t.versions?.[0] && <button className="button" title="Publish latest version" onClick={() => api(`/admin/templates/${t.id}/publish/${t.versions[0].id}`, { method: "POST" }).then(load)}><CheckCircle size={14} /></button>}<a className="button secondary" title="Download YAML" href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${appPath(`/api/v1/templates/${t.id}/download`)}`}><Download size={14} /></a><button className="button danger" title="Archive template" onClick={() => api(`/admin/templates/${t.id}/archive`, { method: "PATCH" }).then(load)}><Archive size={14} /></button></td></tr>)}</tbody></table></div>
+          )}
+        </div>
         <form className="panel" onSubmit={save}>
           <PanelHeader title={selected ? "Edit template" : "Create template"} description="Edit metadata first, then validate YAML before saving or publishing." />
           <div className="grid three">
@@ -83,12 +89,6 @@ export default function TemplatesPage() {
           <div className="field"><FieldLabel help="Must parse as YAML and include title, language, and sections.">YAML</FieldLabel><textarea value={form.yamlContent} onChange={(e) => setForm({ ...form, yamlContent: e.target.value })} /></div>
           <div className="row"><button type="button" className="button secondary" onClick={validate}><CheckCircle size={16} /> Validate</button><button className="button" disabled={saving}><Save size={16} /> {saving ? "Saving..." : "Save template"}</button></div>
         </form>
-        <div className="panel">
-          <PanelHeader title="Library" description="Published versions are available in the mobile manifest and download endpoint." />
-          {!templates.length ? <EmptyState title="No templates yet" message="Create a template draft above, then publish a version." /> : (
-            <div className="table-wrap"><table className="table"><thead><tr><th>Template</th><th>Versions</th><th className="actions">Actions</th></tr></thead><tbody>{templates.map((t) => <tr key={t.id}><td><b>{t.title}</b><br /><span className="muted">{t.shortDescription}</span></td><td className="row">{t.versions?.map((v: any) => <span key={v.id} className={`badge status-${v.state}`}>{v.version} {v.state}</span>)}</td><td className="row actions"><button className="button secondary" onClick={() => edit(t)}>Edit</button>{t.versions?.[0] && <button className="button" title="Publish latest version" onClick={() => api(`/admin/templates/${t.id}/publish/${t.versions[0].id}`, { method: "POST" }).then(load)}><CheckCircle size={14} /></button>}<a className="button secondary" title="Download YAML" href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${appPath(`/api/v1/templates/${t.id}/download`)}`}><Download size={14} /></a><button className="button danger" title="Archive template" onClick={() => api(`/admin/templates/${t.id}/archive`, { method: "PATCH" }).then(load)}><Archive size={14} /></button></td></tr>)}</tbody></table></div>
-          )}
-        </div>
       </div>
       )}
     </RequireAuth>

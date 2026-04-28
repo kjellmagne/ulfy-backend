@@ -56,6 +56,12 @@ export default function ConfigsPage() {
       {error && <Alert tone="danger">{error}</Alert>}
       {loading ? <LoadingPanel label="Loading config profiles" /> : (
       <div className="page-stack">
+        <div className="panel">
+          <PanelHeader title="Profiles" description="Select a profile to edit or assign it when generating enterprise keys." />
+          {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
+            <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Speech provider</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.speechProviderType || "-"}</td><td>{p.templateRepositoryUrl || "-"}</td><td className="actions"><button className="button secondary" onClick={() => edit(p)}>Edit</button></td></tr>)}</tbody></table></div>
+          )}
+        </div>
         <form className="panel" onSubmit={save}>
           <PanelHeader title={selected ? "Edit profile" : "Create profile"} description="Keep provider endpoints, privacy controls, and mobile feature flags together." />
           <div className="grid three">
@@ -76,12 +82,6 @@ export default function ConfigsPage() {
           </details>
           <button className="button" disabled={saving}><Save size={16} /> {saving ? "Saving..." : "Save profile"}</button>
         </form>
-        <div className="panel">
-          <PanelHeader title="Profiles" description="Select a profile to edit or assign it when generating enterprise keys." />
-          {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-            <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Speech provider</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.speechProviderType || "-"}</td><td>{p.templateRepositoryUrl || "-"}</td><td className="actions"><button className="button secondary" onClick={() => edit(p)}>Edit</button></td></tr>)}</tbody></table></div>
-          )}
-        </div>
       </div>
       )}
     </RequireAuth>

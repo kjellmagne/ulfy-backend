@@ -98,6 +98,26 @@ export default function TenantsPage() {
       {error && <Alert tone="danger">{error}</Alert>}
       {loading ? <LoadingPanel label="Loading tenants" /> : (
       <div className="page-stack">
+        <div className="panel">
+          <PanelHeader title="Enterprise customers" description="Usage counts are based on unique active device identifiers." />
+          {!tenants.length ? <EmptyState title="No tenants yet" message="Create a tenant before generating enterprise keys." /> : (
+          <div className="table-wrap"><table className="table">
+            <thead><tr><th>Customer</th><th>Contact</th><th>License usage</th><th></th></tr></thead>
+            <tbody>{tenants.map((tenant) => {
+              const usage = tenant.licenseUsage ?? {};
+              const capacity = usage.unlimited ? "unlimited" : usage.licensedDevices ?? 0;
+              return (
+		                <tr key={tenant.id}>
+		                  <td><b>{tenant.name}</b><br /><span className="muted">{tenant.legalName || tenant.slug}</span><br /><StatusBadge status={tenant.status} /></td>
+		                  <td>{tenant.contactName || "-"}<br /><span className="muted">{tenant.contactEmail || tenant.billingEmail || ""}</span></td>
+		                  <td><b>{usage.activeDevices ?? 0}</b> active / {capacity}<br /><span className="muted">{usage.totalDevices ?? 0} total unique devices</span></td>
+		                  <td className="actions"><button className="button secondary" onClick={() => edit(tenant)}><Building2 size={14} /> Edit</button></td>
+		                </tr>
+		              );
+		            })}</tbody>
+          </table></div>
+          )}
+        </div>
         <form className="panel" onSubmit={save}>
           <PanelHeader title={selected ? "Edit tenant" : "Create tenant"} description="Keep customer identity, contacts, and default app configuration in one place." />
           <div className="grid three">
@@ -120,26 +140,6 @@ export default function TenantsPage() {
           <div className="field"><FieldLabel>Notes</FieldLabel><textarea placeholder="Internal notes for staff admins" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
           <button className="button" disabled={saving}><Save size={16} /> {saving ? "Saving..." : "Save tenant"}</button>
         </form>
-        <div className="panel">
-          <PanelHeader title="Enterprise customers" description="Usage counts are based on unique active device identifiers." />
-          {!tenants.length ? <EmptyState title="No tenants yet" message="Create a tenant before generating enterprise keys." /> : (
-          <div className="table-wrap"><table className="table">
-            <thead><tr><th>Customer</th><th>Contact</th><th>License usage</th><th></th></tr></thead>
-            <tbody>{tenants.map((tenant) => {
-              const usage = tenant.licenseUsage ?? {};
-              const capacity = usage.unlimited ? "unlimited" : usage.licensedDevices ?? 0;
-              return (
-	                <tr key={tenant.id}>
-	                  <td><b>{tenant.name}</b><br /><span className="muted">{tenant.legalName || tenant.slug}</span><br /><StatusBadge status={tenant.status} /></td>
-	                  <td>{tenant.contactName || "-"}<br /><span className="muted">{tenant.contactEmail || tenant.billingEmail || ""}</span></td>
-	                  <td><b>{usage.activeDevices ?? 0}</b> active / {capacity}<br /><span className="muted">{usage.totalDevices ?? 0} total unique devices</span></td>
-	                  <td className="actions"><button className="button secondary" onClick={() => edit(tenant)}><Building2 size={14} /> Edit</button></td>
-	                </tr>
-	              );
-	            })}</tbody>
-          </table></div>
-          )}
-        </div>
       </div>
       )}
     </RequireAuth>
