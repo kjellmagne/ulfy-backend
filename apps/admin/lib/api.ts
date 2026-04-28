@@ -1,6 +1,6 @@
 "use client";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export function getToken() {
   if (typeof window === "undefined") return "";
