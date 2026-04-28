@@ -22,6 +22,7 @@ const empty = {
   country: "NO",
   status: "active",
   notes: "",
+  partnerId: "",
   configProfileId: ""
 };
 
@@ -43,6 +44,7 @@ function tenantToForm(tenant: any) {
     country: tenant.country ?? "NO",
     status: tenant.status ?? "active",
     notes: tenant.notes ?? "",
+    partnerId: tenant.partnerId ?? "",
     configProfileId: tenant.configProfileId ?? ""
   };
 }
@@ -50,6 +52,7 @@ function tenantToForm(tenant: any) {
 export default function TenantsPage() {
   const [tenants, setTenants] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
   const [form, setForm] = useState<any>(empty);
   const [selected, setSelected] = useState("");
   const [message, setMessage] = useState("");
@@ -60,9 +63,10 @@ export default function TenantsPage() {
 
   async function load() {
     try {
-      const [tenantData, profileData] = await Promise.all([api("/admin/tenants"), api("/admin/config-profiles")]);
+      const [tenantData, profileData, partnerData] = await Promise.all([api("/admin/tenants"), api("/admin/config-profiles"), api("/admin/partners")]);
       setTenants(tenantData);
       setProfiles(profileData);
+      setPartners(partnerData);
       setForm((current: any) => ({ ...current, configProfileId: current.configProfileId || profileData[0]?.id || "" }));
     } finally {
       setLoading(false);
@@ -90,7 +94,7 @@ export default function TenantsPage() {
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setSaving(true); setError("");
-    const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, value === "" ? undefined : value]));
+    const payload = { ...Object.fromEntries(Object.entries(form).map(([key, value]) => [key, value === "" ? undefined : value])), partnerId: form.partnerId || null, configProfileId: form.configProfileId || null };
     try {
       await api(selected ? `/admin/tenants/${selected}` : "/admin/tenants", { method: selected ? "PATCH" : "POST", body: JSON.stringify(payload) });
       setMessage(selected ? "Tenant updated" : "Tenant created");
@@ -133,7 +137,7 @@ export default function TenantsPage() {
               <PanelHeader title="Enterprise customers" description="Usage counts are based on unique active device identifiers." actions={<button type="button" className="button" onClick={createNew}><Plus size={16} /> New tenant</button>} />
               {!tenants.length ? <EmptyState title="No tenants yet" message="Create a tenant before generating enterprise keys." /> : (
               <div className="table-wrap"><table className="table">
-                <thead><tr><th>Customer</th><th>Contact</th><th>License usage</th><th className="actions">Actions</th></tr></thead>
+                <thead><tr><th>Customer</th><th>Contact</th><th>Partner</th><th>License usage</th><th className="actions">Actions</th></tr></thead>
                 <tbody>{tenants.map((tenant) => {
                   const usage = tenant.licenseUsage ?? {};
                   const capacity = usage.unlimited ? "unlimited" : usage.licensedDevices ?? 0;
@@ -141,6 +145,7 @@ export default function TenantsPage() {
                     <tr key={tenant.id}>
                       <td><b>{tenant.name}</b><br /><span className="muted">{tenant.legalName || tenant.slug}</span><br /><StatusBadge status={tenant.status} /></td>
                       <td>{tenant.contactName || "-"}<br /><span className="muted">{tenant.contactEmail || tenant.billingEmail || ""}</span></td>
+                      <td>{tenant.partner?.name ?? <span className="muted">Internal</span>}</td>
                       <td><b>{usage.activeDevices ?? 0}</b> active / {capacity}<br /><span className="muted">{usage.totalDevices ?? 0} total unique devices</span></td>
                       <td className="row actions"><button type="button" className="button secondary" onClick={() => edit(tenant)}><Building2 size={14} /> Edit</button><button type="button" className="button danger" onClick={() => deleteTenant(tenant)}><Trash2 size={14} /> Delete</button></td>
                     </tr>
@@ -179,6 +184,7 @@ export default function TenantsPage() {
                 <div className="field"><FieldLabel>City</FieldLabel><input className="input" placeholder="Oslo" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
                 <div className="field"><FieldLabel>Country</FieldLabel><input className="input" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} /></div>
                 <div className="field"><FieldLabel>Status</FieldLabel><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="active">active</option><option value="disabled">disabled</option><option value="prospect">prospect</option></select></div>
+                <div className="field"><FieldLabel help="Partner admins assigned to this solution partner can manage this tenant.">Solution partner</FieldLabel><select value={form.partnerId} onChange={(e) => setForm({ ...form, partnerId: e.target.value })}><option value="">Internal / no partner</option>{partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select></div>
                 <div className="field"><FieldLabel help="Default configuration returned to enterprise devices.">Config profile</FieldLabel><select value={form.configProfileId} onChange={(e) => setForm({ ...form, configProfileId: e.target.value })}><option value="">None</option>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></div>
               </div>
               <div className="field"><FieldLabel>Notes</FieldLabel><textarea placeholder="Internal notes for staff admins" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>

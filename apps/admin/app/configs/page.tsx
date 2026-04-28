@@ -7,7 +7,7 @@ import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHe
 import { api } from "../../lib/api";
 
 const empty = {
-  name: "", description: "", speechProviderType: "", speechEndpointUrl: "", speechModelName: "",
+  name: "", description: "", partnerId: "", speechProviderType: "", speechEndpointUrl: "", speechModelName: "",
   privacyControlEnabled: true, piiControlEnabled: true, presidioEndpointUrl: "", presidioSecretRef: "",
   privacyReviewProviderType: "", privacyReviewEndpointUrl: "", privacyReviewModel: "",
   documentGenerationProviderType: "", documentGenerationEndpointUrl: "", documentGenerationModel: "",
@@ -17,6 +17,7 @@ const empty = {
 
 export default function ConfigsPage() {
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
   const [form, setForm] = useState<any>(empty);
   const [selected, setSelected] = useState("");
   const [message, setMessage] = useState("");
@@ -26,7 +27,11 @@ export default function ConfigsPage() {
   const [editorOpen, setEditorOpen] = useState(false);
 
   async function load() {
-    try { setProfiles(await api("/admin/config-profiles")); }
+    try {
+      const [profileData, partnerData] = await Promise.all([api("/admin/config-profiles"), api("/admin/partners")]);
+      setProfiles(profileData);
+      setPartners(partnerData);
+    }
     finally { setLoading(false); }
   }
   useEffect(() => { load().catch(console.error); }, []);
@@ -51,7 +56,7 @@ export default function ConfigsPage() {
     e.preventDefault();
     setSaving(true); setError("");
     try {
-      const payload = { ...form, featureFlags: JSON.parse(form.featureFlagsText || "{}"), allowedProviderRestrictions: JSON.parse(form.allowedProviderRestrictionsText || "[]") };
+      const payload = { ...form, partnerId: form.partnerId || null, featureFlags: JSON.parse(form.featureFlagsText || "{}"), allowedProviderRestrictions: JSON.parse(form.allowedProviderRestrictionsText || "[]") };
       delete payload.featureFlagsText; delete payload.allowedProviderRestrictionsText;
       await api(selected ? `/admin/config-profiles/${selected}` : "/admin/config-profiles", { method: selected ? "PATCH" : "POST", body: JSON.stringify(payload) });
       setMessage(selected ? "Profile updated" : "Profile created"); setSelected(""); setForm(empty); setEditorOpen(false); await load();
@@ -89,7 +94,7 @@ export default function ConfigsPage() {
             <div className="panel">
               <PanelHeader title="Profiles" description="Select a profile to edit or assign it when generating enterprise keys." actions={<button type="button" className="button" onClick={createNew}><Plus size={16} /> New profile</button>} />
               {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Speech provider</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.speechProviderType || "-"}</td><td>{p.templateRepositoryUrl || "-"}</td><td className="row actions"><button type="button" className="button secondary" onClick={() => edit(p)}>Edit</button><button type="button" className="button danger" onClick={() => deleteProfile(p)}><Trash2 size={14} /> Delete</button></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech provider</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.partner?.name ?? <span className="muted">Internal</span>}</td><td>{p.speechProviderType || "-"}</td><td>{p.templateRepositoryUrl || "-"}</td><td className="row actions"><button type="button" className="button secondary" onClick={() => edit(p)}>Edit</button><button type="button" className="button danger" onClick={() => deleteProfile(p)}><Trash2 size={14} /> Delete</button></td></tr>)}</tbody></table></div>
               )}
             </div>
           </div>
@@ -108,6 +113,7 @@ export default function ConfigsPage() {
           >
             <form id="config-editor-form" onSubmit={save}>
               <div className="grid three">
+                <div className="field"><FieldLabel help="Partner admins assigned to this solution partner can manage this profile.">Solution partner</FieldLabel><select value={form.partnerId ?? ""} onChange={(e) => setForm({ ...form, partnerId: e.target.value })}><option value="">Internal / no partner</option>{partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select></div>
                 {["name", "description", "speechProviderType", "speechEndpointUrl", "speechModelName", "presidioEndpointUrl", "presidioSecretRef", "privacyReviewProviderType", "privacyReviewEndpointUrl", "privacyReviewModel", "documentGenerationProviderType", "documentGenerationEndpointUrl", "documentGenerationModel", "templateRepositoryUrl", "telemetryEndpointUrl"].map((key) => (
                   <div className="field" key={key}><FieldLabel>{labelFor(key)}</FieldLabel><input className="input" placeholder={placeholderFor(key)} value={form[key] ?? ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key === "name"} /></div>
                 ))}

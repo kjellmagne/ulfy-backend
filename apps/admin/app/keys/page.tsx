@@ -17,8 +17,9 @@ export default function KeysPage() {
   const [enterprise, setEnterprise] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
   const [generated, setGenerated] = useState<{ key: string; kind: "single-user" | "enterprise"; label: string } | null>(null);
-  const [form, setForm] = useState({ purchaserFullName: "", purchaserEmail: "", maintenanceUntil: defaultMaintenanceDate(), notes: "" });
+  const [form, setForm] = useState({ purchaserFullName: "", purchaserEmail: "", maintenanceUntil: defaultMaintenanceDate(), partnerId: "", notes: "" });
   const [enterpriseForm, setEnterpriseForm] = useState({ tenantId: "", configProfileId: "", maxDevices: 25, maintenanceUntil: defaultMaintenanceDate() });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
@@ -29,8 +30,8 @@ export default function KeysPage() {
 
   async function load() {
     try {
-      const [s, e, t, p] = await Promise.all([api("/admin/single-keys"), api("/admin/enterprise-keys"), api("/admin/tenants"), api("/admin/config-profiles")]);
-      setSingle(s); setEnterprise(e); setTenants(t); setProfiles(p);
+      const [s, e, t, p, partnerData] = await Promise.all([api("/admin/single-keys"), api("/admin/enterprise-keys"), api("/admin/tenants"), api("/admin/config-profiles"), api("/admin/partners")]);
+      setSingle(s); setEnterprise(e); setTenants(t); setProfiles(p); setPartners(partnerData);
       setEnterpriseForm((v) => ({ ...v, tenantId: v.tenantId || t[0]?.id || "", configProfileId: v.configProfileId || p[0]?.id || "" }));
     } finally {
       setLoading(false);
@@ -42,9 +43,9 @@ export default function KeysPage() {
     e.preventDefault();
     setError(""); setSaving("single");
     try {
-      const res = await api("/admin/single-keys", { method: "POST", body: JSON.stringify(form) });
+      const res = await api("/admin/single-keys", { method: "POST", body: JSON.stringify({ ...form, partnerId: form.partnerId || undefined }) });
       setGenerated({ key: res.activationKey, kind: "single-user", label: form.purchaserEmail });
-      setForm({ purchaserFullName: "", purchaserEmail: "", maintenanceUntil: defaultMaintenanceDate(), notes: "" });
+      setForm({ purchaserFullName: "", purchaserEmail: "", maintenanceUntil: defaultMaintenanceDate(), partnerId: "", notes: "" });
       setSingleModalOpen(false);
       await load();
     } catch (err: any) {
@@ -110,13 +111,13 @@ export default function KeysPage() {
             <div className="panel">
               <PanelHeader title="Single-user keys" description="Double-click a row to view all associated details. Full activation keys are hashed and cannot be recovered later." />
               {!single.length ? <EmptyState title="No single-user keys" message="Generate a key above to make it available for activation." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Purchaser</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Device</th><th>Serial</th><th>Last seen</th><th className="actions">Actions</th></tr></thead><tbody>{single.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "single", key: k })}><td><b>{k.purchaserFullName}</b><br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.deviceIdentifier ?? "-"}</td><td>{k.deviceSerialNumber ?? "-"}</td><td>{formatDateTime(k.lastSeenAt)}</td><td className="row actions"><button type="button" className="button secondary" title="View license details" onClick={() => setDetails({ kind: "single", key: k })}><Eye size={14} /></button><button type="button" className="button danger" title="Revoke license" onClick={() => api(`/admin/single-keys/${k.id}/revoke`, { method: "PATCH" }).then(load)}><ShieldX size={14} /></button><button type="button" className="button secondary" title="Reset device binding" onClick={() => api(`/admin/single-keys/${k.id}/reset`, { method: "PATCH" }).then(load)}><RotateCcw size={14} /></button></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Purchaser</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Device</th><th>Serial</th><th>Last seen</th><th className="actions">Actions</th></tr></thead><tbody>{single.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "single", key: k })}><td><b>{k.purchaserFullName}</b><br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.deviceIdentifier ?? "-"}</td><td>{k.deviceSerialNumber ?? "-"}</td><td>{formatDateTime(k.lastSeenAt)}</td><td className="row actions"><button type="button" className="button secondary" title="View license details" onClick={() => setDetails({ kind: "single", key: k })}><Eye size={14} /></button><button type="button" className="button danger" title="Revoke license" onClick={() => api(`/admin/single-keys/${k.id}/revoke`, { method: "PATCH" }).then(load)}><ShieldX size={14} /></button><button type="button" className="button secondary" title="Reset device binding" onClick={() => api(`/admin/single-keys/${k.id}/reset`, { method: "PATCH" }).then(load)}><RotateCcw size={14} /></button></td></tr>)}</tbody></table></div>
               )}
             </div>
             <div className="panel">
               <PanelHeader title="Enterprise keys" description="Double-click a row to inspect tenant, config, and device activation details." />
               {!enterprise.length ? <EmptyState title="No enterprise keys" message="Create a tenant and config profile, then generate an enterprise key." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Tenant</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Devices</th><th>Config</th><th className="actions">Actions</th></tr></thead><tbody>{enterprise.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "enterprise", key: k })}><td><b>{k.tenant?.name}</b></td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.activations?.length ?? 0}/{k.maxDevices ?? "unlimited"}</td><td>{k.configProfile?.name}</td><td className="row actions"><button type="button" className="button secondary" title="View license details" onClick={() => setDetails({ kind: "enterprise", key: k })}><Eye size={14} /></button></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Tenant</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Devices</th><th>Config</th><th className="actions">Actions</th></tr></thead><tbody>{enterprise.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "enterprise", key: k })}><td><b>{k.tenant?.name}</b></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.activations?.length ?? 0}/{k.maxDevices ?? "unlimited"}</td><td>{k.configProfile?.name}</td><td className="row actions"><button type="button" className="button secondary" title="View license details" onClick={() => setDetails({ kind: "enterprise", key: k })}><Eye size={14} /></button></td></tr>)}</tbody></table></div>
               )}
             </div>
           </div>
@@ -136,6 +137,7 @@ export default function KeysPage() {
               <div className="field"><FieldLabel>Purchaser full name</FieldLabel><input className="input" placeholder="Ola Nordmann" value={form.purchaserFullName} onChange={(e) => setForm({ ...form, purchaserFullName: e.target.value })} required /></div>
               <div className="field"><FieldLabel>Email</FieldLabel><input className="input" placeholder="ola@example.com" type="email" value={form.purchaserEmail} onChange={(e) => setForm({ ...form, purchaserEmail: e.target.value })} required /></div>
               <div className="field"><FieldLabel help="Shown to the iPhone app as support coverage.">Maintenance until</FieldLabel><input className="input" type="date" value={form.maintenanceUntil} onChange={(e) => setForm({ ...form, maintenanceUntil: e.target.value })} /></div>
+              <div className="field"><FieldLabel help="Partner admins assigned to this solution partner can manage this key.">Solution partner</FieldLabel><select value={form.partnerId} onChange={(e) => setForm({ ...form, partnerId: e.target.value })}><option value="">Internal / no partner</option>{partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select></div>
               <div className="field"><FieldLabel>Notes</FieldLabel><input className="input" placeholder="Internal context or purchase reference" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
             </form>
           </Modal>

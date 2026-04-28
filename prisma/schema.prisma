@@ -55,6 +55,7 @@ model Partner {
   singleKeys       SingleLicenseKey[]
   enterpriseKeys   EnterpriseLicenseKey[]
   tenants          Tenant[]
+  configProfiles   ConfigProfile[]
 }
 
 model Tenant {
@@ -90,6 +91,8 @@ model ConfigProfile {
   id                               String   @id @default(uuid())
   name                             String
   description                      String?
+  partnerId                        String?
+  partner                          Partner? @relation(fields: [partnerId], references: [id])
   speechProviderType               String?
   speechEndpointUrl                String?
   speechModelName                  String?
