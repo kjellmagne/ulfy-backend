@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Save } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 const empty = {
@@ -52,12 +53,19 @@ export default function TenantsPage() {
   const [form, setForm] = useState<any>(empty);
   const [selected, setSelected] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   async function load() {
-    const [tenantData, profileData] = await Promise.all([api("/admin/tenants"), api("/admin/config-profiles")]);
-    setTenants(tenantData);
-    setProfiles(profileData);
-    setForm((current: any) => ({ ...current, configProfileId: current.configProfileId || profileData[0]?.id || "" }));
+    try {
+      const [tenantData, profileData] = await Promise.all([api("/admin/tenants"), api("/admin/config-profiles")]);
+      setTenants(tenantData);
+      setProfiles(profileData);
+      setForm((current: any) => ({ ...current, configProfileId: current.configProfileId || profileData[0]?.id || "" }));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load().catch(console.error); }, []);
@@ -69,59 +77,71 @@ export default function TenantsPage() {
 
   async function save(event: React.FormEvent) {
     event.preventDefault();
+    setSaving(true); setError("");
     const payload = Object.fromEntries(Object.entries(form).map(([key, value]) => [key, value === "" ? undefined : value]));
-    await api(selected ? `/admin/tenants/${selected}` : "/admin/tenants", { method: selected ? "PATCH" : "POST", body: JSON.stringify(payload) });
-    setMessage("Saved");
-    setSelected("");
-    setForm({ ...empty, configProfileId: profiles[0]?.id || "" });
-    load();
+    try {
+      await api(selected ? `/admin/tenants/${selected}` : "/admin/tenants", { method: selected ? "PATCH" : "POST", body: JSON.stringify(payload) });
+      setMessage(selected ? "Tenant updated" : "Tenant created");
+      setSelected("");
+      setForm({ ...empty, configProfileId: profiles[0]?.id || "" });
+      await load();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <RequireAuth>
-      <div className="topbar"><h1>Tenants</h1><span className="muted">{message || "Enterprise customer register and license usage"}</span></div>
+      <PageHeader title="Tenants" description="Enterprise customer register, contact details, assigned config profile, and license usage." meta={message && <span className="badge status-active">{message}</span>} />
+      {error && <Alert tone="danger">{error}</Alert>}
+      {loading ? <LoadingPanel label="Loading tenants" /> : (
       <div className="page-stack">
         <form className="panel" onSubmit={save}>
-          <h2>{selected ? "Edit tenant" : "Create tenant"}</h2>
+          <PanelHeader title={selected ? "Edit tenant" : "Create tenant"} description="Keep customer identity, contacts, and default app configuration in one place." />
           <div className="grid three">
-            <div className="field"><label>Name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
-            <div className="field"><label>Slug</label><input className="input" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required /></div>
-            <div className="field"><label>Legal name</label><input className="input" value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} /></div>
-            <div className="field"><label>Organization number</label><input className="input" value={form.organizationNumber} onChange={(e) => setForm({ ...form, organizationNumber: e.target.value })} /></div>
-            <div className="field"><label>Contact name</label><input className="input" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} /></div>
-            <div className="field"><label>Contact email</label><input className="input" type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} /></div>
-            <div className="field"><label>Contact phone</label><input className="input" value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} /></div>
-            <div className="field"><label>Billing email</label><input className="input" type="email" value={form.billingEmail} onChange={(e) => setForm({ ...form, billingEmail: e.target.value })} /></div>
-            <div className="field"><label>Address</label><input className="input" value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} /></div>
-            <div className="field"><label>Address 2</label><input className="input" value={form.addressLine2} onChange={(e) => setForm({ ...form, addressLine2: e.target.value })} /></div>
-            <div className="field"><label>Postal code</label><input className="input" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></div>
-            <div className="field"><label>City</label><input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
-            <div className="field"><label>Country</label><input className="input" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} /></div>
-            <div className="field"><label>Status</label><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="active">active</option><option value="disabled">disabled</option><option value="prospect">prospect</option></select></div>
-            <div className="field"><label>Config profile</label><select value={form.configProfileId} onChange={(e) => setForm({ ...form, configProfileId: e.target.value })}><option value="">None</option>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></div>
+            <div className="field"><FieldLabel>Name</FieldLabel><input className="input" placeholder="Acme Health" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
+            <div className="field"><FieldLabel help="Stable internal identifier used in API responses.">Slug</FieldLabel><input className="input" placeholder="acme-health" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required /></div>
+            <div className="field"><FieldLabel>Legal name</FieldLabel><input className="input" placeholder="Acme Health AS" value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Organization number</FieldLabel><input className="input" placeholder="999888777" value={form.organizationNumber} onChange={(e) => setForm({ ...form, organizationNumber: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Contact name</FieldLabel><input className="input" placeholder="Kari Nordmann" value={form.contactName} onChange={(e) => setForm({ ...form, contactName: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Contact email</FieldLabel><input className="input" placeholder="kari@example.no" type="email" value={form.contactEmail} onChange={(e) => setForm({ ...form, contactEmail: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Contact phone</FieldLabel><input className="input" placeholder="+47 900 00 000" value={form.contactPhone} onChange={(e) => setForm({ ...form, contactPhone: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Billing email</FieldLabel><input className="input" placeholder="billing@example.no" type="email" value={form.billingEmail} onChange={(e) => setForm({ ...form, billingEmail: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Address</FieldLabel><input className="input" placeholder="Storgata 1" value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Address 2</FieldLabel><input className="input" placeholder="Floor 4" value={form.addressLine2} onChange={(e) => setForm({ ...form, addressLine2: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Postal code</FieldLabel><input className="input" placeholder="0155" value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></div>
+            <div className="field"><FieldLabel>City</FieldLabel><input className="input" placeholder="Oslo" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Country</FieldLabel><input className="input" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} /></div>
+            <div className="field"><FieldLabel>Status</FieldLabel><select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="active">active</option><option value="disabled">disabled</option><option value="prospect">prospect</option></select></div>
+            <div className="field"><FieldLabel help="Default configuration returned to enterprise devices.">Config profile</FieldLabel><select value={form.configProfileId} onChange={(e) => setForm({ ...form, configProfileId: e.target.value })}><option value="">None</option>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select></div>
           </div>
-          <div className="field"><label>Notes</label><textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
-          <button className="button"><Save size={16} /> Save tenant</button>
+          <div className="field"><FieldLabel>Notes</FieldLabel><textarea placeholder="Internal notes for staff admins" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+          <button className="button" disabled={saving}><Save size={16} /> {saving ? "Saving..." : "Save tenant"}</button>
         </form>
         <div className="panel">
-          <h2>Enterprise customers</h2>
-          <table className="table">
+          <PanelHeader title="Enterprise customers" description="Usage counts are based on unique active device identifiers." />
+          {!tenants.length ? <EmptyState title="No tenants yet" message="Create a tenant before generating enterprise keys." /> : (
+          <div className="table-wrap"><table className="table">
             <thead><tr><th>Customer</th><th>Contact</th><th>License usage</th><th></th></tr></thead>
             <tbody>{tenants.map((tenant) => {
               const usage = tenant.licenseUsage ?? {};
               const capacity = usage.unlimited ? "unlimited" : usage.licensedDevices ?? 0;
               return (
-                <tr key={tenant.id}>
-                  <td><b>{tenant.name}</b><br /><span className="muted">{tenant.legalName || tenant.slug}</span><br /><span className="badge">{tenant.status}</span></td>
-                  <td>{tenant.contactName || "-"}<br /><span className="muted">{tenant.contactEmail || tenant.billingEmail || ""}</span></td>
-                  <td><b>{usage.activeDevices ?? 0}</b> active / {capacity}<br /><span className="muted">{usage.totalDevices ?? 0} total unique devices</span></td>
-                  <td><button className="button secondary" onClick={() => edit(tenant)}><Building2 size={14} /> Edit</button></td>
-                </tr>
-              );
-            })}</tbody>
-          </table>
+	                <tr key={tenant.id}>
+	                  <td><b>{tenant.name}</b><br /><span className="muted">{tenant.legalName || tenant.slug}</span><br /><StatusBadge status={tenant.status} /></td>
+	                  <td>{tenant.contactName || "-"}<br /><span className="muted">{tenant.contactEmail || tenant.billingEmail || ""}</span></td>
+	                  <td><b>{usage.activeDevices ?? 0}</b> active / {capacity}<br /><span className="muted">{usage.totalDevices ?? 0} total unique devices</span></td>
+	                  <td className="actions"><button className="button secondary" onClick={() => edit(tenant)}><Building2 size={14} /> Edit</button></td>
+	                </tr>
+	              );
+	            })}</tbody>
+          </table></div>
+          )}
         </div>
       </div>
+      )}
     </RequireAuth>
   );
 }

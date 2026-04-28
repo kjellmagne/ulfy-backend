@@ -2,25 +2,46 @@
 
 import { useEffect, useState } from "react";
 import { RequireAuth } from "../components/RequireAuth";
+import { EmptyState, LoadingPanel, PageHeader, PanelHeader } from "../components/AdminUI";
 import { api } from "../lib/api";
+
+const metrics = [
+  ["singleKeys", "Single keys"],
+  ["enterpriseKeys", "Enterprise keys"],
+  ["activations", "Activations"],
+  ["activeUniqueDevices", "Active devices"],
+  ["templates", "Templates"]
+];
 
 export default function Home() {
   const [data, setData] = useState<any>();
   useEffect(() => { api("/admin/overview").then(setData).catch(console.error); }, []);
   return (
     <RequireAuth>
-      <div className="topbar"><h1>Overview</h1><span className="muted">Internal control plane</span></div>
-      <div className="grid four">
-        <div className="grid three">
-          {["singleKeys", "enterpriseKeys", "activations", "activeUniqueDevices", "templates"].map((key) => (
-            <div className="card" key={key}><div className="muted">{key}</div><h2>{data?.[key] ?? "-"}</h2></div>
-          ))}
+      <PageHeader title="Overview" description="Operational snapshot for licensing, activations, templates, and recent admin activity." />
+      {!data ? <LoadingPanel label="Loading overview" /> : (
+        <div className="page-stack">
+          <div className="grid four">
+            {metrics.map(([key, label]) => (
+              <div className="card metric-card" key={key}>
+                <div className="metric-label">{label}</div>
+                <h2 className="metric-value">{data?.[key] ?? "-"}</h2>
+              </div>
+            ))}
+          </div>
+          <div className="panel">
+            <PanelHeader title="Recent audit" description="Latest license, tenant, config, and template events." />
+            {!data?.audits?.length ? <EmptyState title="No audit entries yet" message="Recent admin and activation activity will appear here." /> : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead><tr><th>Action</th><th>Target</th><th>Time</th></tr></thead>
+                  <tbody>{data.audits.map((a: any) => <tr key={a.id}><td><b>{a.action}</b></td><td>{a.targetType}</td><td>{new Date(a.createdAt).toLocaleString()}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-      <div className="panel" style={{ marginTop: 16 }}>
-        <h2>Recent audit</h2>
-        <table className="table"><tbody>{data?.audits?.map((a: any) => <tr key={a.id}><td>{a.action}</td><td>{a.targetType}</td><td>{new Date(a.createdAt).toLocaleString()}</td></tr>)}</tbody></table>
-      </div>
+      )}
     </RequireAuth>
   );
 }
