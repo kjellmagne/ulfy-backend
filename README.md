@@ -88,12 +88,46 @@ curl -X POST http://localhost:4000/api/v1/activation/refresh \
 
 `deviceIdentifier` is the stable value used for license binding and unique-device counts. `deviceSerialNumber` is stored for admin support/audit when the app or MDM environment can provide it. Each activation and refresh updates `lastSeenAt` on the device activation record.
 
-Sample enterprise config response:
+Dedicated license details:
+
+```bash
+curl 'http://localhost:4000/api/v1/license/details?activationToken=...'
+```
+
+Effective config with license metadata:
+
+```bash
+curl 'http://localhost:4000/api/v1/config/effective?activationToken=...'
+```
+
+Mobile-facing errors use this shape:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "activation_key_invalid",
+    "message": "Activation key not found"
+  }
+}
+```
+
+Sample enterprise activation payload:
 
 ```json
 {
   "success": true,
   "activationToken": "...",
+  "activationId": "...",
+  "license": {
+    "type": "enterprise",
+    "status": "active",
+    "registeredToName": "Acme Health AS",
+    "registeredToEmail": "kari@acme-health.example",
+    "activatedAt": "2026-04-29T10:15:00.000Z",
+    "maintenanceActive": true,
+    "maintenanceUntil": "2027-04-29T00:00:00.000Z"
+  },
   "tenant": { "id": "...", "name": "Acme Health", "slug": "acme-health" },
   "device": {
     "deviceIdentifier": "iphone-enterprise-1",
@@ -101,6 +135,8 @@ Sample enterprise config response:
     "lastSeenAt": "2026-04-29T10:15:00.000Z"
   },
   "config": {
+    "id": "00000000-0000-0000-0000-000000000101",
+    "name": "Default Enterprise Profile",
     "speechProviderType": "openai-compatible",
     "speechEndpointUrl": "https://speech.example.internal/v1/audio/transcriptions",
     "privacyControlEnabled": true,
@@ -147,6 +183,7 @@ The admin UI supports:
 - Admin login
 - Single-user key generation
 - Enterprise key generation
+- Maintenance/support expiry dates on generated keys
 - Enterprise customer/tenant registration
 - Active unique-device license usage counts
 - Activation inspection

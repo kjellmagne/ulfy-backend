@@ -15,11 +15,11 @@ export class ActivationService {
 
   async activateSingle(input: ActivationInput) {
     const key = await this.prisma.singleLicenseKey.findUnique({ where: { keyHash: sha256(input.activationKey) } });
-    if (!key) throw new NotFoundException({ success: false, error: "Activation key not found" });
+    if (!key) throw new NotFoundException(mobileError("activation_key_invalid", "Activation key not found"));
     this.assertUsable(key.status, key.expiresAt);
 
     if (key.deviceIdentifier && key.deviceIdentifier !== input.deviceIdentifier) {
-      throw new ForbiddenException({ success: false, error: "Activation key is already bound to another device" });
+      throw new ForbiddenException(mobileError("license_already_bound", "Activation key is already bound to another device"));
     }
 
     const activationToken = await this.issueActivationToken("single", key.id, input.deviceIdentifier);
@@ -47,10 +47,11 @@ export class ActivationService {
       }
     });
 
-    await this.prisma.singleLicenseKey.update({
+    const activatedAt = key.activatedAt ?? now;
+    const updatedKey = await this.prisma.singleLicenseKey.update({
       where: { id: key.id },
       data: {
-        activatedAt: key.activatedAt ?? now,
+        activatedAt,
         deviceIdentifier: input.deviceIdentifier,
         deviceSerialNumber: input.deviceSerialNumber,
         appVersion: input.appVersion,
@@ -64,7 +65,7 @@ export class ActivationService {
       success: true,
       activationToken,
       activationId: activation.id,
-      license: { type: "single", status: "active" },
+      license: this.mapSingleLicense(updatedKey),
       device: this.mapDevice(activation),
       config: {}
     };
@@ -75,12 +76,12 @@ export class ActivationService {
       where: { keyHash: sha256(input.activationKey) },
       include: { tenant: true, configProfile: true, activations: true }
     });
-    if (!key) throw new NotFoundException({ success: false, error: "Enterprise key not found" });
+    if (!key) throw new NotFoundException(mobileError("enterprise_key_invalid", "Enterprise key not found"));
     this.assertUsable(key.status, key.expiresAt);
 
     const existingForDevice = key.activations.find((item) => item.deviceIdentifier === input.deviceIdentifier);
     if (!existingForDevice && key.maxDevices && key.activations.filter((item) => item.status === "active").length >= key.maxDevices) {
-      throw new ForbiddenException({ success: false, error: "Enterprise device limit reached" });
+      throw new ForbiddenException(mobileError("enterprise_device_limit_reached", "Enterprise device limit reached"));
     }
 
     const activationToken = await this.issueActivationToken("enterprise", key.id, input.deviceIdentifier);
@@ -114,7 +115,8 @@ export class ActivationService {
       success: true,
       activationToken,
       activationId: activation.id,
-      tenant: { id: key.tenant.id, name: key.tenant.name, slug: key.tenant.slug },
+      license: this.mapEnterpriseLicense(key, activation.activatedAt),
+      tenant: this.mapTenant(key.tenant),
       device: this.mapDevice(activation),
       config: this.mapConfig(key.configProfile)
     };
@@ -123,8 +125,9 @@ export class ActivationService {
   async refresh(input: RefreshInput) {
     const activation = await this.findActivationByToken(input.activationToken);
     this.assertUsable(activation.status, null);
+    this.assertActivationLicenseUsable(activation);
     if (input.deviceIdentifier && input.deviceIdentifier !== activation.deviceIdentifier) {
-      throw new ForbiddenException({ success: false, error: "Activation token does not belong to this device" });
+      throw new ForbiddenException(mobileError("activation_device_mismatch", "Activation token does not belong to this device"));
     }
     const now = new Date();
     await this.prisma.deviceActivation.update({
@@ -147,33 +150,63 @@ export class ActivationService {
         }
       });
     }
+    const refreshedActivation = {
+      ...activation,
+      lastSeenAt: now,
+      appVersion: input.appVersion ?? activation.appVersion,
+      deviceSerialNumber: input.deviceSerialNumber ?? activation.deviceSerialNumber
+    };
     const config = activation.enterpriseLicenseKey?.configProfile ? this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {};
+    const tenant = activation.enterpriseLicenseKey?.tenant ? this.mapTenant(activation.enterpriseLicenseKey.tenant) : null;
     return {
       success: true,
       status: activation.status,
       kind: activation.kind,
       lastSeenAt: now.toISOString(),
-      device: {
-        deviceIdentifier: activation.deviceIdentifier,
-        deviceSerialNumber: input.deviceSerialNumber ?? activation.deviceSerialNumber ?? null,
-        lastSeenAt: now.toISOString()
-      },
+      license: this.mapActivationLicense(refreshedActivation),
+      tenant,
+      device: this.mapDevice(refreshedActivation),
       config
     };
   }
 
   async effectiveConfig(activationToken: string) {
-    if (!activationToken) throw new BadRequestException("activationToken query parameter is required");
+    if (!activationToken) throw new BadRequestException(mobileError("activation_token_required", "activationToken query parameter is required"));
     const activation = await this.findActivationByToken(activationToken);
     this.assertUsable(activation.status, null);
-    if (activation.kind !== "enterprise" || !activation.enterpriseLicenseKey?.configProfile) return { config: {} };
-    return { tenantId: activation.tenantId, config: this.mapConfig(activation.enterpriseLicenseKey.configProfile) };
+    this.assertActivationLicenseUsable(activation);
+    const tenant = activation.enterpriseLicenseKey?.tenant ? this.mapTenant(activation.enterpriseLicenseKey.tenant) : null;
+    return {
+      success: true,
+      tenant,
+      license: this.mapActivationLicense(activation),
+      config: activation.enterpriseLicenseKey?.configProfile ? this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {}
+    };
+  }
+
+  async licenseDetails(activationToken: string) {
+    if (!activationToken) throw new BadRequestException(mobileError("activation_token_required", "activationToken query parameter is required"));
+    const activation = await this.findActivationByToken(activationToken);
+    this.assertUsable(activation.status, null);
+    this.assertActivationLicenseUsable(activation);
+    const tenant = activation.enterpriseLicenseKey?.tenant ? this.mapTenant(activation.enterpriseLicenseKey.tenant) : null;
+    return {
+      success: true,
+      license: this.mapActivationLicense(activation),
+      tenant,
+      device: this.mapDevice(activation),
+      config: activation.enterpriseLicenseKey?.configProfile ? this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {}
+    };
   }
 
   private async findActivationByToken(activationToken: string) {
     const activation = await this.prisma.deviceActivation.findUnique({
       where: { activationTokenHash: tokenHash(activationToken) },
-      include: { enterpriseLicenseKey: { include: { configProfile: true } } }
+      include: {
+        singleLicenseKey: true,
+        enterpriseLicenseKey: { include: { configProfile: true, tenant: true } },
+        tenant: true
+      }
     });
     if (!activation) throw new UnauthorizedActivation();
     return activation;
@@ -187,8 +220,17 @@ export class ActivationService {
   }
 
   private assertUsable(status: LicenseStatus, expiresAt?: Date | null) {
-    if (status !== "active") throw new ForbiddenException({ success: false, error: `License is ${status}` });
-    if (expiresAt && expiresAt.getTime() < Date.now()) throw new ForbiddenException({ success: false, error: "License is expired" });
+    if (status !== "active") throw new ForbiddenException(mobileError(`license_${status}`, `License is ${status}`));
+    if (expiresAt && expiresAt.getTime() < Date.now()) throw new ForbiddenException(mobileError("license_expired", "License is expired"));
+  }
+
+  private assertActivationLicenseUsable(activation: any) {
+    if (activation.kind === "single" && activation.singleLicenseKey) {
+      this.assertUsable(activation.singleLicenseKey.status, activation.singleLicenseKey.expiresAt);
+    }
+    if (activation.kind === "enterprise" && activation.enterpriseLicenseKey) {
+      this.assertUsable(activation.enterpriseLicenseKey.status, activation.enterpriseLicenseKey.expiresAt);
+    }
   }
 
   private mapDevice(activation: { deviceIdentifier: string; deviceSerialNumber?: string | null; lastSeenAt?: Date | null; lastCheckIn?: Date | null }) {
@@ -197,6 +239,73 @@ export class ActivationService {
       deviceIdentifier: activation.deviceIdentifier,
       deviceSerialNumber: activation.deviceSerialNumber ?? null,
       lastSeenAt: lastSeenAt.toISOString()
+    };
+  }
+
+  private mapActivationLicense(activation: any) {
+    if (activation.kind === "single" && activation.singleLicenseKey) {
+      return this.mapSingleLicense(activation.singleLicenseKey);
+    }
+    if (activation.kind === "enterprise" && activation.enterpriseLicenseKey) {
+      return this.mapEnterpriseLicense(activation.enterpriseLicenseKey, activation.activatedAt);
+    }
+    return {
+      type: activation.kind,
+      status: activation.status,
+      registeredToName: null,
+      registeredToEmail: null,
+      activatedAt: activation.activatedAt?.toISOString?.() ?? null,
+      maintenanceActive: false,
+      maintenanceUntil: null
+    };
+  }
+
+  private mapSingleLicense(key: { purchaserFullName: string; purchaserEmail: string; status: LicenseStatus; activatedAt?: Date | null; maintenanceUntil?: Date | null }) {
+    return {
+      type: "single",
+      status: key.status,
+      registeredToName: key.purchaserFullName,
+      registeredToEmail: key.purchaserEmail,
+      activatedAt: key.activatedAt?.toISOString() ?? null,
+      maintenanceActive: this.isMaintenanceActive(key.status, key.maintenanceUntil),
+      maintenanceUntil: key.maintenanceUntil?.toISOString() ?? null
+    };
+  }
+
+  private mapEnterpriseLicense(key: { status: LicenseStatus; maintenanceUntil?: Date | null; tenant: any }, activatedAt?: Date | null) {
+    const tenant = key.tenant;
+    return {
+      type: "enterprise",
+      status: key.status,
+      registeredToName: tenant.legalName ?? tenant.name,
+      registeredToEmail: tenant.contactEmail ?? tenant.billingEmail ?? null,
+      activatedAt: activatedAt?.toISOString() ?? null,
+      maintenanceActive: this.isMaintenanceActive(key.status, key.maintenanceUntil),
+      maintenanceUntil: key.maintenanceUntil?.toISOString() ?? null
+    };
+  }
+
+  private isMaintenanceActive(status: LicenseStatus, maintenanceUntil?: Date | null) {
+    return status === "active" && (!maintenanceUntil || maintenanceUntil.getTime() >= Date.now());
+  }
+
+  private mapTenant(tenant: any) {
+    return {
+      id: tenant.id,
+      name: tenant.name,
+      slug: tenant.slug,
+      legalName: tenant.legalName,
+      organizationNumber: tenant.organizationNumber,
+      contactName: tenant.contactName,
+      contactEmail: tenant.contactEmail,
+      contactPhone: tenant.contactPhone,
+      billingEmail: tenant.billingEmail,
+      addressLine1: tenant.addressLine1,
+      addressLine2: tenant.addressLine2,
+      postalCode: tenant.postalCode,
+      city: tenant.city,
+      country: tenant.country,
+      status: tenant.status
     };
   }
 
@@ -228,6 +337,10 @@ export class ActivationService {
 
 class UnauthorizedActivation extends ForbiddenException {
   constructor() {
-    super({ success: false, error: "Invalid activation token" });
+    super(mobileError("activation_token_invalid", "Invalid activation token"));
   }
+}
+
+export function mobileError(code: string, message: string) {
+  return { success: false, error: { code, message } };
 }

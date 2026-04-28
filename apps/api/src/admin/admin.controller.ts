@@ -21,6 +21,11 @@ class SingleKeyDto {
   @IsString()
   purchaseDate?: string;
 
+  @ApiProperty({ required: false, example: "2027-04-29T00:00:00.000Z" })
+  @IsOptional()
+  @IsString()
+  maintenanceUntil?: string;
+
   @ApiProperty({ required: false, example: "Purchased through selected solution partner." })
   @IsOptional()
   @IsString()
@@ -46,6 +51,11 @@ class EnterpriseKeyDto {
   @IsInt()
   @Min(1)
   maxDevices?: number;
+
+  @ApiProperty({ required: false, example: "2027-04-29T00:00:00.000Z" })
+  @IsOptional()
+  @IsString()
+  maintenanceUntil?: string;
 
   @ApiProperty({ required: false, example: "Enterprise pilot key." })
   @IsOptional()
@@ -277,6 +287,7 @@ export class AdminController {
         purchaserFullName: dto.purchaserFullName,
         purchaserEmail: dto.purchaserEmail,
         purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : undefined,
+        maintenanceUntil: dto.maintenanceUntil ? new Date(dto.maintenanceUntil) : undefined,
         notes: dto.notes,
         partnerId: dto.partnerId,
         createdByAdminId: req.user.sub
@@ -328,6 +339,7 @@ export class AdminController {
         tenantId: dto.tenantId,
         configProfileId: dto.configProfileId,
         maxDevices: dto.maxDevices,
+        maintenanceUntil: dto.maintenanceUntil ? new Date(dto.maintenanceUntil) : undefined,
         notes: dto.notes,
         createdByAdminId: req.user.sub
       },

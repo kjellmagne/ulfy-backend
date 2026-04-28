@@ -14,6 +14,7 @@ function createActivationKey(prefix: "ULFY-S" | "ULFY-E") {
 }
 
 async function main() {
+  const maintenanceUntil = new Date("2027-04-29T00:00:00.000Z");
   const passwordHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!", 12);
   await prisma.adminUser.upsert({
     where: { email: "admin@ulfy.local" },
@@ -131,6 +132,7 @@ sections:
       keyPrefix: singleKey.slice(0, 14),
       purchaserFullName: "Seed User",
       purchaserEmail: "seed.user@example.com",
+      maintenanceUntil,
       notes: "Seeded single-user key for local testing"
     }
   });
@@ -145,6 +147,7 @@ sections:
       tenantId: tenant.id,
       configProfileId: profile.id,
       maxDevices: 100,
+      maintenanceUntil,
       notes: "Seeded enterprise key for local testing"
     }
   });

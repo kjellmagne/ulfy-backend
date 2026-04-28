@@ -18,6 +18,30 @@ export const RefreshRequest = z.object({
   appVersion: z.string().optional()
 });
 
+export const LicenseDetails = z.object({
+  type: z.enum(["single", "enterprise"]),
+  status: ActivationStatus,
+  registeredToName: z.string().nullable(),
+  registeredToEmail: z.string().email().nullable(),
+  activatedAt: z.string().datetime().nullable(),
+  maintenanceActive: z.boolean(),
+  maintenanceUntil: z.string().datetime().nullable()
+});
+
+export const DeviceDetails = z.object({
+  deviceIdentifier: z.string(),
+  deviceSerialNumber: z.string().nullable(),
+  lastSeenAt: z.string().datetime()
+});
+
+export const MobileErrorPayload = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string(),
+    message: z.string()
+  })
+});
+
 export const ConfigProfilePayload = z.object({
   speechProviderType: z.string().optional().nullable(),
   speechEndpointUrl: z.string().url().optional().nullable(),
@@ -64,4 +88,7 @@ export type ConfigProfilePayload = z.infer<typeof ConfigProfilePayload>;
 export type SingleActivationRequest = z.infer<typeof SingleActivationRequest>;
 export type EnterpriseActivationRequest = z.infer<typeof EnterpriseActivationRequest>;
 export type RefreshRequest = z.infer<typeof RefreshRequest>;
+export type LicenseDetails = z.infer<typeof LicenseDetails>;
+export type DeviceDetails = z.infer<typeof DeviceDetails>;
+export type MobileErrorPayload = z.infer<typeof MobileErrorPayload>;
 export type TemplateMetadata = z.infer<typeof TemplateMetadata>;

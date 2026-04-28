@@ -125,6 +125,7 @@ model SingleLicenseKey {
   purchaseDate        DateTime?
   activatedAt         DateTime?
   expiresAt           DateTime?
+  maintenanceUntil    DateTime?
   deviceIdentifier    String?
   deviceSerialNumber  String?
   appVersion          String?
@@ -151,6 +152,7 @@ model EnterpriseLicenseKey {
   configProfile    ConfigProfile @relation(fields: [configProfileId], references: [id])
   generatedAt      DateTime      @default(now())
   expiresAt        DateTime?
+  maintenanceUntil DateTime?
   maxDevices       Int?
   status           LicenseStatus @default(active)
   notes            String?

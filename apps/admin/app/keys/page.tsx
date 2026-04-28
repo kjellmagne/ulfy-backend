@@ -5,14 +5,20 @@ import { Copy, KeyRound, RotateCcw, ShieldX } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { api } from "../../lib/api";
 
+function defaultMaintenanceDate() {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
 export default function KeysPage() {
   const [single, setSingle] = useState<any[]>([]);
   const [enterprise, setEnterprise] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [generated, setGenerated] = useState<{ key: string; kind: "single-user" | "enterprise"; label: string } | null>(null);
-  const [form, setForm] = useState({ purchaserFullName: "", purchaserEmail: "", notes: "" });
-  const [enterpriseForm, setEnterpriseForm] = useState({ tenantId: "", configProfileId: "", maxDevices: 25 });
+  const [form, setForm] = useState({ purchaserFullName: "", purchaserEmail: "", maintenanceUntil: defaultMaintenanceDate(), notes: "" });
+  const [enterpriseForm, setEnterpriseForm] = useState({ tenantId: "", configProfileId: "", maxDevices: 25, maintenanceUntil: defaultMaintenanceDate() });
 
   async function load() {
     const [s, e, t, p] = await Promise.all([api("/admin/single-keys"), api("/admin/enterprise-keys"), api("/admin/tenants"), api("/admin/config-profiles")]);
@@ -25,7 +31,7 @@ export default function KeysPage() {
     e.preventDefault();
     const res = await api("/admin/single-keys", { method: "POST", body: JSON.stringify(form) });
     setGenerated({ key: res.activationKey, kind: "single-user", label: form.purchaserEmail });
-    setForm({ purchaserFullName: "", purchaserEmail: "", notes: "" }); load();
+    setForm({ purchaserFullName: "", purchaserEmail: "", maintenanceUntil: defaultMaintenanceDate(), notes: "" }); load();
   }
   async function createEnterprise(e: React.FormEvent) {
     e.preventDefault();
@@ -54,6 +60,7 @@ export default function KeysPage() {
           <h2>Generate single-user key</h2>
           <div className="field"><label>Purchaser full name</label><input className="input" value={form.purchaserFullName} onChange={(e) => setForm({ ...form, purchaserFullName: e.target.value })} required /></div>
           <div className="field"><label>Email</label><input className="input" type="email" value={form.purchaserEmail} onChange={(e) => setForm({ ...form, purchaserEmail: e.target.value })} required /></div>
+          <div className="field"><label>Maintenance until</label><input className="input" type="date" value={form.maintenanceUntil} onChange={(e) => setForm({ ...form, maintenanceUntil: e.target.value })} /></div>
           <div className="field"><label>Notes</label><input className="input" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
           <button className="button"><KeyRound size={16} /> Generate</button>
         </form>
@@ -62,14 +69,15 @@ export default function KeysPage() {
           <div className="field"><label>Tenant</label><select value={enterpriseForm.tenantId} onChange={(e) => setEnterpriseForm({ ...enterpriseForm, tenantId: e.target.value })}>{tenants.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
           <div className="field"><label>Config profile</label><select value={enterpriseForm.configProfileId} onChange={(e) => setEnterpriseForm({ ...enterpriseForm, configProfileId: e.target.value })}>{profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
           <div className="field"><label>Max devices</label><input className="input" type="number" value={enterpriseForm.maxDevices} onChange={(e) => setEnterpriseForm({ ...enterpriseForm, maxDevices: Number(e.target.value) })} /></div>
+          <div className="field"><label>Maintenance until</label><input className="input" type="date" value={enterpriseForm.maintenanceUntil} onChange={(e) => setEnterpriseForm({ ...enterpriseForm, maintenanceUntil: e.target.value })} /></div>
           <button className="button"><KeyRound size={16} /> Generate</button>
         </form>
       </div>
       <h2>Single-user keys</h2>
       <p className="muted">The table shows only prefixes by design. Activation keys are hashed and cannot be recovered after this page changes.</p>
-      <table className="table"><thead><tr><th>Purchaser</th><th>Prefix</th><th>Status</th><th>Device</th><th>Serial</th><th>Last seen</th><th></th></tr></thead><tbody>{single.map((k) => <tr key={k.id}><td>{k.purchaserFullName}<br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.keyPrefix}</td><td><span className="badge">{k.status}</span></td><td>{k.deviceIdentifier ?? "-"}</td><td>{k.deviceSerialNumber ?? "-"}</td><td>{k.lastSeenAt ? new Date(k.lastSeenAt).toLocaleString() : "-"}</td><td className="row"><button className="button danger" onClick={() => api(`/admin/single-keys/${k.id}/revoke`, { method: "PATCH" }).then(load)}><ShieldX size={14} /></button><button className="button secondary" onClick={() => api(`/admin/single-keys/${k.id}/reset`, { method: "PATCH" }).then(load)}><RotateCcw size={14} /></button></td></tr>)}</tbody></table>
+      <table className="table"><thead><tr><th>Purchaser</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Device</th><th>Serial</th><th>Last seen</th><th></th></tr></thead><tbody>{single.map((k) => <tr key={k.id}><td>{k.purchaserFullName}<br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.keyPrefix}</td><td><span className="badge">{k.status}</span></td><td>{k.maintenanceUntil ? new Date(k.maintenanceUntil).toLocaleDateString() : "-"}</td><td>{k.deviceIdentifier ?? "-"}</td><td>{k.deviceSerialNumber ?? "-"}</td><td>{k.lastSeenAt ? new Date(k.lastSeenAt).toLocaleString() : "-"}</td><td className="row"><button className="button danger" onClick={() => api(`/admin/single-keys/${k.id}/revoke`, { method: "PATCH" }).then(load)}><ShieldX size={14} /></button><button className="button secondary" onClick={() => api(`/admin/single-keys/${k.id}/reset`, { method: "PATCH" }).then(load)}><RotateCcw size={14} /></button></td></tr>)}</tbody></table>
       <h2>Enterprise keys</h2>
-      <table className="table"><thead><tr><th>Tenant</th><th>Prefix</th><th>Status</th><th>Devices</th><th>Config</th></tr></thead><tbody>{enterprise.map((k) => <tr key={k.id}><td>{k.tenant?.name}</td><td>{k.keyPrefix}</td><td><span className="badge">{k.status}</span></td><td>{k.activations?.length ?? 0}/{k.maxDevices ?? "unlimited"}</td><td>{k.configProfile?.name}</td></tr>)}</tbody></table>
+      <table className="table"><thead><tr><th>Tenant</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Devices</th><th>Config</th></tr></thead><tbody>{enterprise.map((k) => <tr key={k.id}><td>{k.tenant?.name}</td><td>{k.keyPrefix}</td><td><span className="badge">{k.status}</span></td><td>{k.maintenanceUntil ? new Date(k.maintenanceUntil).toLocaleDateString() : "-"}</td><td>{k.activations?.length ?? 0}/{k.maxDevices ?? "unlimited"}</td><td>{k.configProfile?.name}</td></tr>)}</tbody></table>
     </RequireAuth>
   );
 }
