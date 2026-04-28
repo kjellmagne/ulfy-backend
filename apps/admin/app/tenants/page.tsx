@@ -80,10 +80,10 @@ export default function TenantsPage() {
   return (
     <RequireAuth>
       <div className="topbar"><h1>Tenants</h1><span className="muted">{message || "Enterprise customer register and license usage"}</span></div>
-      <div className="grid two">
+      <div className="page-stack">
         <form className="panel" onSubmit={save}>
           <h2>{selected ? "Edit tenant" : "Create tenant"}</h2>
-          <div className="grid two">
+          <div className="grid three">
             <div className="field"><label>Name</label><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
             <div className="field"><label>Slug</label><input className="input" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required /></div>
             <div className="field"><label>Legal name</label><input className="input" value={form.legalName} onChange={(e) => setForm({ ...form, legalName: e.target.value })} /></div>

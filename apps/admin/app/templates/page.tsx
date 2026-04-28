@@ -51,10 +51,10 @@ export default function TemplatesPage() {
   return (
     <RequireAuth>
       <div className="topbar"><h1>Templates</h1><span className="muted">{validation}</span></div>
-      <div className="grid two">
+      <div className="page-stack">
         <form className="panel" onSubmit={save}>
           <h2>{selected ? "Edit template" : "Create template"}</h2>
-          <div className="grid two">
+          <div className="grid three">
             <div className="field"><label>Title</label><input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></div>
             <div className="field"><label>Short description</label><input className="input" value={form.shortDescription} onChange={(e) => setForm({ ...form, shortDescription: e.target.value })} required /></div>
             <div className="field"><label>Category</label><select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>{categories.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}</select></div>

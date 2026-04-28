@@ -24,6 +24,7 @@ button, input, textarea, select { font: inherit; }
 .nav a:hover { background: #1f2937; color: #fff; }
 .main { padding: 28px; max-width: 1280px; width: 100%; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+.page-stack { display: grid; gap: 18px; }
 .grid { display: grid; gap: 16px; }
 .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }

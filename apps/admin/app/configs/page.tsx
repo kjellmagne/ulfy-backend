@@ -39,18 +39,22 @@ export default function ConfigsPage() {
   return (
     <RequireAuth>
       <div className="topbar"><h1>Config profiles</h1><span className="muted">{message}</span></div>
-      <div className="grid two">
+      <div className="page-stack">
         <form className="panel" onSubmit={save}>
           <h2>{selected ? "Edit profile" : "Create profile"}</h2>
-          {["name", "description", "speechProviderType", "speechEndpointUrl", "speechModelName", "presidioEndpointUrl", "presidioSecretRef", "privacyReviewProviderType", "privacyReviewEndpointUrl", "privacyReviewModel", "documentGenerationProviderType", "documentGenerationEndpointUrl", "documentGenerationModel", "templateRepositoryUrl", "telemetryEndpointUrl"].map((key) => (
-            <div className="field" key={key}><label>{key}</label><input className="input" value={form[key] ?? ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key === "name"} /></div>
-          ))}
+          <div className="grid three">
+            {["name", "description", "speechProviderType", "speechEndpointUrl", "speechModelName", "presidioEndpointUrl", "presidioSecretRef", "privacyReviewProviderType", "privacyReviewEndpointUrl", "privacyReviewModel", "documentGenerationProviderType", "documentGenerationEndpointUrl", "documentGenerationModel", "templateRepositoryUrl", "telemetryEndpointUrl"].map((key) => (
+              <div className="field" key={key}><label>{key}</label><input className="input" value={form[key] ?? ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key === "name"} /></div>
+            ))}
+          </div>
           <div className="row">
             <label><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> Privacy control</label>
             <label><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> PII control</label>
           </div>
-          <div className="field"><label>Feature flags JSON</label><textarea value={form.featureFlagsText} onChange={(e) => setForm({ ...form, featureFlagsText: e.target.value })} /></div>
-          <div className="field"><label>Allowed providers JSON</label><textarea value={form.allowedProviderRestrictionsText} onChange={(e) => setForm({ ...form, allowedProviderRestrictionsText: e.target.value })} /></div>
+          <div className="grid two">
+            <div className="field"><label>Feature flags JSON</label><textarea value={form.featureFlagsText} onChange={(e) => setForm({ ...form, featureFlagsText: e.target.value })} /></div>
+            <div className="field"><label>Allowed providers JSON</label><textarea value={form.allowedProviderRestrictionsText} onChange={(e) => setForm({ ...form, allowedProviderRestrictionsText: e.target.value })} /></div>
+          </div>
           <button className="button"><Save size={16} /> Save</button>
         </form>
         <div className="panel">
