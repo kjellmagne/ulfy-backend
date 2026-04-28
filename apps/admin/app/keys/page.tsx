@@ -10,7 +10,7 @@ export default function KeysPage() {
   const [enterprise, setEnterprise] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
-  const [generated, setGenerated] = useState("");
+  const [generated, setGenerated] = useState<{ key: string; kind: "single-user" | "enterprise"; label: string } | null>(null);
   const [form, setForm] = useState({ purchaserFullName: "", purchaserEmail: "", notes: "" });
   const [enterpriseForm, setEnterpriseForm] = useState({ tenantId: "", configProfileId: "", maxDevices: 25 });
 
@@ -24,17 +24,31 @@ export default function KeysPage() {
   async function createSingle(e: React.FormEvent) {
     e.preventDefault();
     const res = await api("/admin/single-keys", { method: "POST", body: JSON.stringify(form) });
-    setGenerated(res.activationKey); setForm({ purchaserFullName: "", purchaserEmail: "", notes: "" }); load();
+    setGenerated({ key: res.activationKey, kind: "single-user", label: form.purchaserEmail });
+    setForm({ purchaserFullName: "", purchaserEmail: "", notes: "" }); load();
   }
   async function createEnterprise(e: React.FormEvent) {
     e.preventDefault();
     const res = await api("/admin/enterprise-keys", { method: "POST", body: JSON.stringify(enterpriseForm) });
-    setGenerated(res.activationKey); load();
+    setGenerated({ key: res.activationKey, kind: "enterprise", label: res.tenant?.name ?? "Enterprise tenant" });
+    load();
   }
 
   return (
     <RequireAuth>
-      <div className="topbar"><h1>License keys</h1>{generated && <button className="button secondary" onClick={() => navigator.clipboard.writeText(generated)}><Copy size={16} /> {generated}</button>}</div>
+      <div className="topbar"><h1>License keys</h1><span className="muted">Full activation keys are shown once after generation.</span></div>
+      {generated && (
+        <div className="panel" style={{ marginBottom: 16, borderColor: "var(--accent)" }}>
+          <div className="topbar" style={{ marginBottom: 10 }}>
+            <div>
+              <h2 style={{ margin: 0 }}>Activation key generated</h2>
+              <div className="muted">{generated.kind} key for {generated.label}. Store it now; the full key is not saved in plain text.</div>
+            </div>
+            <button className="button" onClick={() => navigator.clipboard.writeText(generated.key)}><Copy size={16} /> Copy key</button>
+          </div>
+          <input className="input" readOnly value={generated.key} onFocus={(e) => e.currentTarget.select()} style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontWeight: 800 }} />
+        </div>
+      )}
       <div className="grid two">
         <form className="panel" onSubmit={createSingle}>
           <h2>Generate single-user key</h2>
@@ -52,6 +66,7 @@ export default function KeysPage() {
         </form>
       </div>
       <h2>Single-user keys</h2>
+      <p className="muted">The table shows only prefixes by design. Activation keys are hashed and cannot be recovered after this page changes.</p>
       <table className="table"><thead><tr><th>Purchaser</th><th>Prefix</th><th>Status</th><th>Device</th><th></th></tr></thead><tbody>{single.map((k) => <tr key={k.id}><td>{k.purchaserFullName}<br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.keyPrefix}</td><td><span className="badge">{k.status}</span></td><td>{k.deviceIdentifier ?? "-"}</td><td className="row"><button className="button danger" onClick={() => api(`/admin/single-keys/${k.id}/revoke`, { method: "PATCH" }).then(load)}><ShieldX size={14} /></button><button className="button secondary" onClick={() => api(`/admin/single-keys/${k.id}/reset`, { method: "PATCH" }).then(load)}><RotateCcw size={14} /></button></td></tr>)}</tbody></table>
       <h2>Enterprise keys</h2>
       <table className="table"><thead><tr><th>Tenant</th><th>Prefix</th><th>Status</th><th>Devices</th><th>Config</th></tr></thead><tbody>{enterprise.map((k) => <tr key={k.id}><td>{k.tenant?.name}</td><td>{k.keyPrefix}</td><td><span className="badge">{k.status}</span></td><td>{k.activations?.length ?? 0}/{k.maxDevices ?? "unlimited"}</td><td>{k.configProfile?.name}</td></tr>)}</tbody></table>
