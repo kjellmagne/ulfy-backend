@@ -160,6 +160,17 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pn
 docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pnpm prisma db seed
 ```
 
+## GitHub Docker Images
+
+GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0.0`, manual workflow runs, and pull requests. Pull requests build images for verification only. Pushes to `main` and tags publish images to GitHub Container Registry:
+
+- `ghcr.io/kjellmagne/ulfy-backend-api:latest`
+- `ghcr.io/kjellmagne/ulfy-backend-admin:latest`
+- `ghcr.io/kjellmagne/ulfy-backend-api:sha-<commit>`
+- `ghcr.io/kjellmagne/ulfy-backend-admin:sha-<commit>`
+
+The admin image uses the GitHub Actions repository variable `NEXT_PUBLIC_API_BASE_URL` at build time. If the variable is not set, it defaults to `http://localhost:4000`.
+
 Required deployment environment variables:
 
 - `DATABASE_URL` for non-compose deployments
