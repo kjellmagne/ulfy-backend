@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AdminRole {
+  superadmin
+  staff_admin
+  partner_admin
+}
+
+enum LicenseStatus {
+  active
+  revoked
+  expired
+  disabled
+}
+
+enum ActivationKind {
+  single
+  enterprise
+}
+
+enum TemplateState {
+  draft
+  published
+  archived
+}
+
+model AdminUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  fullName     String
+  passwordHash String
+  role         AdminRole @default(staff_admin)
+  partnerId    String?
+  partner      Partner?  @relation(fields: [partnerId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Partner {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  admins           AdminUser[]
+  singleKeys       SingleLicenseKey[]
+  enterpriseKeys   EnterpriseLicenseKey[]
+  tenants          Tenant[]
+}
+
+model Tenant {
+  id              String         @id @default(uuid())
+  name            String
+  slug            String         @unique
+  partnerId       String?
+  partner         Partner?       @relation(fields: [partnerId], references: [id])
+  configProfileId String?
+  configProfile   ConfigProfile? @relation(fields: [configProfileId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  enterpriseKeys EnterpriseLicenseKey[]
+  activations    DeviceActivation[]
+  templates      Template[]
+}
+
+model ConfigProfile {
+  id                               String   @id @default(uuid())
+  name                             String
+  description                      String?
+  speechProviderType               String?
+  speechEndpointUrl                String?
+  speechModelName                  String?
+  privacyControlEnabled            Boolean  @default(false)
+  piiControlEnabled                Boolean  @default(false)
+  presidioEndpointUrl              String?
+  presidioSecretRef                String?
+  privacyReviewProviderType        String?
+  privacyReviewEndpointUrl         String?
+  privacyReviewModel               String?
+  documentGenerationProviderType   String?
+  documentGenerationEndpointUrl    String?
+  documentGenerationModel          String?
+  templateRepositoryUrl            String?
+  telemetryEndpointUrl             String?
+  featureFlags                     Json     @default("{}")
+  allowedProviderRestrictions      Json     @default("[]")
+  defaultTemplateId                String?
+  createdAt                        DateTime @default(now())
+  updatedAt                        DateTime @updatedAt
+
+  tenants        Tenant[]
+  enterpriseKeys EnterpriseLicenseKey[]
+}
+
+model SingleLicenseKey {
+  id                  String        @id @default(uuid())
+  keyHash             String        @unique
+  keyPrefix           String
+  purchaserFullName   String
+  purchaserEmail      String
+  generatedAt         DateTime      @default(now())
+  purchaseDate        DateTime?
+  activatedAt         DateTime?
+  expiresAt           DateTime?
+  deviceIdentifier    String?
+  appVersion          String?
+  lastCheckIn         DateTime?
+  status              LicenseStatus @default(active)
+  notes               String?
+  partnerId           String?
+  partner             Partner?      @relation(fields: [partnerId], references: [id])
+  createdByAdminId    String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  activations DeviceActivation[]
+}
+
+model EnterpriseLicenseKey {
+  id               String        @id @default(uuid())
+  keyHash          String        @unique
+  keyPrefix        String
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  configProfileId  String
+  configProfile    ConfigProfile @relation(fields: [configProfileId], references: [id])
+  generatedAt      DateTime      @default(now())
+  expiresAt        DateTime?
+  maxDevices       Int?
+  status           LicenseStatus @default(active)
+  notes            String?
+  partnerId        String?
+  partner          Partner?      @relation(fields: [partnerId], references: [id])
+  createdByAdminId String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  activations DeviceActivation[]
+}
+
+model DeviceActivation {
+  id                     String                @id @default(uuid())
+  kind                   ActivationKind
+  singleLicenseKeyId     String?
+  singleLicenseKey       SingleLicenseKey?     @relation(fields: [singleLicenseKeyId], references: [id])
+  enterpriseLicenseKeyId String?
+  enterpriseLicenseKey   EnterpriseLicenseKey? @relation(fields: [enterpriseLicenseKeyId], references: [id])
+  tenantId               String?
+  tenant                 Tenant?               @relation(fields: [tenantId], references: [id])
+  deviceIdentifier       String
+  activationTokenHash    String                @unique
+  appVersion             String
+  activatedAt            DateTime              @default(now())
+  lastCheckIn            DateTime              @default(now())
+  status                 LicenseStatus         @default(active)
+  metadata               Json                  @default("{}")
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  @@unique([singleLicenseKeyId, deviceIdentifier])
+  @@unique([enterpriseLicenseKeyId, deviceIdentifier])
+}
+
+model ActivationAuditLog {
+  id             String   @id @default(uuid())
+  actorAdminId   String?
+  actorEmail     String?
+  action         String
+  targetType     String
+  targetId       String?
+  ipAddress      String?
+  userAgent      String?
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+}
+
+model TemplateCategory {
+  id          String     @id @default(uuid())
+  slug        String     @unique
+  title       String
+  description String?
+  templates   Template[]
+}
+
+model Template {
+  id               String            @id @default(uuid())
+  title            String
+  shortDescription String
+  categoryId       String?
+  category         TemplateCategory? @relation(fields: [categoryId], references: [id])
+  language         String
+  icon             String
+  tags             Json              @default("[]")
+  tenantId         String?
+  tenant           Tenant?           @relation(fields: [tenantId], references: [id])
+  state            TemplateState     @default(draft)
+  publishedVersionId String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  versions TemplateVersion[]
+}
+
+model TemplateVersion {
+  id          String        @id @default(uuid())
+  templateId  String
+  template    Template      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version     String
+  yamlContent String
+  state       TemplateState @default(draft)
+  createdByAdminId String?
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+
+  @@unique([templateId, version])
+}

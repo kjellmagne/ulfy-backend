@@ -1,0 +1,175 @@
+# Ulfy Backend
+
+Internal/admin-controlled backend monorepo for Ulfy licensing, enterprise configuration, and YAML template management.
+
+## Local Development
+
+Docker is not required for daily development. Run PostgreSQL locally on your machine and point `DATABASE_URL` at it.
+
+Required tools:
+
+- Node.js 22+
+- pnpm via Corepack: `corepack enable`
+- PostgreSQL 15+
+
+Setup:
+
+```bash
+cd /Users/kjellmagnegabrielsen/ulfy-backend
+cp .env.example .env
+pnpm install
+pnpm prisma:migrate
+pnpm prisma:seed
+pnpm dev:api
+```
+
+In another terminal:
+
+```bash
+cd /Users/kjellmagnegabrielsen/ulfy-backend
+pnpm dev:admin
+```
+
+Default local URLs:
+
+- API: `http://localhost:4000/api/v1`
+- Swagger: `http://localhost:4000/api/docs`
+- Admin UI: `http://localhost:3000`
+
+Seed admin user:
+
+- Email: `admin@ulfy.local`
+- Password: `ChangeMe123!`
+
+To choose a different first admin password during seeding:
+
+```bash
+SEED_ADMIN_PASSWORD='YourStrongPassword123!' pnpm prisma:seed
+```
+
+Useful scripts:
+
+```bash
+pnpm dev:api
+pnpm dev:admin
+pnpm build
+pnpm lint
+pnpm test
+pnpm prisma:migrate
+pnpm prisma:seed
+```
+
+## API Examples
+
+Single activation:
+
+```bash
+curl -X POST http://localhost:4000/api/v1/activate/single \
+  -H 'Content-Type: application/json' \
+  -d '{"activationKey":"ULFY-S-...","deviceIdentifier":"iphone-abc","appVersion":"1.0.0"}'
+```
+
+Enterprise activation:
+
+```bash
+curl -X POST http://localhost:4000/api/v1/activate/enterprise \
+  -H 'Content-Type: application/json' \
+  -d '{"activationKey":"ULFY-E-...","deviceIdentifier":"iphone-enterprise-1","appVersion":"1.0.0"}'
+```
+
+Sample enterprise config response:
+
+```json
+{
+  "success": true,
+  "activationToken": "...",
+  "tenant": { "id": "...", "name": "Acme Health", "slug": "acme-health" },
+  "config": {
+    "speechProviderType": "openai-compatible",
+    "speechEndpointUrl": "https://speech.example.internal/v1/audio/transcriptions",
+    "privacyControlEnabled": true,
+    "piiControlEnabled": true,
+    "templateRepositoryUrl": "http://localhost:4000/api/v1/templates/manifest",
+    "featureFlags": { "enterpriseTemplates": true, "privacyReview": true },
+    "allowedProviderRestrictions": ["openai-compatible", "internal"]
+  }
+}
+```
+
+Template manifest:
+
+```bash
+curl http://localhost:4000/api/v1/templates/manifest
+```
+
+Sample manifest response:
+
+```json
+{
+  "name": "Ulfy Templates",
+  "templates": [
+    {
+      "id": "00000000-0000-0000-0000-000000000201",
+      "title": "Personlig diktat / logg",
+      "short_description": "Kort beskrivelse",
+      "category": "personlig_diktat",
+      "language": "nb-NO",
+      "version": "1.0.0",
+      "icon": "waveform.and.mic",
+      "tags": ["dictation", "personal"],
+      "download_url": "/api/v1/templates/00000000-0000-0000-0000-000000000201/download",
+      "updated_at": "2026-04-28T12:00:00.000Z"
+    }
+  ]
+}
+```
+
+## Admin UI
+
+The admin UI supports:
+
+- Admin login
+- Single-user key generation
+- Enterprise key generation
+- Activation inspection
+- Single key revoke/reset
+- Config profile creation and editing
+- Template metadata and YAML editing
+- YAML validation before save
+- Template publish/archive
+- Version history display
+- Audit log listing
+
+There are no public signup, billing, self-service onboarding, or tenant portal routes.
+
+## Docker Deployment
+
+Docker is included for deployment, pull-down setup, server packaging, and production-like verification. It is not the primary local development path.
+
+```bash
+cd /Users/kjellmagnegabrielsen/ulfy-backend
+cp infra/.env.example infra/.env
+docker compose --env-file infra/.env -f infra/docker-compose.yml build
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
+```
+
+Run migrations and seed inside the deployment stack:
+
+```bash
+docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pnpm prisma migrate deploy
+docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pnpm prisma db seed
+```
+
+Required deployment environment variables:
+
+- `DATABASE_URL` for non-compose deployments
+- `JWT_SECRET`
+- `ACTIVATION_TOKEN_SECRET`
+- `NEXT_PUBLIC_API_BASE_URL`
+
+## v1 Simplifications
+
+- Partner-admin scoping is represented in the model but not fully enforced on every admin list endpoint.
+- Config profiles are manually managed JSON-backed records, without an advanced policy engine.
+- Activation tokens are long-lived JWTs whose hashes are stored for lookup and revocation.
+- Template schema validation is intentionally small and focused on the current Ulfy YAML shape.
