@@ -1,8 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import * as yaml from "js-yaml";
-import { TemplateYamlSchema } from "@ulfy/contracts";
+import { z } from "zod";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../common/audit.service";
+
+const TemplateYamlSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().min(2),
+  language: z.string().min(2),
+  sections: z.array(z.object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    prompt: z.string().min(1)
+  })).min(1)
+});
 
 @Injectable()
 export class TemplatesService {
