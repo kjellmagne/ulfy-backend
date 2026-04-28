@@ -1,8 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { createActivationKey, sha256 } from "../apps/api/src/common/crypto";
+import { createHash, randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
+
+function sha256(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function createActivationKey(prefix: "ULFY-S" | "ULFY-E") {
+  const body = randomBytes(18).toString("base64url").toUpperCase();
+  return `${prefix}-${body.slice(0, 6)}-${body.slice(6, 12)}-${body.slice(12, 18)}-${body.slice(18, 24)}`;
+}
 
 async function main() {
   const passwordHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!", 12);
