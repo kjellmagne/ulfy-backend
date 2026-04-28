@@ -5,6 +5,7 @@ import * as yaml from "js-yaml";
 import { Archive, CheckCircle, Download, Save } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { api } from "../../lib/api";
+import { appPath } from "../../lib/base-path";
 
 const starterYaml = `title: New Ulfy template
 language: nb-NO
@@ -67,7 +68,7 @@ export default function TemplatesPage() {
         </form>
         <div className="panel">
           <h2>Library</h2>
-          <table className="table"><tbody>{templates.map((t) => <tr key={t.id}><td><b>{t.title}</b><br /><span className="muted">{t.shortDescription}</span><br />{t.versions?.map((v: any) => <span key={v.id} className="badge">{v.version} {v.state}</span>)}</td><td className="row"><button className="button secondary" onClick={() => edit(t)}>Edit</button>{t.versions?.[0] && <button className="button" onClick={() => api(`/admin/templates/${t.id}/publish/${t.versions[0].id}`, { method: "POST" }).then(load)}><CheckCircle size={14} /></button>}<a className="button secondary" href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}/api/v1/templates/${t.id}/download`}><Download size={14} /></a><button className="button danger" onClick={() => api(`/admin/templates/${t.id}/archive`, { method: "PATCH" }).then(load)}><Archive size={14} /></button></td></tr>)}</tbody></table>
+          <table className="table"><tbody>{templates.map((t) => <tr key={t.id}><td><b>{t.title}</b><br /><span className="muted">{t.shortDescription}</span><br />{t.versions?.map((v: any) => <span key={v.id} className="badge">{v.version} {v.state}</span>)}</td><td className="row"><button className="button secondary" onClick={() => edit(t)}>Edit</button>{t.versions?.[0] && <button className="button" onClick={() => api(`/admin/templates/${t.id}/publish/${t.versions[0].id}`, { method: "POST" }).then(load)}><CheckCircle size={14} /></button>}<a className="button secondary" href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${appPath(`/api/v1/templates/${t.id}/download`)}`}><Download size={14} /></a><button className="button danger" onClick={() => api(`/admin/templates/${t.id}/archive`, { method: "PATCH" }).then(load)}><Archive size={14} /></button></td></tr>)}</tbody></table>
         </div>
       </div>
     </RequireAuth>

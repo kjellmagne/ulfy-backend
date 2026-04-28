@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { appPath } from "../../lib/base-path";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("admin@ulfy.local");
@@ -10,7 +11,7 @@ export default function LoginPage() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}/api/v1/auth/login`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${appPath("/api/v1/auth/login")}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
@@ -21,7 +22,7 @@ export default function LoginPage() {
     }
     const data = await res.json();
     localStorage.setItem("ulfy_admin_token", data.accessToken);
-    window.location.href = "/";
+    window.location.href = appPath("/");
   }
 
   return (
