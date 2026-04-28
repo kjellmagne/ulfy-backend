@@ -190,7 +190,7 @@ docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma db seed
 ```
 
-The Kvasetech/APISIX deployment serves Ulfy at `https://kvasetech.com/backend/`. In this setup the admin app consistently owns `/backend`, while APISIX strips `/backend` only for API requests:
+The Kvasetech/APISIX deployment serves Ulfy publicly at `https://kvasetech.com/backend/`. APISIX strips `/backend` before proxying to both upstream containers, so the API and admin services both run internally at `/`. The admin image still emits public `/backend/...` links and static asset URLs.
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml pull

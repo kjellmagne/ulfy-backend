@@ -14,7 +14,8 @@ ARG NEXT_PUBLIC_BASE_PATH=/backend
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 RUN pnpm --filter @ulfy/admin build
-RUN node -e 'const fs=require("fs"); const manifest=JSON.parse(fs.readFileSync("apps/admin/.next/routes-manifest.json","utf8")); if (process.env.NEXT_PUBLIC_BASE_PATH && manifest.basePath !== process.env.NEXT_PUBLIC_BASE_PATH) { throw new Error("Admin image basePath mismatch: expected "+process.env.NEXT_PUBLIC_BASE_PATH+", got "+manifest.basePath); }'
+RUN node -e 'const fs=require("fs"); const manifest=JSON.parse(fs.readFileSync("apps/admin/.next/routes-manifest.json","utf8")); if (manifest.basePath !== "") { throw new Error("Admin image must run internally at root behind APISIX; got basePath "+manifest.basePath); }'
+RUN if [ -n "$NEXT_PUBLIC_BASE_PATH" ]; then grep -R "${NEXT_PUBLIC_BASE_PATH}/_next" apps/admin/.next/server >/dev/null; fi
 
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -26,7 +27,6 @@ RUN corepack enable
 COPY --from=build /app/package.json /app/pnpm-workspace.yaml ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/admin/.next ./apps/admin/.next
-COPY --from=build /app/apps/admin/next.config.ts ./apps/admin/next.config.ts
 COPY --from=build /app/apps/admin/public ./apps/admin/public
 COPY --from=build /app/apps/admin/package.json ./apps/admin/package.json
 COPY --from=build /app/apps/admin/node_modules ./apps/admin/node_modules
