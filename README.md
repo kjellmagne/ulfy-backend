@@ -160,6 +160,24 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pn
 docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pnpm prisma db seed
 ```
 
+For an Ubuntu server behind APISIX, use the server compose file instead. It keeps Postgres private and only binds API/admin to localhost:
+
+```bash
+cp infra/.env.server.example infra/.env.server
+docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml build
+docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml up -d
+docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml run --rm api pnpm prisma migrate deploy
+docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml run --rm api pnpm prisma db seed
+```
+
+APISIX can route the same public HTTPS hostname to both services:
+
+```bash
+APISIX_ADMIN_KEY='your-admin-key' \
+ULFY_HOST='ulfy.example.com' \
+bash infra/apisix/ulfy-routes.sh
+```
+
 ## GitHub Docker Images
 
 GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0.0`, manual workflow runs, and pull requests. Pull requests build images for verification only. Pushes to `main` and tags publish images to GitHub Container Registry:
