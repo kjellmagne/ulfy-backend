@@ -61,6 +61,19 @@ model Tenant {
   id              String         @id @default(uuid())
   name            String
   slug            String         @unique
+  legalName       String?
+  organizationNumber String?
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  billingEmail    String?
+  addressLine1    String?
+  addressLine2    String?
+  postalCode      String?
+  city            String?
+  country         String         @default("NO")
+  status          String         @default("active")
+  notes           String?
   partnerId       String?
   partner         Partner?       @relation(fields: [partnerId], references: [id])
   configProfileId String?
@@ -113,8 +126,10 @@ model SingleLicenseKey {
   activatedAt         DateTime?
   expiresAt           DateTime?
   deviceIdentifier    String?
+  deviceSerialNumber  String?
   appVersion          String?
   lastCheckIn         DateTime?
+  lastSeenAt          DateTime?
   status              LicenseStatus @default(active)
   notes               String?
   partnerId           String?
@@ -158,10 +173,12 @@ model DeviceActivation {
   tenantId               String?
   tenant                 Tenant?               @relation(fields: [tenantId], references: [id])
   deviceIdentifier       String
+  deviceSerialNumber     String?
   activationTokenHash    String                @unique
   appVersion             String
   activatedAt            DateTime              @default(now())
   lastCheckIn            DateTime              @default(now())
+  lastSeenAt             DateTime              @default(now())
   status                 LicenseStatus         @default(active)
   metadata               Json                  @default("{}")
   createdAt              DateTime              @default(now())

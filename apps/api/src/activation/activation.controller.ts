@@ -14,6 +14,11 @@ class ActivateDto {
   @MinLength(3)
   deviceIdentifier!: string;
 
+  @ApiProperty({ example: "C39XK123N72Q", required: false, description: "Optional physical device serial number or managed-device serial from MDM. Stored for admin audit/support, not used as the only binding secret." })
+  @IsOptional()
+  @IsString()
+  deviceSerialNumber?: string;
+
   @ApiProperty({ example: "1.0.0", description: "Installed iPhone app version." })
   @IsString()
   appVersion!: string;
@@ -24,6 +29,16 @@ class RefreshDto {
   @IsString()
   @MinLength(20)
   activationToken!: string;
+
+  @ApiProperty({ example: "ios-vendor-id-or-installation-id", required: false, description: "Optional device identifier to confirm/update during check-in." })
+  @IsOptional()
+  @IsString()
+  deviceIdentifier?: string;
+
+  @ApiProperty({ example: "C39XK123N72Q", required: false, description: "Optional device serial number to update during check-in." })
+  @IsOptional()
+  @IsString()
+  deviceSerialNumber?: string;
 
   @ApiProperty({ example: "1.0.1", required: false })
   @IsOptional()
@@ -47,6 +62,11 @@ export class ActivationController {
         activationToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
         activationId: "4b3d9ce0-8dd5-4f65-9198-71df8b5ff3c7",
         license: { type: "single", status: "active" },
+        device: {
+          deviceIdentifier: "ios-vendor-id-or-installation-id",
+          deviceSerialNumber: "C39XK123N72Q",
+          lastSeenAt: "2026-04-29T10:15:00.000Z"
+        },
         config: {}
       }
     }
@@ -68,6 +88,11 @@ export class ActivationController {
         activationToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
         activationId: "c2dcfc17-8a83-4452-a9bb-952fd916510d",
         tenant: { id: "6c7a6b92-fd2e-4a52-aa42-c675502a11ce", name: "Acme Health", slug: "acme-health" },
+        device: {
+          deviceIdentifier: "ios-vendor-id-or-installation-id",
+          deviceSerialNumber: "C39XK123N72Q",
+          lastSeenAt: "2026-04-29T10:15:00.000Z"
+        },
         config: {
           id: "b5e33e6f-5ff1-4e8d-a7cc-2f2e9781612f",
           name: "Default Enterprise Profile",
@@ -102,10 +127,10 @@ export class ActivationController {
   @Post("activation/refresh")
   @ApiOperation({ summary: "Refresh/check in an activation", description: "Validates the activation token, updates last check-in/app version, and returns current status/config." })
   @ApiBody({ type: RefreshDto })
-  @ApiOkResponse({ description: "Activation token accepted.", schema: { example: { success: true, status: "active", kind: "enterprise", config: { featureFlags: { enterpriseTemplates: true } } } } })
+  @ApiOkResponse({ description: "Activation token accepted.", schema: { example: { success: true, status: "active", kind: "enterprise", lastSeenAt: "2026-04-29T10:20:00.000Z", device: { deviceIdentifier: "ios-vendor-id-or-installation-id", deviceSerialNumber: "C39XK123N72Q", lastSeenAt: "2026-04-29T10:20:00.000Z" }, config: { featureFlags: { enterpriseTemplates: true } } } } })
   @ApiForbiddenResponse({ description: "Invalid/revoked/disabled activation token.", schema: { example: { success: false, error: "Invalid activation token" } } })
   refresh(@Body() dto: RefreshDto) {
-    return this.activation.refresh(dto.activationToken, dto.appVersion);
+    return this.activation.refresh(dto);
   }
 
   @Get("config/effective")

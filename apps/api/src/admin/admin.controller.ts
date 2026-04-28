@@ -144,12 +144,86 @@ class TemplateDto {
 
 class TenantDto {
   @ApiProperty({ example: "Acme Health" })
+  @IsString()
   name!: string;
+
   @ApiProperty({ example: "acme-health" })
+  @IsString()
   slug!: string;
+
+  @ApiProperty({ required: false, example: "Acme Health AS" })
+  @IsOptional()
+  @IsString()
+  legalName?: string;
+
+  @ApiProperty({ required: false, example: "999888777" })
+  @IsOptional()
+  @IsString()
+  organizationNumber?: string;
+
+  @ApiProperty({ required: false, example: "Kari Nordmann" })
+  @IsOptional()
+  @IsString()
+  contactName?: string;
+
+  @ApiProperty({ required: false, example: "kari@acme.example" })
+  @IsOptional()
+  @IsEmail()
+  contactEmail?: string;
+
+  @ApiProperty({ required: false, example: "+47 900 00 000" })
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @ApiProperty({ required: false, example: "billing@acme.example" })
+  @IsOptional()
+  @IsEmail()
+  billingEmail?: string;
+
+  @ApiProperty({ required: false, example: "Storgata 1" })
+  @IsOptional()
+  @IsString()
+  addressLine1?: string;
+
+  @ApiProperty({ required: false, example: "Floor 4" })
+  @IsOptional()
+  @IsString()
+  addressLine2?: string;
+
+  @ApiProperty({ required: false, example: "0155" })
+  @IsOptional()
+  @IsString()
+  postalCode?: string;
+
+  @ApiProperty({ required: false, example: "Oslo" })
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @ApiProperty({ required: false, example: "NO" })
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @ApiProperty({ required: false, example: "active" })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiProperty({ required: false, example: "Enterprise customer managed by staff admins." })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
   @ApiProperty({ required: false, example: "partner-uuid" })
+  @IsOptional()
+  @IsString()
   partnerId?: string;
+
   @ApiProperty({ required: false, example: "config-profile-uuid" })
+  @IsOptional()
+  @IsString()
   configProfileId?: string;
 }
 
@@ -170,16 +244,17 @@ export class AdminController {
 
   @Get("overview")
   @ApiOperation({ summary: "Admin dashboard overview", description: "Counts and latest audit entries for the internal admin dashboard." })
-  @ApiOkResponse({ description: "Overview counters and recent audit logs.", schema: { example: { singleKeys: 12, enterpriseKeys: 3, activations: 8, templates: 5, audits: [] } } })
+  @ApiOkResponse({ description: "Overview counters and recent audit logs.", schema: { example: { singleKeys: 12, enterpriseKeys: 3, activations: 8, activeUniqueDevices: 7, templates: 5, audits: [] } } })
   async overview() {
-    const [singleKeys, enterpriseKeys, activations, templates, audits] = await Promise.all([
+    const [singleKeys, enterpriseKeys, activations, activeUniqueDevices, templates, audits] = await Promise.all([
       this.prisma.singleLicenseKey.count(),
       this.prisma.enterpriseLicenseKey.count(),
       this.prisma.deviceActivation.count(),
+      this.prisma.deviceActivation.findMany({ where: { status: "active" }, select: { deviceIdentifier: true } }),
       this.prisma.template.count(),
       this.prisma.activationAuditLog.findMany({ orderBy: { createdAt: "desc" }, take: 25 })
     ]);
-    return { singleKeys, enterpriseKeys, activations, templates, audits };
+    return { singleKeys, enterpriseKeys, activations, activeUniqueDevices: new Set(activeUniqueDevices.map((item) => item.deviceIdentifier)).size, templates, audits };
   }
 
   @Get("single-keys")
@@ -228,7 +303,7 @@ export class AdminController {
   @ApiOkResponse({ description: "License key reset." })
   async resetSingle(@Param("id") id: string, @Req() req: any) {
     await this.prisma.deviceActivation.deleteMany({ where: { singleLicenseKeyId: id } });
-    const key = await this.prisma.singleLicenseKey.update({ where: { id }, data: { deviceIdentifier: null, activatedAt: null, lastCheckIn: null, status: "active" } });
+    const key = await this.prisma.singleLicenseKey.update({ where: { id }, data: { deviceIdentifier: null, deviceSerialNumber: null, activatedAt: null, lastCheckIn: null, lastSeenAt: null, status: "active" } });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "license.single.reset", targetType: "SingleLicenseKey", targetId: id });
     return key;
   }
@@ -263,18 +338,49 @@ export class AdminController {
   }
 
   @Get("tenants")
-  @ApiOperation({ summary: "List tenants" })
-  @ApiOkResponse({ description: "Tenant list." })
-  tenants() {
-    return this.prisma.tenant.findMany({ orderBy: { name: "asc" }, include: { configProfile: true, partner: true } });
+  @ApiOperation({ summary: "List tenants", description: "Returns enterprise/customer tenant records with active unique-device license usage counts." })
+  @ApiOkResponse({ description: "Tenant list with license usage.", schema: { example: [{ id: "tenant-uuid", name: "Acme Health", slug: "acme-health", contactEmail: "kari@acme.example", licenseUsage: { activeDevices: 8, totalDevices: 10, enterpriseKeys: 2, licensedDevices: 100, unlimited: false } }] } })
+  async tenants() {
+    const tenants = await this.prisma.tenant.findMany({
+      orderBy: { name: "asc" },
+      include: { configProfile: true, partner: true, activations: true, enterpriseKeys: true }
+    });
+    return tenants.map((tenant) => ({ ...tenant, licenseUsage: this.tenantLicenseUsage(tenant) }));
   }
 
   @Post("tenants")
-  @ApiOperation({ summary: "Create tenant" })
+  @ApiOperation({ summary: "Create tenant/customer", description: "Registers an enterprise customer/tenant and optional contact/legal/billing details." })
   @ApiBody({ type: TenantDto })
   @ApiOkResponse({ description: "Tenant created." })
-  tenantsCreate(@Body() dto: TenantDto) {
-    return this.prisma.tenant.create({ data: dto });
+  async tenantsCreate(@Body() dto: TenantDto, @Req() req: any) {
+    const tenant = await this.prisma.tenant.create({ data: this.cleanTenant(dto) as any });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "tenant.create", targetType: "Tenant", targetId: tenant.id });
+    return tenant;
+  }
+
+  @Patch("tenants/:id")
+  @ApiOperation({ summary: "Update tenant/customer details" })
+  @ApiParam({ name: "id", description: "Tenant UUID." })
+  @ApiBody({ type: TenantDto })
+  @ApiOkResponse({ description: "Tenant updated." })
+  async tenantsUpdate(@Param("id") id: string, @Body() dto: Partial<TenantDto>, @Req() req: any) {
+    const tenant = await this.prisma.tenant.update({ where: { id }, data: this.cleanTenant(dto) as any });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "tenant.update", targetType: "Tenant", targetId: id });
+    return tenant;
+  }
+
+  @Get("license-usage")
+  @ApiOperation({ summary: "Enterprise license usage summary", description: "Shows unique active device counts per tenant and global active unique-device totals." })
+  @ApiOkResponse({ description: "License usage summary.", schema: { example: { activeUniqueDevices: 8, tenants: [{ tenantId: "tenant-uuid", name: "Acme Health", activeDevices: 8, totalDevices: 10, licensedDevices: 100, unlimited: false }] } } })
+  async licenseUsage() {
+    const tenants = await this.prisma.tenant.findMany({ orderBy: { name: "asc" }, include: { activations: true, enterpriseKeys: true } });
+    const activeDeviceSet = new Set<string>();
+    const tenantUsage = tenants.map((tenant) => {
+      const usage = this.tenantLicenseUsage(tenant);
+      tenant.activations.filter((activation) => activation.status === "active").forEach((activation) => activeDeviceSet.add(activation.deviceIdentifier));
+      return { tenantId: tenant.id, name: tenant.name, slug: tenant.slug, ...usage };
+    });
+    return { activeUniqueDevices: activeDeviceSet.size, tenants: tenantUsage };
   }
 
   @Get("config-profiles")
@@ -390,7 +496,7 @@ export class AdminController {
   @ApiOperation({ summary: "List device activations" })
   @ApiOkResponse({ description: "Device activation list." })
   activations() {
-    return this.prisma.deviceActivation.findMany({ orderBy: { lastCheckIn: "desc" }, include: { singleLicenseKey: true, enterpriseLicenseKey: { include: { tenant: true } } } });
+    return this.prisma.deviceActivation.findMany({ orderBy: { lastSeenAt: "desc" }, include: { singleLicenseKey: true, enterpriseLicenseKey: { include: { tenant: true } } } });
   }
 
   @Get("audit-logs")
@@ -405,6 +511,45 @@ export class AdminController {
       ...dto,
       featureFlags: dto.featureFlags ?? {},
       allowedProviderRestrictions: dto.allowedProviderRestrictions ?? []
+    };
+  }
+
+  private cleanTenant(dto: Partial<TenantDto>) {
+    return {
+      name: dto.name,
+      slug: dto.slug,
+      legalName: dto.legalName,
+      organizationNumber: dto.organizationNumber,
+      contactName: dto.contactName,
+      contactEmail: dto.contactEmail,
+      contactPhone: dto.contactPhone,
+      billingEmail: dto.billingEmail,
+      addressLine1: dto.addressLine1,
+      addressLine2: dto.addressLine2,
+      postalCode: dto.postalCode,
+      city: dto.city,
+      country: dto.country ?? undefined,
+      status: dto.status ?? undefined,
+      notes: dto.notes,
+      partnerId: dto.partnerId,
+      configProfileId: dto.configProfileId
+    };
+  }
+
+  private tenantLicenseUsage(tenant: { activations: Array<{ status: string; deviceIdentifier: string }>; enterpriseKeys: Array<{ maxDevices: number | null; status: string }> }) {
+    const activeDevices = new Set(tenant.activations.filter((activation) => activation.status === "active").map((activation) => activation.deviceIdentifier));
+    const totalDevices = new Set(tenant.activations.map((activation) => activation.deviceIdentifier));
+    const activeKeys = tenant.enterpriseKeys.filter((key) => key.status === "active");
+    const unlimited = activeKeys.some((key) => key.maxDevices == null);
+    const licensedDevices = unlimited ? null : activeKeys.reduce((sum, key) => sum + (key.maxDevices ?? 0), 0);
+    return {
+      activeDevices: activeDevices.size,
+      totalDevices: totalDevices.size,
+      enterpriseKeys: tenant.enterpriseKeys.length,
+      activeEnterpriseKeys: activeKeys.length,
+      licensedDevices,
+      unlimited,
+      availableDevices: licensedDevices == null ? null : Math.max(licensedDevices - activeDevices.size, 0)
     };
   }
 }

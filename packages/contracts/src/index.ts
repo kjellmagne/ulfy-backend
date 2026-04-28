@@ -5,6 +5,7 @@ export const ActivationStatus = z.enum(["active", "revoked", "expired", "disable
 export const SingleActivationRequest = z.object({
   activationKey: z.string().min(12),
   deviceIdentifier: z.string().min(3),
+  deviceSerialNumber: z.string().min(1).optional(),
   appVersion: z.string().min(1)
 });
 
@@ -12,6 +13,8 @@ export const EnterpriseActivationRequest = SingleActivationRequest;
 
 export const RefreshRequest = z.object({
   activationToken: z.string().min(20),
+  deviceIdentifier: z.string().min(3).optional(),
+  deviceSerialNumber: z.string().min(1).optional(),
   appVersion: z.string().optional()
 });
 

@@ -61,10 +61,27 @@ async function main() {
 
   const tenant = await prisma.tenant.upsert({
     where: { slug: "acme-health" },
-    update: {},
+    update: {
+      legalName: "Acme Health AS",
+      organizationNumber: "999888777",
+      contactName: "Kari Nordmann",
+      contactEmail: "kari@acme-health.example",
+      billingEmail: "billing@acme-health.example",
+      city: "Oslo",
+      country: "NO",
+      status: "active"
+    },
     create: {
       name: "Acme Health",
       slug: "acme-health",
+      legalName: "Acme Health AS",
+      organizationNumber: "999888777",
+      contactName: "Kari Nordmann",
+      contactEmail: "kari@acme-health.example",
+      billingEmail: "billing@acme-health.example",
+      city: "Oslo",
+      country: "NO",
+      status: "active",
       configProfileId: profile.id
     }
   });

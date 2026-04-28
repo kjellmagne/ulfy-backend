@@ -12,7 +12,7 @@ export default function Home() {
       <div className="topbar"><h1>Overview</h1><span className="muted">Internal control plane</span></div>
       <div className="grid four">
         <div className="grid three">
-          {["singleKeys", "enterpriseKeys", "activations", "templates"].map((key) => (
+          {["singleKeys", "enterpriseKeys", "activations", "activeUniqueDevices", "templates"].map((key) => (
             <div className="card" key={key}><div className="muted">{key}</div><h2>{data?.[key] ?? "-"}</h2></div>
           ))}
         </div>

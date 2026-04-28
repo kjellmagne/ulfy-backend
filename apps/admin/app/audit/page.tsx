@@ -13,7 +13,7 @@ export default function AuditPage() {
       <div className="topbar"><h1>Audit and activations</h1></div>
       <div className="panel">
         <h2>Device activations</h2>
-        <table className="table"><thead><tr><th>Kind</th><th>Device</th><th>Status</th><th>Last check-in</th></tr></thead><tbody>{activations.map((a) => <tr key={a.id}><td>{a.kind}</td><td>{a.deviceIdentifier}</td><td>{a.status}</td><td>{new Date(a.lastCheckIn).toLocaleString()}</td></tr>)}</tbody></table>
+        <table className="table"><thead><tr><th>Kind</th><th>Device</th><th>Serial</th><th>Status</th><th>Last seen</th></tr></thead><tbody>{activations.map((a) => <tr key={a.id}><td>{a.kind}</td><td>{a.deviceIdentifier}</td><td>{a.deviceSerialNumber ?? "-"}</td><td>{a.status}</td><td>{new Date(a.lastSeenAt ?? a.lastCheckIn).toLocaleString()}</td></tr>)}</tbody></table>
       </div>
       <div className="panel" style={{ marginTop: 16 }}>
         <h2>Audit history</h2>

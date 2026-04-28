@@ -67,7 +67,7 @@ Single activation:
 ```bash
 curl -X POST http://localhost:4000/api/v1/activate/single \
   -H 'Content-Type: application/json' \
-  -d '{"activationKey":"ULFY-S-...","deviceIdentifier":"iphone-abc","appVersion":"1.0.0"}'
+  -d '{"activationKey":"ULFY-S-...","deviceIdentifier":"iphone-abc","deviceSerialNumber":"C39XK123N72Q","appVersion":"1.0.0"}'
 ```
 
 Enterprise activation:
@@ -75,8 +75,18 @@ Enterprise activation:
 ```bash
 curl -X POST http://localhost:4000/api/v1/activate/enterprise \
   -H 'Content-Type: application/json' \
-  -d '{"activationKey":"ULFY-E-...","deviceIdentifier":"iphone-enterprise-1","appVersion":"1.0.0"}'
+  -d '{"activationKey":"ULFY-E-...","deviceIdentifier":"iphone-enterprise-1","deviceSerialNumber":"C39XK123N72Q","appVersion":"1.0.0"}'
 ```
+
+License refresh/check-in:
+
+```bash
+curl -X POST http://localhost:4000/api/v1/activation/refresh \
+  -H 'Content-Type: application/json' \
+  -d '{"activationToken":"...","deviceIdentifier":"iphone-enterprise-1","deviceSerialNumber":"C39XK123N72Q","appVersion":"1.0.1"}'
+```
+
+`deviceIdentifier` is the stable value used for license binding and unique-device counts. `deviceSerialNumber` is stored for admin support/audit when the app or MDM environment can provide it. Each activation and refresh updates `lastSeenAt` on the device activation record.
 
 Sample enterprise config response:
 
@@ -85,6 +95,11 @@ Sample enterprise config response:
   "success": true,
   "activationToken": "...",
   "tenant": { "id": "...", "name": "Acme Health", "slug": "acme-health" },
+  "device": {
+    "deviceIdentifier": "iphone-enterprise-1",
+    "deviceSerialNumber": "C39XK123N72Q",
+    "lastSeenAt": "2026-04-29T10:15:00.000Z"
+  },
   "config": {
     "speechProviderType": "openai-compatible",
     "speechEndpointUrl": "https://speech.example.internal/v1/audio/transcriptions",
@@ -132,6 +147,8 @@ The admin UI supports:
 - Admin login
 - Single-user key generation
 - Enterprise key generation
+- Enterprise customer/tenant registration
+- Active unique-device license usage counts
 - Activation inspection
 - Single key revoke/reset
 - Config profile creation and editing
