@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader } from "../../components/AdminUI";
 import { api } from "../../lib/api";
@@ -33,6 +33,15 @@ export default function ConfigsPage() {
   function edit(profile: any) {
     setSelected(profile.id);
     setForm({ ...empty, ...profile, featureFlagsText: JSON.stringify(profile.featureFlags ?? {}, null, 2), allowedProviderRestrictionsText: JSON.stringify(profile.allowedProviderRestrictions ?? [], null, 2) });
+    setMessage(`Editing ${profile.name}`);
+    setError("");
+  }
+
+  function createNew() {
+    setSelected("");
+    setForm(empty);
+    setMessage("Creating new profile");
+    setError("");
   }
 
   async function save(e: React.FormEvent) {
@@ -50,6 +59,19 @@ export default function ConfigsPage() {
     }
   }
 
+  async function deleteProfile(profile: any) {
+    if (!window.confirm(`Delete ${profile.name}? This cannot be undone.`)) return;
+    setError("");
+    try {
+      await api(`/admin/config-profiles/${profile.id}`, { method: "DELETE" });
+      if (selected === profile.id) createNew();
+      setMessage("Profile deleted");
+      await load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
   return (
     <RequireAuth>
       <PageHeader title="Config profiles" description="Central app settings returned to enterprise activations and refresh checks." meta={message && <span className="badge status-active">{message}</span>} />
@@ -57,13 +79,13 @@ export default function ConfigsPage() {
       {loading ? <LoadingPanel label="Loading config profiles" /> : (
       <div className="page-stack">
         <div className="panel">
-          <PanelHeader title="Profiles" description="Select a profile to edit or assign it when generating enterprise keys." />
+          <PanelHeader title="Profiles" description="Select a profile to edit or assign it when generating enterprise keys." actions={<button className="button" onClick={createNew}><Plus size={16} /> New profile</button>} />
           {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-            <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Speech provider</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.speechProviderType || "-"}</td><td>{p.templateRepositoryUrl || "-"}</td><td className="actions"><button className="button secondary" onClick={() => edit(p)}>Edit</button></td></tr>)}</tbody></table></div>
+            <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Speech provider</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.speechProviderType || "-"}</td><td>{p.templateRepositoryUrl || "-"}</td><td className="row actions"><button className="button secondary" onClick={() => edit(p)}>Edit</button><button className="button danger" onClick={() => deleteProfile(p)}><Trash2 size={14} /> Delete</button></td></tr>)}</tbody></table></div>
           )}
         </div>
         <form className="panel" onSubmit={save}>
-          <PanelHeader title={selected ? "Edit profile" : "Create profile"} description="Keep provider endpoints, privacy controls, and mobile feature flags together." />
+          <PanelHeader title={selected ? "Edit profile" : "Create profile"} description="Keep provider endpoints, privacy controls, and mobile feature flags together." actions={selected && <button type="button" className="button secondary" onClick={createNew}><Plus size={16} /> New profile</button>} />
           <div className="grid three">
             {["name", "description", "speechProviderType", "speechEndpointUrl", "speechModelName", "presidioEndpointUrl", "presidioSecretRef", "privacyReviewProviderType", "privacyReviewEndpointUrl", "privacyReviewModel", "documentGenerationProviderType", "documentGenerationEndpointUrl", "documentGenerationModel", "templateRepositoryUrl", "telemetryEndpointUrl"].map((key) => (
               <div className="field" key={key}><FieldLabel>{labelFor(key)}</FieldLabel><input className="input" placeholder={placeholderFor(key)} value={form[key] ?? ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key === "name"} /></div>

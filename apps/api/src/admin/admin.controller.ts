@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, ConflictException, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { IsArray, IsEmail, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
-import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdminGuard } from "../auth/admin.guard";
 import { createActivationKey, sha256 } from "../common/crypto";
@@ -381,6 +381,25 @@ export class AdminController {
     return tenant;
   }
 
+  @Delete("tenants/:id")
+  @ApiOperation({ summary: "Delete tenant/customer", description: "Deletes a tenant only when it has no enterprise keys, activations, or tenant-specific templates." })
+  @ApiParam({ name: "id", description: "Tenant UUID." })
+  @ApiOkResponse({ description: "Tenant deleted.", schema: { example: { success: true } } })
+  @ApiConflictResponse({ description: "Tenant is in use and cannot be deleted." })
+  async tenantsDelete(@Param("id") id: string, @Req() req: any) {
+    const [enterpriseKeys, activations, templates] = await Promise.all([
+      this.prisma.enterpriseLicenseKey.count({ where: { tenantId: id } }),
+      this.prisma.deviceActivation.count({ where: { tenantId: id } }),
+      this.prisma.template.count({ where: { tenantId: id } })
+    ]);
+    if (enterpriseKeys || activations || templates) {
+      throw new ConflictException("Cannot delete tenant with enterprise keys, activations, or templates. Disable it instead.");
+    }
+    await this.prisma.tenant.delete({ where: { id } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "tenant.delete", targetType: "Tenant", targetId: id });
+    return { success: true };
+  }
+
   @Get("license-usage")
   @ApiOperation({ summary: "Enterprise license usage summary", description: "Shows unique active device counts per tenant and global active unique-device totals." })
   @ApiOkResponse({ description: "License usage summary.", schema: { example: { activeUniqueDevices: 8, tenants: [{ tenantId: "tenant-uuid", name: "Acme Health", activeDevices: 8, totalDevices: 10, licensedDevices: 100, unlimited: false }] } } })
@@ -421,6 +440,24 @@ export class AdminController {
     const profile = await this.prisma.configProfile.update({ where: { id }, data: this.cleanConfig(dto) as any });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "config.update", targetType: "ConfigProfile", targetId: id });
     return profile;
+  }
+
+  @Delete("config-profiles/:id")
+  @ApiOperation({ summary: "Delete config profile", description: "Deletes a config profile only when no tenants or enterprise keys reference it." })
+  @ApiParam({ name: "id", description: "ConfigProfile UUID." })
+  @ApiOkResponse({ description: "Config profile deleted.", schema: { example: { success: true } } })
+  @ApiConflictResponse({ description: "Config profile is in use and cannot be deleted." })
+  async deleteConfig(@Param("id") id: string, @Req() req: any) {
+    const [tenants, enterpriseKeys] = await Promise.all([
+      this.prisma.tenant.count({ where: { configProfileId: id } }),
+      this.prisma.enterpriseLicenseKey.count({ where: { configProfileId: id } })
+    ]);
+    if (tenants || enterpriseKeys) {
+      throw new ConflictException("Cannot delete config profile while tenants or enterprise keys reference it.");
+    }
+    await this.prisma.configProfile.delete({ where: { id } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "config.delete", targetType: "ConfigProfile", targetId: id });
+    return { success: true };
   }
 
   @Get("templates")

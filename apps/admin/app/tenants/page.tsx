@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Save } from "lucide-react";
+import { Building2, Plus, Save, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
@@ -73,6 +73,15 @@ export default function TenantsPage() {
   function edit(tenant: any) {
     setSelected(tenant.id);
     setForm(tenantToForm(tenant));
+    setMessage(`Editing ${tenant.name}`);
+    setError("");
+  }
+
+  function createNew() {
+    setSelected("");
+    setForm({ ...empty, configProfileId: profiles[0]?.id || "" });
+    setMessage("Creating new tenant");
+    setError("");
   }
 
   async function save(event: React.FormEvent) {
@@ -92,6 +101,19 @@ export default function TenantsPage() {
     }
   }
 
+  async function deleteTenant(tenant: any) {
+    if (!window.confirm(`Delete ${tenant.name}? This cannot be undone.`)) return;
+    setError("");
+    try {
+      await api(`/admin/tenants/${tenant.id}`, { method: "DELETE" });
+      if (selected === tenant.id) createNew();
+      setMessage("Tenant deleted");
+      await load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  }
+
   return (
     <RequireAuth>
       <PageHeader title="Tenants" description="Enterprise customer register, contact details, assigned config profile, and license usage." meta={message && <span className="badge status-active">{message}</span>} />
@@ -99,10 +121,10 @@ export default function TenantsPage() {
       {loading ? <LoadingPanel label="Loading tenants" /> : (
       <div className="page-stack">
         <div className="panel">
-          <PanelHeader title="Enterprise customers" description="Usage counts are based on unique active device identifiers." />
+          <PanelHeader title="Enterprise customers" description="Usage counts are based on unique active device identifiers." actions={<button className="button" onClick={createNew}><Plus size={16} /> New tenant</button>} />
           {!tenants.length ? <EmptyState title="No tenants yet" message="Create a tenant before generating enterprise keys." /> : (
           <div className="table-wrap"><table className="table">
-            <thead><tr><th>Customer</th><th>Contact</th><th>License usage</th><th></th></tr></thead>
+            <thead><tr><th>Customer</th><th>Contact</th><th>License usage</th><th className="actions">Actions</th></tr></thead>
             <tbody>{tenants.map((tenant) => {
               const usage = tenant.licenseUsage ?? {};
               const capacity = usage.unlimited ? "unlimited" : usage.licensedDevices ?? 0;
@@ -111,7 +133,7 @@ export default function TenantsPage() {
 		                  <td><b>{tenant.name}</b><br /><span className="muted">{tenant.legalName || tenant.slug}</span><br /><StatusBadge status={tenant.status} /></td>
 		                  <td>{tenant.contactName || "-"}<br /><span className="muted">{tenant.contactEmail || tenant.billingEmail || ""}</span></td>
 		                  <td><b>{usage.activeDevices ?? 0}</b> active / {capacity}<br /><span className="muted">{usage.totalDevices ?? 0} total unique devices</span></td>
-		                  <td className="actions"><button className="button secondary" onClick={() => edit(tenant)}><Building2 size={14} /> Edit</button></td>
+		                  <td className="row actions"><button className="button secondary" onClick={() => edit(tenant)}><Building2 size={14} /> Edit</button><button className="button danger" onClick={() => deleteTenant(tenant)}><Trash2 size={14} /> Delete</button></td>
 		                </tr>
 		              );
 		            })}</tbody>
@@ -119,7 +141,7 @@ export default function TenantsPage() {
           )}
         </div>
         <form className="panel" onSubmit={save}>
-          <PanelHeader title={selected ? "Edit tenant" : "Create tenant"} description="Keep customer identity, contacts, and default app configuration in one place." />
+          <PanelHeader title={selected ? "Edit tenant" : "Create tenant"} description="Keep customer identity, contacts, and default app configuration in one place." actions={selected && <button type="button" className="button secondary" onClick={createNew}><Plus size={16} /> New tenant</button>} />
           <div className="grid three">
             <div className="field"><FieldLabel>Name</FieldLabel><input className="input" placeholder="Acme Health" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
             <div className="field"><FieldLabel help="Stable internal identifier used in API responses.">Slug</FieldLabel><input className="input" placeholder="acme-health" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} required /></div>
