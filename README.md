@@ -34,6 +34,7 @@ Default local URLs:
 
 - API: `http://localhost:4000/api/v1`
 - Swagger: `http://localhost:4000/api/docs`
+- OpenAPI JSON: `http://localhost:4000/api/docs-json`
 - Admin UI: `http://localhost:3000`
 
 Seed admin user:
@@ -197,6 +198,11 @@ docker compose --env-file .env -f docker-compose.yml pull
 docker compose --env-file .env -f docker-compose.yml up -d
 APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-backend-routes.sh
 ```
+
+Public API documentation is available through APISIX at:
+
+- Swagger UI: `https://kvasetech.com/backend/api/docs`
+- OpenAPI JSON: `https://kvasetech.com/backend/api/docs-json`
 
 ## GitHub Docker Images
 

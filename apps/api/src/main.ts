@@ -14,11 +14,22 @@ async function bootstrap() {
 
   const config = new DocumentBuilder()
     .setTitle("Ulfy Backend API")
-    .setDescription("Internal/admin-controlled backend for Ulfy licensing, enterprise config and templates.")
+    .setDescription("Internal/admin-controlled backend for Ulfy licensing, enterprise config and templates. Mobile app activation endpoints are public; admin endpoints require a bearer token from /auth/login. Public deployment path through APISIX is /backend/api/v1.")
     .setVersion("1.0")
+    .addServer("https://kvasetech.com/backend", "Kvasetech production through APISIX")
+    .addServer("http://localhost:4000", "Local development")
     .addBearerAuth()
     .build();
-  SwaggerModule.setup("api/docs", app, SwaggerModule.createDocument(app, config));
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup("api/docs", app, document, {
+    customSiteTitle: "Ulfy API Docs",
+    jsonDocumentUrl: "api/docs-json",
+    swaggerOptions: {
+      persistAuthorization: true,
+      tagsSorter: "alpha",
+      operationsSorter: "alpha"
+    }
+  });
 
   await app.listen(process.env.PORT ? Number(process.env.PORT) : 4000);
 }
