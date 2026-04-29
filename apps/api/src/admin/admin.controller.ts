@@ -493,14 +493,15 @@ export class AdminController {
   }
 
   @Patch("single-keys/:id/revoke")
-  @ApiOperation({ summary: "Revoke single-user license key" })
+  @ApiOperation({ summary: "Toggle single-user license revocation", description: "Revokes an active key, or reactivates a revoked key without resetting the device binding." })
   @ApiParam({ name: "id", description: "SingleLicenseKey UUID." })
-  @ApiOkResponse({ description: "License key revoked." })
+  @ApiOkResponse({ description: "License key revocation toggled." })
   async revokeSingle(@Param("id") id: string, @Req() req: any) {
-    await this.assertSingleKeyAccess(req, id);
-    const key = await this.prisma.singleLicenseKey.update({ where: { id }, data: { status: "revoked" } });
-    await this.prisma.deviceActivation.updateMany({ where: { singleLicenseKeyId: id }, data: { status: "revoked" } });
-    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "license.single.revoke", targetType: "SingleLicenseKey", targetId: id });
+    const current = await this.assertSingleKeyAccess(req, id);
+    const status = current.status === "revoked" ? "active" : "revoked";
+    const key = await this.prisma.singleLicenseKey.update({ where: { id }, data: { status } });
+    await this.prisma.deviceActivation.updateMany({ where: { singleLicenseKeyId: id }, data: { status } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: status === "revoked" ? "license.single.revoke" : "license.single.reactivate", targetType: "SingleLicenseKey", targetId: id });
     return key;
   }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Eye, KeyRound, Plus, RotateCcw, ShieldX, Trash2 } from "lucide-react";
+import { Copy, Eye, KeyRound, Plus, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
@@ -112,7 +112,7 @@ export default function KeysPage() {
     <RequireAuth>
       <PageHeader
         title="License keys"
-        description="Generate, inspect, revoke, and reset activation keys. Full keys are shown once after generation."
+        description="Generate, inspect, revoke/reactivate, and delete activation keys. Full keys are shown once after generation."
         meta={(
           <>
             <button type="button" className="button" onClick={() => setSingleModalOpen(true)}><Plus size={16} /> Single-user key</button>
@@ -137,7 +137,7 @@ export default function KeysPage() {
             <div className="panel">
               <PanelHeader title="Single-user keys" description="Double-click a row to view all associated details. Full activation keys are hashed and cannot be recovered later." />
               {!single.length ? <EmptyState title="No single-user keys" message="Generate a key above to make it available for activation." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Purchaser</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Device</th><th className="actions">Actions</th></tr></thead><tbody>{single.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "single", key: k })}><td><b>{k.purchaserFullName}</b><br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.deviceIdentifier ?? "-"}</td><td className="row actions"><button type="button" className="button secondary" title="View license details" onClick={() => setDetails({ kind: "single", key: k })}><Eye size={14} /></button><button type="button" className="button danger" title="Revoke license" onClick={() => api(`/admin/single-keys/${k.id}/revoke`, { method: "PATCH" }).then(load)}><ShieldX size={14} /></button><button type="button" className="button secondary" title="Reset device binding" onClick={() => api(`/admin/single-keys/${k.id}/reset`, { method: "PATCH" }).then(load)}><RotateCcw size={14} /></button><button type="button" className="button danger" title="Delete key" onClick={() => deleteSingleKey(k)}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Purchaser</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Device</th><th className="actions">Actions</th></tr></thead><tbody>{single.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "single", key: k })}><td><b>{k.purchaserFullName}</b><br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.deviceIdentifier ?? "-"}</td><td className="row actions"><button type="button" className="button secondary" title="View license details" onClick={() => setDetails({ kind: "single", key: k })}><Eye size={14} /></button><button type="button" className={k.status === "revoked" ? "button secondary" : "button danger"} title={k.status === "revoked" ? "Reactivate license" : "Revoke license"} onClick={() => api(`/admin/single-keys/${k.id}/revoke`, { method: "PATCH" }).then(load)}>{k.status === "revoked" ? <ShieldCheck size={14} /> : <ShieldX size={14} />}</button><button type="button" className="button danger" title="Delete key" onClick={() => deleteSingleKey(k)}><Trash2 size={14} /></button></td></tr>)}</tbody></table></div>
               )}
             </div>
             <div className="panel">
