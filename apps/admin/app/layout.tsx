@@ -12,15 +12,23 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <div className="shell">
           <nav className="nav">
-            <div className="brand">Ulfy Admin</div>
+            <div className="brand">
+              <div className="brand-icon">U</div>
+              <div className="brand-text">
+                <div className="brand-title">Ulfy</div>
+                <div className="brand-subtitle">Admin Portal</div>
+              </div>
+            </div>
             <div className="nav-links">
-              <a href={appPath("/")}><LayoutDashboard size={17} /> Overview</a>
-              <a href={appPath("/tenants")}><Building2 size={17} /> Tenants</a>
-              <a href={appPath("/keys")}><KeyRound size={17} /> Keys</a>
-              <a href={appPath("/configs")}><Settings size={17} /> Configs</a>
-              <a href={appPath("/templates")}><ScrollText size={17} /> Templates</a>
-              <a href={appPath("/users")}><Users size={17} /> Users</a>
-              <a href={appPath("/audit")}><ShieldCheck size={17} /> Audit</a>
+              <div className="nav-label">Main</div>
+              <a href={appPath("/")}><span className="nav-icon"><LayoutDashboard size={18} /></span> Overview</a>
+              <a href={appPath("/tenants")}><span className="nav-icon"><Building2 size={18} /></span> Tenants</a>
+              <a href={appPath("/keys")}><span className="nav-icon"><KeyRound size={18} /></span> Keys</a>
+              <a href={appPath("/configs")}><span className="nav-icon"><Settings size={18} /></span> Configs</a>
+              <a href={appPath("/templates")}><span className="nav-icon"><ScrollText size={18} /></span> Templates</a>
+              <div className="nav-label">System</div>
+              <a href={appPath("/users")}><span className="nav-icon"><Users size={18} /></span> Users</a>
+              <a href={appPath("/audit")}><span className="nav-icon"><ShieldCheck size={18} /></span> Audit</a>
             </div>
             <AdminSession />
           </nav>

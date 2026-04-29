@@ -50,18 +50,20 @@ export function StatusBadge({ status }: { status?: string | null }) {
   return <span className={`badge status-${value}`}>{value}</span>;
 }
 
-export function EmptyState({ title, message }: { title: string; message?: string }) {
+export function EmptyState({ title, message, icon, action }: { title: string; message?: string; icon?: string; action?: ReactNode }) {
   return (
     <div className="empty-state">
+      {icon && <div style={{ fontSize: '36px', marginBottom: '12px' }}>{icon}</div>}
       <strong>{title}</strong>
       {message && <span>{message}</span>}
+      {action && <div style={{ marginTop: '20px' }}>{action}</div>}
     </div>
   );
 }
 
 export function LoadingPanel({ label = "Loading" }: { label?: string }) {
   return (
-    <div className="panel loading-panel">
+    <div className="loading-panel">
       <Loader2 size={18} />
       <span>{label}</span>
     </div>
@@ -125,6 +127,44 @@ export function Modal({
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </section>
+    </div>
+  );
+}
+
+export function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
+  return <div className="card" style={style}>{children}</div>;
+}
+
+export function CardHeader({ title, subtitle, right }: { title: string; subtitle?: string; right?: ReactNode }) {
+  return (
+    <div className="panel-header">
+      <div>
+        <h2>{title}</h2>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+export function StatCard({ label, value, icon, sub }: { label: string; value: number | string; icon: ReactNode; sub?: string }) {
+  return (
+    <div className="metric-card">
+      <div className="metric-topline">
+        <div className="metric-label">{label}</div>
+        <span className="metric-icon">{icon}</span>
+      </div>
+      <div className="metric-value">{value}</div>
+      {sub && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '5px' }}>{sub}</div>}
+    </div>
+  );
+}
+
+export function ProgressBar({ value, max }: { value: number; max: number }) {
+  const pct = max > 0 ? Math.min((value / max) * 100, 100) : 0;
+  return (
+    <div className="usage-track">
+      <span style={{ width: `${pct}%` }} />
     </div>
   );
 }

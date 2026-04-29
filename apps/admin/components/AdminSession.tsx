@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LogOut, UserCircle } from "lucide-react";
 import { api, getToken } from "../lib/api";
 import { appPath } from "../lib/base-path";
 
@@ -20,19 +19,23 @@ export function AdminSession() {
 
   if (!user) return null;
 
+  const initials = (user.fullName ?? user.email ?? 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+
   return (
     <div className="nav-session">
       <div className="session-user">
-        <UserCircle size={20} />
-        <div>
-          <strong>{user.fullName ?? user.email}</strong>
-          <span>{user.email}</span>
-          <small>{roleLabel(user.role)}{user.partner?.name ? ` · ${user.partner.name}` : ""}</small>
+        <div className="session-avatar">{initials}</div>
+        <div className="session-info">
+          <div className="session-name">{user.fullName ?? user.email}</div>
+          <div className="session-email">{user.email}</div>
         </div>
       </div>
-      <button type="button" className="nav-logout" onClick={logout}>
-        <LogOut size={15} /> Logout
-      </button>
+      <div className="session-footer">
+        <span className="session-role">{roleLabel(user.role)}</span>
+        <button type="button" className="nav-logout" onClick={logout}>
+          Logout
+        </button>
+      </div>
     </div>
   );
 }
