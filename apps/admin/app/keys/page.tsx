@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Eye, KeyRound, Plus, RotateCcw, ShieldX } from "lucide-react";
+import { Copy, Eye, KeyRound, Plus, RotateCcw, ShieldX, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
@@ -66,6 +66,21 @@ export default function KeysPage() {
       setError(err.message);
     } finally {
       setSaving("");
+    }
+  }
+
+  async function deleteEnterpriseActivation(activation: any) {
+    if (!window.confirm(`Delete activation for ${activation.deviceIdentifier}? This frees one enterprise device slot.`)) return;
+    setError("");
+    try {
+      await api(`/admin/activations/${activation.id}`, { method: "DELETE" });
+      setDetails((current) => {
+        if (current?.kind !== "enterprise") return current;
+        return { ...current, key: { ...current.key, activations: (current.key.activations ?? []).filter((item: any) => item.id !== activation.id) } };
+      });
+      await load();
+    } catch (err: any) {
+      setError(err.message);
     }
   }
 
@@ -155,7 +170,7 @@ export default function KeysPage() {
             wide
           >
             {details?.kind === "single" && <SingleLicenseDetails licenseKey={details.key} />}
-            {details?.kind === "enterprise" && <EnterpriseLicenseDetails licenseKey={details.key} />}
+            {details?.kind === "enterprise" && <EnterpriseLicenseDetails licenseKey={details.key} onDeleteActivation={deleteEnterpriseActivation} />}
           </Modal>
         </>
       )}
@@ -200,7 +215,7 @@ function SingleLicenseDetails({ licenseKey }: { licenseKey: any }) {
   );
 }
 
-function EnterpriseLicenseDetails({ licenseKey }: { licenseKey: any }) {
+function EnterpriseLicenseDetails({ licenseKey, onDeleteActivation }: { licenseKey: any; onDeleteActivation: (activation: any) => void }) {
   return (
     <div className="page-stack">
       <section>
@@ -246,19 +261,19 @@ function EnterpriseLicenseDetails({ licenseKey }: { licenseKey: any }) {
         </div>
       </section>
       <Notes value={licenseKey.notes} />
-      <ActivationDetails activations={licenseKey.activations ?? []} />
+      <ActivationDetails activations={licenseKey.activations ?? []} onDeleteActivation={onDeleteActivation} />
     </div>
   );
 }
 
-function ActivationDetails({ activations }: { activations: any[] }) {
+function ActivationDetails({ activations, onDeleteActivation }: { activations: any[]; onDeleteActivation?: (activation: any) => void }) {
   return (
     <section>
       <h3>Device activations</h3>
       {!activations.length ? <EmptyState title="No activations" message="This key has not been used by a device yet." /> : (
         <div className="table-wrap">
           <table className="table">
-            <thead><tr><th>Device</th><th>Serial</th><th>Status</th><th>App</th><th>Activated</th><th>Last seen</th></tr></thead>
+            <thead><tr><th>Device</th><th>Serial</th><th>Status</th><th>App</th><th>Activated</th><th>Last seen</th>{onDeleteActivation && <th className="actions">Actions</th>}</tr></thead>
             <tbody>{activations.map((activation) => (
               <tr key={activation.id}>
                 <td><span className="code">{activation.deviceIdentifier}</span></td>
@@ -267,6 +282,7 @@ function ActivationDetails({ activations }: { activations: any[] }) {
                 <td>{activation.appVersion ?? "-"}</td>
                 <td>{formatDateTime(activation.activatedAt)}</td>
                 <td>{formatDateTime(activation.lastSeenAt)}</td>
+                {onDeleteActivation && <td className="row actions"><button type="button" className="button danger" title="Delete activation" onClick={() => onDeleteActivation(activation)}><Trash2 size={14} /> Delete</button></td>}
               </tr>
             ))}</tbody>
           </table>

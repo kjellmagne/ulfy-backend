@@ -789,6 +789,28 @@ export class AdminController {
     });
   }
 
+  @Delete("activations/:id")
+  @ApiOperation({ summary: "Delete enterprise device activation", description: "Removes one enterprise device activation to free a licensed device slot. Single-user activations must be reset from the license key." })
+  @ApiParam({ name: "id", description: "DeviceActivation UUID." })
+  @ApiOkResponse({ description: "Enterprise device activation deleted.", schema: { example: { success: true } } })
+  @ApiConflictResponse({ description: "Single-user activations cannot be deleted directly." })
+  async deleteActivation(@Param("id") id: string, @Req() req: any) {
+    const activation = await this.findScopedActivation(req, id);
+    if (activation.kind !== "enterprise" || !activation.enterpriseLicenseKeyId) {
+      throw new ConflictException("Only enterprise device activations can be deleted directly. Reset single-user licenses instead.");
+    }
+    await this.prisma.deviceActivation.delete({ where: { id } });
+    await this.audit.log({
+      actorAdminId: req.user.sub,
+      actorEmail: req.user.email,
+      action: "activation.enterprise.delete",
+      targetType: "DeviceActivation",
+      targetId: id,
+      metadata: { enterpriseLicenseKeyId: activation.enterpriseLicenseKeyId, tenantId: activation.tenantId, deviceIdentifier: activation.deviceIdentifier }
+    });
+    return { success: true };
+  }
+
   @Get("audit-logs")
   @ApiOperation({ summary: "List audit logs", description: "Returns latest activation/config/license/template audit entries." })
   @ApiOkResponse({ description: "Audit log list." })
@@ -897,6 +919,18 @@ export class AdminController {
     if (!partnerId) return;
     const template = await this.prisma.template.findFirst({ where: { id: templateId, tenant: { partnerId } } });
     if (!template) throw new ForbiddenException("Template is not available to this admin user.");
+  }
+
+  private async findScopedActivation(req: any, activationId: string) {
+    const partnerId = this.scopedPartnerId(req);
+    const activation = await this.prisma.deviceActivation.findFirst({
+      where: {
+        id: activationId,
+        ...(partnerId ? { OR: [{ tenant: { partnerId } }, { enterpriseLicenseKey: { tenant: { partnerId } } }] } : {})
+      }
+    });
+    if (!activation) throw new ForbiddenException("Device activation is not available to this admin user.");
+    return activation;
   }
 
   private tenantLicenseUsage(tenant: { activations: Array<{ status: string; deviceIdentifier: string }>; enterpriseKeys: Array<{ maxDevices: number | null; status: string }> }) {
