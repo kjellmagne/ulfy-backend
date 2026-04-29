@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import * as yaml from "js-yaml";
-import { Archive, CheckCircle, Download, Save } from "lucide-react";
+import { Archive, CheckCircle, Download, FileText, Save } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, StatCard } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 import { appPath } from "../../lib/base-path";
 
@@ -63,16 +63,26 @@ export default function TemplatesPage() {
     }
   }
 
+  const published = templates.filter(t => t.versions?.some((v: any) => v.state === 'published')).length;
+  const drafts = templates.filter(t => !t.versions?.some((v: any) => v.state === 'published')).length;
+
   return (
     <RequireAuth>
       <PageHeader title="Templates" description="Create, validate, publish, archive, and download YAML templates for app consumption." meta={<span className="badge">{validation}</span>} />
       {error && <Alert tone="danger">{error}</Alert>}
       {loading ? <LoadingPanel label="Loading templates" /> : (
       <div className="page-stack">
+        {/* Stats */}
+        <div className="grid three">
+          <StatCard label="Total templates" value={templates.length} icon={<FileText size={18} />} sub={`${categories.length} categories`} />
+          <StatCard label="Published" value={published} icon={<CheckCircle size={18} />} sub="available in app" />
+          <StatCard label="Drafts" value={drafts} icon={<FileText size={18} />} sub="unpublished versions" />
+        </div>
+
         <div className="panel">
-          <PanelHeader title="Library" description="Published versions are available in the mobile manifest and download endpoint." />
+          <PanelHeader title="Template library" description="Published versions are available in the mobile manifest and download endpoint." />
           {!templates.length ? <EmptyState title="No templates yet" message="Create a template draft below, then publish a version." /> : (
-            <div className="table-wrap"><table className="table"><thead><tr><th>Template</th><th>Versions</th><th className="actions">Actions</th></tr></thead><tbody>{templates.map((t) => <tr key={t.id}><td><b>{t.title}</b><br /><span className="muted">{t.shortDescription}</span></td><td className="row">{t.versions?.map((v: any) => <span key={v.id} className={`badge status-${v.state}`}>{v.version} {v.state}</span>)}</td><td className="row actions"><button className="button secondary" onClick={() => edit(t)}>Edit</button>{t.versions?.[0] && <button className="button" title="Publish latest version" onClick={() => api(`/admin/templates/${t.id}/publish/${t.versions[0].id}`, { method: "POST" }).then(load)}><CheckCircle size={14} /></button>}<a className="button secondary" title="Download YAML" href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${appPath(`/api/v1/templates/${t.id}/download`)}`}><Download size={14} /></a><button className="button danger" title="Archive template" onClick={() => api(`/admin/templates/${t.id}/archive`, { method: "PATCH" }).then(load)}><Archive size={14} /></button></td></tr>)}</tbody></table></div>
+            <div className="table-wrap"><table className="table"><thead><tr><th>Template</th><th>Category</th><th>Language</th><th>Versions</th><th className="actions">Actions</th></tr></thead><tbody>{templates.map((t) => <tr key={t.id}><td><b>{t.title}</b><br /><span className="muted">{t.shortDescription}</span></td><td>{categories.find(c => c.id === t.categoryId)?.title ?? "-"}</td><td>{t.language}</td><td className="row">{t.versions?.map((v: any) => <span key={v.id} className={`badge status-${v.state}`}>{v.version}</span>)}</td><td className="row actions"><button className="button secondary" onClick={() => edit(t)}>Edit</button>{t.versions?.[0] && <button className="button" title="Publish latest version" onClick={() => api(`/admin/templates/${t.id}/publish/${t.versions[0].id}`, { method: "POST" }).then(load)}><CheckCircle size={14} /></button>}<a className="button secondary" title="Download YAML" href={`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${appPath(`/api/v1/templates/${t.id}/download`)}`}><Download size={14} /></a><button className="button danger" title="Archive template" onClick={() => api(`/admin/templates/${t.id}/archive`, { method: "PATCH" }).then(load)}><Archive size={14} /></button></td></tr>)}</tbody></table></div>
           )}
         </div>
         <form className="panel" onSubmit={save}>
@@ -86,7 +96,7 @@ export default function TemplatesPage() {
             <div className="field"><FieldLabel help="Semantic version saved as immutable history.">Version</FieldLabel><input className="input" placeholder="1.0.0" value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} /></div>
           </div>
           <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" placeholder="dictation, personal" value={form.tagsText} onChange={(e) => setForm({ ...form, tagsText: e.target.value })} /></div>
-          <div className="field"><FieldLabel help="Must parse as YAML and include title, language, and sections.">YAML</FieldLabel><textarea value={form.yamlContent} onChange={(e) => setForm({ ...form, yamlContent: e.target.value })} /></div>
+          <div className="field"><FieldLabel help="Must parse as YAML and include title, language, and sections.">YAML</FieldLabel><textarea value={form.yamlContent} onChange={(e) => setForm({ ...form, yamlContent: e.target.value })} style={{ minHeight: '200px' }} /></div>
           <div className="row"><button type="button" className="button secondary" onClick={validate}><CheckCircle size={16} /> Validate</button><button className="button" disabled={saving}><Save size={16} /> {saving ? "Saving..." : "Save template"}</button></div>
         </form>
       </div>

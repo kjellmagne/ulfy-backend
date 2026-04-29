@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Settings, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatCard } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 const empty = {
@@ -12,7 +12,9 @@ const empty = {
   privacyReviewProviderType: "", privacyReviewEndpointUrl: "", privacyReviewModel: "",
   documentGenerationProviderType: "", documentGenerationEndpointUrl: "", documentGenerationModel: "",
   templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest", telemetryEndpointUrl: "",
-  featureFlagsText: "{\n  \"enterpriseTemplates\": true\n}", allowedProviderRestrictionsText: "[\"openai-compatible\"]"
+  featureFlagsText: `{
+  "enterpriseTemplates": true
+}`, allowedProviderRestrictionsText: "[\"openai-compatible\"]"
 };
 
 export default function ConfigsPage() {
@@ -84,6 +86,9 @@ export default function ConfigsPage() {
     }
   }
 
+  const internalProfiles = profiles.filter(p => !p.partnerId);
+  const partnerProfiles = profiles.filter(p => p.partnerId);
+
   return (
     <RequireAuth>
       <PageHeader title="Config profiles" description="Central app settings returned to enterprise activations and refresh checks." meta={message && <span className="badge status-active">{message}</span>} />
@@ -91,10 +96,17 @@ export default function ConfigsPage() {
       {loading ? <LoadingPanel label="Loading config profiles" /> : (
         <>
           <div className="page-stack">
+            {/* Stats */}
+            <div className="grid three">
+              <StatCard label="Total profiles" value={profiles.length} icon={<Settings size={18} />} sub={`${internalProfiles.length} internal`} />
+              <StatCard label="Partner profiles" value={partnerProfiles.length} icon={<Settings size={18} />} sub="managed by partners" />
+              <StatCard label="Privacy enabled" value={profiles.filter(p => p.privacyControlEnabled).length} icon={<Settings size={18} />} sub="profiles with privacy" />
+            </div>
+
             <div className="panel">
-              <PanelHeader title="Profiles" description="Select a profile to edit or assign it when generating enterprise keys." actions={<button type="button" className="button" onClick={createNew}><Plus size={16} /> New profile</button>} />
+              <PanelHeader title="Configuration profiles" description="Select a profile to edit or assign it when generating enterprise keys." actions={<button type="button" className="button" onClick={createNew}><Plus size={16} /> New profile</button>} />
               {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech provider</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.partner?.name ?? <span className="muted">Internal</span>}</td><td>{p.speechProviderType || "-"}</td><td>{p.templateRepositoryUrl || "-"}</td><td className="row actions"><button type="button" className="button secondary" onClick={() => edit(p)}>Edit</button><button type="button" className="button danger" onClick={() => deleteProfile(p)}><Trash2 size={14} /> Delete</button></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech provider</th><th>Privacy</th><th>Template manifest</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((p) => <tr key={p.id}><td><b>{p.name}</b><br /><span className="muted">{p.description || "No description"}</span></td><td>{p.partner?.name ?? <span className="muted">Internal</span>}</td><td>{p.speechProviderType || "-"}</td><td>{p.privacyControlEnabled ? "✓ Enabled" : <span className="muted">Disabled</span>}</td><td className="code" style={{ fontSize: '11px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.templateRepositoryUrl || "-"}</td><td className="row actions"><button type="button" className="button secondary" onClick={() => edit(p)}>Edit</button><button type="button" className="button danger" onClick={() => deleteProfile(p)}><Trash2 size={14} /> Delete</button></td></tr>)}</tbody></table></div>
               )}
             </div>
           </div>
@@ -118,12 +130,12 @@ export default function ConfigsPage() {
                   <div className="field" key={key}><FieldLabel>{labelFor(key)}</FieldLabel><input className="input" placeholder={placeholderFor(key)} value={form[key] ?? ""} onChange={(e) => setForm({ ...form, [key]: e.target.value })} required={key === "name"} /></div>
                 ))}
               </div>
-              <div className="row">
-                <label><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> Privacy control</label>
-                <label><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> PII control</label>
+              <div className="row" style={{ gap: '16px', marginTop: '8px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> Privacy control</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> PII control</label>
               </div>
-              <details className="details-panel">
-                <summary>Advanced JSON settings</summary>
+              <details style={{ marginTop: '16px', padding: '16px', background: '#f8fafc', border: '1px solid var(--line)', borderRadius: '8px' }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: '13px', marginBottom: '12px' }}>Advanced JSON settings</summary>
                 <div className="grid two">
                   <div className="field"><FieldLabel help="Object of mobile feature flags, for example enterpriseTemplates.">Feature flags JSON</FieldLabel><textarea value={form.featureFlagsText} onChange={(e) => setForm({ ...form, featureFlagsText: e.target.value })} /></div>
                   <div className="field"><FieldLabel help="Array of provider identifiers allowed for this customer.">Allowed providers JSON</FieldLabel><textarea value={form.allowedProviderRestrictionsText} onChange={(e) => setForm({ ...form, allowedProviderRestrictionsText: e.target.value })} /></div>

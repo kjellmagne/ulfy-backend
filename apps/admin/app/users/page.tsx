@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Plus, Save, Trash2, UserRound } from "lucide-react";
+import { Building2, Plus, Save, Trash2, UserRound, Users } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatCard, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 const emptyUser = {
@@ -164,11 +164,21 @@ export default function UsersPage() {
     );
   }
 
+  const superadmins = users.filter(u => u.role === 'superadmin').length;
+  const partnerAdmins = users.filter(u => u.role === 'partner_admin').length;
+
   return (
     <RequireAuth>
       <PageHeader title="Users" description="Manage internal admin users, solution partners, and partner access to tenants, licenses, and configs." meta={message && <span className="badge status-active">{message}</span>} />
       {error && <Alert tone="danger">{error}</Alert>}
       <div className="page-stack">
+        {/* Stats */}
+        <div className="grid three">
+          <StatCard label="Total users" value={users.length} icon={<Users size={18} />} sub={`${superadmins} superadmins`} />
+          <StatCard label="Partner admins" value={partnerAdmins} icon={<UserRound size={18} />} sub="with partner scope" />
+          <StatCard label="Partners" value={partners.length} icon={<Building2 size={18} />} sub="solution partners" />
+        </div>
+
         <div className="panel">
           <PanelHeader title="Admin portal users" description="Partner admins inherit access from their assigned solution partner." actions={<button type="button" className="button" onClick={createUser}><Plus size={16} /> New user</button>} />
           {!users.length ? <EmptyState title="No admin users" message="Create the first partner or staff user." /> : (
@@ -198,7 +208,7 @@ export default function UsersPage() {
                   <tr key={partner.id}>
                     <td><b>{partner.name}</b></td>
                     <td>{partner.email ?? "-"}</td>
-                    <td>{partner.admins?.length ?? 0} users / {partner.tenants?.length ?? 0} tenants</td>
+                    <td><b>{partner.admins?.length ?? 0}</b> users / <b>{partner.tenants?.length ?? 0}</b> tenants</td>
                     <td><span className="muted">{partner.notes ?? "-"}</span></td>
                     <td className="row actions"><button type="button" className="button secondary" onClick={() => editPartner(partner)}><Building2 size={14} /> Edit</button><button type="button" className="button danger" onClick={() => deletePartner(partner)}><Trash2 size={14} /> Delete</button></td>
                   </tr>
