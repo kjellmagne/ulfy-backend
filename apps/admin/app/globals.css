@@ -442,6 +442,24 @@ textarea {
   white-space: nowrap;
   text-align: right;
 }
+.table td.actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: max-content;
+}
+.table td.actions .button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.table td.actions .button svg {
+  flex: 0 0 auto;
+}
 .table td b {
   font-weight: 600;
   color: var(--ink);
