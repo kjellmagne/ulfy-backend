@@ -259,7 +259,12 @@ docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d api admin
 ```
 
-The Kvasetech/APISIX deployment serves Ulfy publicly at `https://kvasetech.com/backend/`. APISIX strips `/backend` before proxying to both upstream containers, so the API and admin services both run internally at `/`. The admin image still emits public `/backend/...` links and static asset URLs.
+The Kvasetech/APISIX deployment serves Ulfy publicly at `https://kvasetech.com/backend/`.
+
+Important routing rule:
+
+- API route: `/backend/api/*` is proxied to the API after stripping `/backend`, so the API receives `/api/*`.
+- Admin route: `/backend` and `/backend/*` are proxied to the admin without stripping `/backend`. The admin image is built with Next.js `basePath=/backend`, so pages and `_next` assets must keep that prefix.
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml pull

@@ -16,31 +16,15 @@ function normalizePath(value?: string) {
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@ulfy/contracts"],
-  assetPrefix: publicBasePath || undefined,
+  basePath: publicBasePath || undefined,
   async rewrites() {
-    const rewrites = [];
-
-    if (!process.env.NEXT_PUBLIC_API_BASE_URL) {
-      if (publicBasePath) {
-        rewrites.push({
-          source: `${publicBasePath}/api/:path*`,
-          destination: `${apiProxyTarget}/api/:path*`
-        });
-      }
-      rewrites.push({
+    if (process.env.NEXT_PUBLIC_API_BASE_URL) return [];
+    return [
+      {
         source: "/api/:path*",
         destination: `${apiProxyTarget}/api/:path*`
-      });
-    }
-
-    if (publicBasePath) {
-      rewrites.push(
-        { source: publicBasePath, destination: "/" },
-        { source: `${publicBasePath}/:path*`, destination: "/:path*" }
-      );
-    }
-
-    return rewrites;
+      }
+    ];
   }
 };
 
