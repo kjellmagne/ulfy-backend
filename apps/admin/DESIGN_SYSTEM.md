@@ -193,7 +193,7 @@ Icon button:
 
 ## Modals
 
-Use modals for short focused tasks such as create/edit forms and confirmations. Do not use centered modals for long read-only detail views.
+Avoid centered modals for primary resource workflows. They are reserved only for rare, short interruptions that cannot be handled inline or by a slide-in panel.
 
 - Backdrop: fixed full-screen, z-index 500, `rgba(15,23,42,0.35)`, blur 2px.
 - Default width: `min(560px, 95vw)`.
@@ -205,9 +205,9 @@ Use modals for short focused tasks such as create/edit forms and confirmations. 
 - Body padding: 20px 24px with vertical scroll.
 - Footer padding: 14px 24px, `#fafbfc` background.
 
-## Slide-In Detail Panels
+## Slide-In Resource Panels
 
-Use right-side slide-in panels for row details and long inspection flows, for example license key metadata, tenant/config summaries, and device activation lists.
+Use right-side slide-in panels for create, edit, and detail flows on core admin resources. This includes license keys, tenants, config profiles, admin users, solution partners, and long inspection flows such as license metadata or device activation lists.
 
 - Backdrop: fixed full-screen, z-index 500, `rgba(15,23,42,0.28)`, blur 2px.
 - Alignment: panel enters from the right edge.

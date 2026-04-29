@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Plus, Save, Trash2, UserRound, Users } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatCard, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 const emptyUser = {
@@ -218,7 +218,7 @@ export default function UsersPage() {
           )}
         </div>
       </div>
-      <Modal
+      <SidePanel
         open={userModalOpen}
         title={selectedUser ? "Edit admin user" : "Create admin user"}
         description="Partner admins can only access tenants, licenses, and configs assigned to their solution partner."
@@ -239,8 +239,8 @@ export default function UsersPage() {
             <div className="field"><FieldLabel>{selectedUser ? "New password" : "Password"}</FieldLabel><input className="input" type="password" placeholder={selectedUser ? "Leave blank to keep current password" : "Minimum 8 characters"} value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} required={!selectedUser} /></div>
           </div>
         </form>
-      </Modal>
-      <Modal
+      </SidePanel>
+      <SidePanel
         open={partnerModalOpen}
         title={selectedPartner ? "Edit solution partner" : "Create solution partner"}
         description="Partners group users, tenants, license keys, and partner-managed config profiles."
@@ -257,7 +257,7 @@ export default function UsersPage() {
           <div className="field"><FieldLabel>Email</FieldLabel><input className="input" type="email" placeholder="partner@example.no" value={partnerForm.email} onChange={(e) => setPartnerForm({ ...partnerForm, email: e.target.value })} /></div>
           <div className="field"><FieldLabel>Notes</FieldLabel><textarea placeholder="Internal notes about this partner" value={partnerForm.notes} onChange={(e) => setPartnerForm({ ...partnerForm, notes: e.target.value })} /></div>
         </form>
-      </Modal>
+      </SidePanel>
     </RequireAuth>
   );
 }

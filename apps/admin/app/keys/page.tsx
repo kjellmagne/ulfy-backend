@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Copy, Eye, KeyRound, Plus, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, SidePanel, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 function defaultMaintenanceDate() {
@@ -147,7 +147,7 @@ export default function KeysPage() {
               )}
             </div>
           </div>
-          <Modal
+          <SidePanel
             open={singleModalOpen}
             title="Generate single-user key"
             description="For one purchaser and one bound device in v1."
@@ -166,8 +166,8 @@ export default function KeysPage() {
               <div className="field"><FieldLabel help="Partner admins assigned to this solution partner can manage this key.">Solution partner</FieldLabel><select value={form.partnerId} onChange={(e) => setForm({ ...form, partnerId: e.target.value })}><option value="">Internal / no partner</option>{partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select></div>
               <div className="field"><FieldLabel>Notes</FieldLabel><input className="input" placeholder="Internal context or purchase reference" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
             </form>
-          </Modal>
-          <Modal
+          </SidePanel>
+          <SidePanel
             open={enterpriseModalOpen}
             title="Generate enterprise key"
             description="Links a tenant, device allowance, and central config profile."
@@ -185,7 +185,7 @@ export default function KeysPage() {
               <div className="field"><FieldLabel help="Leave blank in the API for unlimited.">Max devices</FieldLabel><input className="input" type="number" min={1} value={enterpriseForm.maxDevices} onChange={(e) => setEnterpriseForm({ ...enterpriseForm, maxDevices: Number(e.target.value) })} /></div>
               <div className="field"><FieldLabel help="Shown to users as maintenance/support coverage.">Maintenance until</FieldLabel><input className="input" type="date" value={enterpriseForm.maintenanceUntil} onChange={(e) => setEnterpriseForm({ ...enterpriseForm, maintenanceUntil: e.target.value })} /></div>
             </form>
-          </Modal>
+          </SidePanel>
           <SidePanel
             open={Boolean(details)}
             title={details?.kind === "single" ? "Single-user license details" : "Enterprise license details"}

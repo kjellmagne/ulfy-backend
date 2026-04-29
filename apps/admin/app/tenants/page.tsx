@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Building2, Plus, Save, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 const empty = {
@@ -155,12 +155,11 @@ export default function TenantsPage() {
               )}
             </div>
           </div>
-          <Modal
+          <SidePanel
             open={editorOpen}
             title={selected ? "Edit tenant" : "Create tenant"}
             description="Keep customer identity, contacts, and default app configuration in one place."
             onClose={() => !saving && setEditorOpen(false)}
-            wide
             footer={(
               <>
                 <button type="button" className="button secondary" onClick={() => setEditorOpen(false)} disabled={saving}>Cancel</button>
@@ -189,7 +188,7 @@ export default function TenantsPage() {
               </div>
               <div className="field"><FieldLabel>Notes</FieldLabel><textarea placeholder="Internal notes for staff admins" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
             </form>
-          </Modal>
+          </SidePanel>
         </>
       )}
     </RequireAuth>

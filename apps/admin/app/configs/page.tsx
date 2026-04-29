@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Save, Settings, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatCard } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 const empty = {
@@ -110,12 +110,11 @@ export default function ConfigsPage() {
               )}
             </div>
           </div>
-          <Modal
+          <SidePanel
             open={editorOpen}
             title={selected ? "Edit profile" : "Create profile"}
             description="Keep provider endpoints, privacy controls, and mobile feature flags together."
             onClose={() => !saving && setEditorOpen(false)}
-            wide
             footer={(
               <>
                 <button type="button" className="button secondary" onClick={() => setEditorOpen(false)} disabled={saving}>Cancel</button>
@@ -142,7 +141,7 @@ export default function ConfigsPage() {
                 </div>
               </details>
             </form>
-          </Modal>
+          </SidePanel>
         </>
       )}
     </RequireAuth>
