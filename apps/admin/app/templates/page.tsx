@@ -643,31 +643,79 @@ export default function TemplatesPage() {
           </div>
 
           <div className="panel">
-            <PanelHeader title="Template repository" description="List first, full-screen designer for focused authoring. Double-click a row to open the first variant." />
+            <PanelHeader title="Template repository" description="Families are the shared template concepts. Language variants under each family are the actual YAML files opened in the designer." />
             {!families.length ? <EmptyState title="No template families" message="Create a family, add a language variant, then publish it." /> : (
-              <div className="table-wrap">
-                <table className="table">
-                  <thead><tr><th>Family</th><th>Availability</th><th>Variants</th><th>Latest</th><th className="actions">Actions</th></tr></thead>
-                  <tbody>{families.map((family) => (
-                    <tr key={family.id} onDoubleClick={() => openDesignerRoute(family, family.variants[0])}>
-                      <td><b>{family.title}</b><br /><span className="muted">{family.shortDescription}</span></td>
-                      <td>
-                        <div className="row">
-                          <StatusBadge status={family.state} />
-                          <span className="badge">{family.isGlobal ? "Global" : `${family.entitlements.length} tenants`}</span>
+              <div className="template-family-list">
+                {families.map((family) => (
+                  <section key={family.id} className="template-family-card">
+                    <div className="template-family-header">
+                      <div className="template-family-title">
+                        <span className="sf-symbol-tile" aria-hidden="true">SF</span>
+                        <div>
+                          <div className="template-family-kicker">Template family</div>
+                          <h3>{family.title}</h3>
+                          <p>{family.shortDescription || "No description yet."}</p>
+                          <div className="template-family-meta">
+                            <StatusBadge status={family.state} />
+                            <span className="badge">{family.category?.title ?? "Uncategorized"}</span>
+                            <span className="badge">{family.icon}</span>
+                            <span className="badge">{family.isGlobal ? "Global catalog" : `${family.entitlements.length} tenant${family.entitlements.length === 1 ? "" : "s"}`}</span>
+                            <span className="badge">{family.variants.length} variant{family.variants.length === 1 ? "" : "s"}</span>
+                          </div>
+                          {family.tags.length ? (
+                            <div className="template-family-tags">
+                              {family.tags.map((tag) => <span key={tag}>{tag}</span>)}
+                            </div>
+                          ) : null}
                         </div>
-                      </td>
-                      <td>{family.variants.length ? family.variants.map((variant) => <span key={variant.id} className="badge">{variant.language}</span>) : <span className="muted">No variants</span>}</td>
-                      <td>{family.variants.map((variant) => latest(variant) ? <span key={variant.id} className="badge status-published">{variant.language} {latest(variant)?.version}</span> : <span key={variant.id} className="badge status-draft">{variant.language} draft</span>)}</td>
-                      <td className="row actions">
-                        <IconLink label="Open designer" href={designerPath(family, family.variants[0])}><FileText size={14} /></IconLink>
-                        <IconLink label="New language variant" href={designerPath(family)}><Globe2 size={14} /></IconLink>
-                        <IconAction label="Edit family" onClick={() => openFamilyEditor(family)}><Pencil size={14} /></IconAction>
+                      </div>
+                      <div className="template-family-actions">
+                        <IconAction label="Edit family metadata" onClick={() => openFamilyEditor(family)}><Pencil size={14} /></IconAction>
+                        <IconLink label="Add language variant" href={designerPath(family)}><Globe2 size={14} /></IconLink>
                         <IconAction label="Archive family" tone="danger" onClick={() => archiveFamily(family)}><Archive size={14} /></IconAction>
-                      </td>
-                    </tr>
-                  ))}</tbody>
-                </table>
+                      </div>
+                    </div>
+
+                    <div className="template-variant-section">
+                      <div className="template-variant-heading">
+                        <span>Language variants</span>
+                        <small>Each row is one YAML draft/published track.</small>
+                      </div>
+                      {family.variants.length ? (
+                        <div className="template-variant-list">
+                          {family.variants.map((variant) => {
+                            const published = latest(variant);
+                            return (
+                              <div key={variant.id} className="template-variant-row">
+                                <div className="variant-language">
+                                  <strong>{variant.language}</strong>
+                                  <span>{variant.templateIdentityId}</span>
+                                </div>
+                                <div className="variant-status">
+                                  {published ? <span className="badge status-published">Published v{published.version}</span> : <span className="badge status-draft">Draft only</span>}
+                                  <span className="badge">{variant.publishedVersions.length} version{variant.publishedVersions.length === 1 ? "" : "s"}</span>
+                                </div>
+                                <div className="variant-date">
+                                  <span>Latest</span>
+                                  <strong>{published ? new Date(published.publishedAt).toLocaleDateString() : "Not published"}</strong>
+                                </div>
+                                <div className="row actions">
+                                  <IconLink label="Open designer" href={designerPath(family, variant)}><FileText size={14} /></IconLink>
+                                  {published && <IconAction label="Download YAML" onClick={() => downloadYaml(variant)}><Download size={14} /></IconAction>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="template-variant-empty">
+                          <span>No language variants yet.</span>
+                          <IconLink label="Add first language variant" href={designerPath(family)} tone="primary"><Globe2 size={14} /></IconLink>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
           </div>
