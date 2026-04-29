@@ -194,20 +194,78 @@ Config profiles keep provider domains separate:
 
 Leave provider fields blank when the backend should not manage that setting for the tenant.
 
+Admin config/policy endpoints require a bearer token from `/api/v1/auth/login`.
+
+Clone an existing policy/config profile:
+
+```bash
+TOKEN='admin-jwt-from-login'
+
+curl -X POST http://localhost:4000/api/v1/admin/config-profiles/<config-profile-id>/clone \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Copy of Strict enterprise policy"}'
+```
+
+The clone endpoint copies managed provider fields, API keys, privacy settings, repository settings, feature flags, provider profile metadata, and managed policy switches. It does not copy tenants or enterprise keys that reference the original policy.
+
+List live provider models while editing a policy:
+
+```bash
+curl -X POST http://localhost:4000/api/v1/admin/provider-models \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "providerDomain": "document_generation",
+    "providerType": "openai_compatible",
+    "endpointUrl": "https://llm.example.internal/v1",
+    "apiKey": "provider-or-gateway-key"
+  }'
+```
+
+Sample model lookup response:
+
+```json
+{
+  "success": true,
+  "providerType": "openai_compatible",
+  "models": [
+    { "id": "ulfy-docgen", "name": "ulfy-docgen" }
+  ]
+}
+```
+
+Model lookup support:
+
+- `openai`, `openai_compatible`, and `vllm` use an OpenAI-compatible `/models` endpoint.
+- `ollama` uses `/api/tags`.
+- `gemini` uses the Google model-list endpoint.
+- `claude` uses the Anthropic model-list endpoint.
+- `local`, `apple_online`, `apple_intelligence`, `local_heuristic`, and Azure Speech do not expose useful remote model lists in v1.
+
 ## Admin UI
 
 The admin UI supports:
 
 - Admin login
+- Current logged-in user display and logout
+- Superadmin user management for staff and partner admins
+- Solution partner management
 - Single-user key generation
 - Enterprise key generation
 - Maintenance/support expiry dates on generated keys
 - Enterprise customer/tenant registration
 - Active unique-device license usage counts
 - Activation inspection
-- Single key revoke/reset
-- Config profile creation and editing, with speech, formatter, Presidio PII, and privacy review kept as separate provider domains
+- Single and enterprise key revoke/reactivate/delete flows
+- Enterprise device activation inspection and deletion
+- Config profile creation, editing, deletion, and cloning
+- Provider model lookup directly from the policy editor
+- Policy editing with speech, formatter, Presidio PII, and privacy review kept as separate provider domains
+- Optional managed provider API keys for speech and document generation formatter
 - Template family, language-variant and YAML draft editing
+- Template category and reusable section-preset settings
+- SF Symbol-style icon picker for templates
 - Tenant entitlement assignment for enterprise repository access
 - YAML validation before save and publish
 - Admin-chosen semver publish flow with immutable version history
@@ -263,6 +321,18 @@ docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up 
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma migrate deploy
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma db seed
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d api admin
+```
+
+Important: after pulling a new API image, run `pnpm prisma migrate deploy` before relying on the admin UI. If the image expects a newer Prisma schema than the database, admin list endpoints can fail with Prisma `P2022` missing-column errors.
+
+On older Ubuntu hosts using legacy `docker-compose` 1.x, container recreation may fail after image updates. A safe pull/recreate sequence is:
+
+```bash
+cd /opt/ulfy
+sudo docker-compose pull api admin
+sudo docker-compose run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 api pnpm prisma migrate deploy
+sudo docker rm -f ulfy_api_1 ulfy_admin_1
+sudo docker-compose up -d --no-deps api admin
 ```
 
 The Kvasetech/APISIX deployment serves Ulfy publicly at `https://kvasetech.com/backend/`.
