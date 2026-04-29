@@ -275,6 +275,14 @@ docker compose --env-file .env -f docker-compose.yml up -d api admin
 APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-backend-routes.sh
 ```
 
+Verify the deployed routing after pulling a new admin image:
+
+```bash
+bash infra/apisix/check-kvasetech-backend.sh
+```
+
+This check fails if either the template list or the full template designer route serves root `/_next/...` assets instead of `/backend/_next/...`.
+
 Public API documentation is available through APISIX at:
 
 - Swagger UI: `https://kvasetech.com/backend/api/docs`
