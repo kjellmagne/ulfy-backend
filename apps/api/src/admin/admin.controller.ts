@@ -112,6 +112,23 @@ class ConfigDto {
   featureFlags?: Record<string, boolean>;
   @ApiProperty({ required: false, example: ["openai-compatible", "internal"] })
   allowedProviderRestrictions?: string[];
+  @ApiProperty({
+    required: false,
+    description: "Admin-side provider profile metadata, privacy classifications and future app connection profile settings. Not required by the current mobile payload.",
+    example: {
+      speech: { selected: "azure", azure: { endpointURL: "http://192.168.222.171:5000" } },
+      formatter: { selected: "openai_compatible", privacyEmphasis: "managed" },
+      privacyReview: { selected: "local_heuristic" },
+      presidio: { scoreThreshold: 0.7, detectEmail: true, detectPerson: true }
+    }
+  })
+  providerProfiles?: Record<string, unknown>;
+  @ApiProperty({
+    required: false,
+    description: "Admin-side policy switches, such as whether users may override provider selections.",
+    example: { userMayChangeSpeechProvider: false, userMayChangeFormatter: false, externalFormattersAllowed: false }
+  })
+  managedPolicy?: Record<string, unknown>;
   @ApiProperty({ required: false, nullable: true, example: null })
   defaultTemplateId?: string | null;
   [key: string]: unknown;
@@ -1156,11 +1173,39 @@ export class AdminController {
   }
 
   private cleanConfig(dto: ConfigDto) {
-    return {
-      ...dto,
+    const data: Record<string, unknown> = {
+      name: dto.name,
+      partnerId: this.emptyToNull(dto.partnerId),
+      description: this.emptyToNull(dto.description as string | undefined),
+      speechProviderType: this.emptyToNull(dto.speechProviderType),
+      speechEndpointUrl: this.emptyToNull(dto.speechEndpointUrl),
+      speechModelName: this.emptyToNull(dto.speechModelName),
+      privacyControlEnabled: dto.privacyControlEnabled ?? false,
+      piiControlEnabled: dto.piiControlEnabled ?? false,
+      presidioEndpointUrl: this.emptyToNull(dto.presidioEndpointUrl),
+      presidioSecretRef: this.emptyToNull(dto.presidioSecretRef),
+      privacyReviewProviderType: this.emptyToNull(dto.privacyReviewProviderType),
+      privacyReviewEndpointUrl: this.emptyToNull(dto.privacyReviewEndpointUrl),
+      privacyReviewModel: this.emptyToNull(dto.privacyReviewModel),
+      documentGenerationProviderType: this.emptyToNull(dto.documentGenerationProviderType),
+      documentGenerationEndpointUrl: this.emptyToNull(dto.documentGenerationEndpointUrl),
+      documentGenerationModel: this.emptyToNull(dto.documentGenerationModel),
+      templateRepositoryUrl: this.emptyToNull(dto.templateRepositoryUrl),
+      telemetryEndpointUrl: this.emptyToNull(dto.telemetryEndpointUrl),
       featureFlags: dto.featureFlags ?? {},
-      allowedProviderRestrictions: dto.allowedProviderRestrictions ?? []
+      allowedProviderRestrictions: dto.allowedProviderRestrictions ?? [],
+      providerProfiles: dto.providerProfiles ?? {},
+      managedPolicy: dto.managedPolicy ?? {},
+      defaultTemplateId: this.emptyToNull(dto.defaultTemplateId ?? undefined)
     };
+    return data;
+  }
+
+  private emptyToNull(value?: string | null) {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
   }
 
   private cleanPartner(dto: Partial<PartnerDto>) {

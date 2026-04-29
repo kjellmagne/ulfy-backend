@@ -1000,6 +1000,55 @@ textarea {
   font-size: 12px;
 }
 
+.config-form {
+  display: grid;
+  gap: 16px;
+}
+.config-section {
+  padding: 16px;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+.config-section > .panel-header,
+.config-subsection > .panel-header {
+  padding: 0 0 14px;
+  border-bottom: 0;
+}
+.config-subsection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+.config-hint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: -4px 0 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.config-hint span,
+.config-hint strong {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid var(--line);
+}
+.config-hint strong {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: #fecaca;
+}
+.checkbox-group {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
 /* Info tip */
 .info-tip {
   position: relative;

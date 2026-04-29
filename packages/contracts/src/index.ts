@@ -43,23 +43,25 @@ export const MobileErrorPayload = z.object({
 });
 
 export const ConfigProfilePayload = z.object({
-  speechProviderType: z.string().optional().nullable(),
+  speechProviderType: z.enum(["local", "apple_online", "openai", "azure", "gemini"]).optional().nullable(),
   speechEndpointUrl: z.string().url().optional().nullable(),
   speechModelName: z.string().optional().nullable(),
   privacyControlEnabled: z.boolean().default(false),
   piiControlEnabled: z.boolean().default(false),
   presidioEndpointUrl: z.string().url().optional().nullable(),
   presidioSecretRef: z.string().optional().nullable(),
-  privacyReviewProviderType: z.string().optional().nullable(),
+  privacyReviewProviderType: z.enum(["local_heuristic", "apple_intelligence", "openai", "ollama", "vllm", "openai_compatible", "gemini", "claude"]).optional().nullable(),
   privacyReviewEndpointUrl: z.string().url().optional().nullable(),
   privacyReviewModel: z.string().optional().nullable(),
-  documentGenerationProviderType: z.string().optional().nullable(),
+  documentGenerationProviderType: z.enum(["apple_intelligence", "openai", "ollama", "vllm", "openai_compatible", "gemini", "claude"]).optional().nullable(),
   documentGenerationEndpointUrl: z.string().url().optional().nullable(),
   documentGenerationModel: z.string().optional().nullable(),
   templateRepositoryUrl: z.string().url().optional().nullable(),
   telemetryEndpointUrl: z.string().url().optional().nullable(),
   featureFlags: z.record(z.boolean()).default({}),
   allowedProviderRestrictions: z.array(z.string()).default([]),
+  providerProfiles: z.record(z.unknown()).default({}).optional(),
+  managedPolicy: z.record(z.unknown()).default({}).optional(),
   defaultTemplateId: z.string().uuid().optional().nullable()
 });
 

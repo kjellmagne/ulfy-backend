@@ -137,13 +137,13 @@ Sample enterprise activation payload:
   "config": {
     "id": "00000000-0000-0000-0000-000000000101",
     "name": "Default Enterprise Profile",
-    "speechProviderType": "openai-compatible",
-    "speechEndpointUrl": "https://speech.example.internal/v1/audio/transcriptions",
+    "speechProviderType": "azure",
+    "speechEndpointUrl": "http://192.168.222.171:5000",
     "privacyControlEnabled": true,
     "piiControlEnabled": true,
     "templateRepositoryUrl": "http://localhost:4000/api/v1/templates/manifest",
-    "featureFlags": { "enterpriseTemplates": true, "privacyReview": true },
-    "allowedProviderRestrictions": ["openai-compatible", "internal"]
+    "featureFlags": { "enterpriseTemplates": true, "privacyReview": true, "developerMode": false },
+    "allowedProviderRestrictions": ["azure", "openai_compatible", "local_heuristic"]
   }
 }
 ```
@@ -179,6 +179,15 @@ Sample manifest response:
 
 Single-user activations are intentionally blocked from the central repository. Enterprise catalog and download calls are filtered by the tenant tied to the activation token. Internal/dev override access can be enabled with `TEMPLATE_REPOSITORY_API_KEY`.
 
+Config profiles keep provider domains separate:
+
+- Speech: `local`, `apple_online`, `openai`, `azure`, `gemini`
+- Document generation / formatter: `apple_intelligence`, `openai`, `ollama`, `vllm`, `openai_compatible`, `gemini`, `claude`
+- Privacy review / guardrail: `local_heuristic`, `ollama`, `openai_compatible` are the recommended v1 choices
+- Presidio PII is configured separately from privacy review
+
+Leave provider fields blank when the backend should not manage that setting for the tenant.
+
 ## Admin UI
 
 The admin UI supports:
@@ -191,7 +200,7 @@ The admin UI supports:
 - Active unique-device license usage counts
 - Activation inspection
 - Single key revoke/reset
-- Config profile creation and editing
+- Config profile creation and editing, with speech, formatter, Presidio PII, and privacy review kept as separate provider domains
 - Template family, language-variant and YAML draft editing
 - Tenant entitlement assignment for enterprise repository access
 - YAML validation before save and publish

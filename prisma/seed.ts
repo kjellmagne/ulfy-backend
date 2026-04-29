@@ -284,6 +284,48 @@ async function seedTemplateRepository(tenantId: string) {
   await prisma.template.update({ where: { id: legacyTemplate.id }, data: { publishedVersionId: legacyVersion.id } });
 }
 
+function defaultProviderProfiles() {
+  return {
+    speech: {
+      selected: "azure",
+      azure: { endpointURL: "http://192.168.222.171:5000" },
+      privacyClass: "safe",
+      speakerDiarizationEnabled: false
+    },
+    formatter: {
+      selected: "openai_compatible",
+      endpointURL: "http://localhost:8000/v1",
+      modelName: "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      privacyEmphasis: "managed"
+    },
+    presidio: {
+      scoreThreshold: 0.7,
+      detectEmail: true,
+      detectPhone: true,
+      detectPerson: true,
+      detectLocation: true,
+      detectIdentifier: true,
+      fullPersonNamesOnly: false
+    },
+    privacyReview: {
+      selected: "local_heuristic",
+      privacyEmphasis: "safe",
+      eligibleForReview: true
+    }
+  };
+}
+
+function defaultManagedPolicy() {
+  return {
+    userMayChangeSpeechProvider: false,
+    userMayChangeFormatter: false,
+    userMayChangePrivacyReviewProvider: false,
+    externalFormattersAllowed: false,
+    privacyControlRequired: true,
+    piiRequired: true
+  };
+}
+
 async function main() {
   const maintenanceUntil = new Date("2027-04-29T00:00:00.000Z");
   const passwordHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!", 12);
@@ -302,29 +344,43 @@ async function main() {
     where: { id: "00000000-0000-0000-0000-000000000101" },
     update: {
       templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest",
-      featureFlags: { enterpriseTemplates: true, privacyReview: true }
+      speechProviderType: "azure",
+      speechEndpointUrl: "http://192.168.222.171:5000",
+      speechModelName: null,
+      privacyReviewProviderType: "local_heuristic",
+      privacyReviewEndpointUrl: null,
+      privacyReviewModel: null,
+      documentGenerationProviderType: "openai_compatible",
+      documentGenerationEndpointUrl: "http://localhost:8000/v1",
+      documentGenerationModel: "meta-llama/Meta-Llama-3.1-8B-Instruct",
+      featureFlags: { enterpriseTemplates: true, privacyReview: true, developerMode: false, allowExternalProviders: false },
+      allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
+      providerProfiles: defaultProviderProfiles(),
+      managedPolicy: defaultManagedPolicy()
     },
     create: {
       id: "00000000-0000-0000-0000-000000000101",
       name: "Default Enterprise Profile",
       description: "Seeded local development enterprise configuration.",
-      speechProviderType: "openai-compatible",
-      speechEndpointUrl: "https://speech.example.internal/v1/audio/transcriptions",
-      speechModelName: "whisper-large-v3",
+      speechProviderType: "azure",
+      speechEndpointUrl: "http://192.168.222.171:5000",
+      speechModelName: null,
       privacyControlEnabled: true,
       piiControlEnabled: true,
       presidioEndpointUrl: "https://presidio.example.internal",
       presidioSecretRef: "secret://ulfy/presidio",
-      privacyReviewProviderType: "openai-compatible",
-      privacyReviewEndpointUrl: "https://privacy.example.internal/v1/chat/completions",
-      privacyReviewModel: "privacy-review-v1",
-      documentGenerationProviderType: "openai-compatible",
-      documentGenerationEndpointUrl: "https://docs.example.internal/v1/chat/completions",
-      documentGenerationModel: "docgen-v1",
+      privacyReviewProviderType: "local_heuristic",
+      privacyReviewEndpointUrl: null,
+      privacyReviewModel: null,
+      documentGenerationProviderType: "openai_compatible",
+      documentGenerationEndpointUrl: "http://localhost:8000/v1",
+      documentGenerationModel: "meta-llama/Meta-Llama-3.1-8B-Instruct",
       templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest",
       telemetryEndpointUrl: "https://telemetry.example.internal/events",
-      featureFlags: { enterpriseTemplates: true, privacyReview: true },
-      allowedProviderRestrictions: ["openai-compatible", "internal"]
+      featureFlags: { enterpriseTemplates: true, privacyReview: true, developerMode: false, allowExternalProviders: false },
+      allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
+      providerProfiles: defaultProviderProfiles(),
+      managedPolicy: defaultManagedPolicy()
     }
   });
 

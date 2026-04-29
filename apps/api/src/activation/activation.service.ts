@@ -310,7 +310,7 @@ export class ActivationService {
   }
 
   private mapConfig(profile: any) {
-    return {
+    return compactObject({
       id: profile.id,
       name: profile.name,
       speechProviderType: profile.speechProviderType,
@@ -331,7 +331,7 @@ export class ActivationService {
       featureFlags: profile.featureFlags,
       allowedProviderRestrictions: profile.allowedProviderRestrictions,
       defaultTemplateId: profile.defaultTemplateId
-    };
+    });
   }
 }
 
@@ -343,4 +343,13 @@ class UnauthorizedActivation extends ForbiddenException {
 
 export function mobileError(code: string, message: string) {
   return { success: false, error: { code, message } };
+}
+
+function compactObject(input: Record<string, unknown>) {
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => {
+    if (value === null || value === undefined || value === "") return false;
+    if (Array.isArray(value) && value.length === 0) return false;
+    if (typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length === 0) return false;
+    return true;
+  }));
 }
