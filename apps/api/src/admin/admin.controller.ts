@@ -183,6 +183,13 @@ export class ConfigDto {
   [key: string]: unknown;
 }
 
+class CloneConfigDto {
+  @ApiProperty({ required: false, example: "Copy of Default Enterprise Profile" })
+  @IsOptional()
+  @IsString()
+  name?: string;
+}
+
 class TemplateDto {
   @ApiProperty({ example: "Personlig diktat / logg" })
   @IsString()
@@ -902,6 +909,41 @@ export class AdminController {
     if (partnerId) dto.partnerId = partnerId;
     const profile = await this.prisma.configProfile.create({ data: this.cleanConfig(dto) as any });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "config.create", targetType: "ConfigProfile", targetId: profile.id });
+    return profile;
+  }
+
+  @Post("config-profiles/:id/clone")
+  @ApiOperation({ summary: "Clone config profile", description: "Creates a new policy/config profile by copying all managed provider, privacy, repository, and policy fields from an existing profile." })
+  @ApiParam({ name: "id", description: "ConfigProfile UUID to clone." })
+  @ApiBody({ type: CloneConfigDto, required: false })
+  @ApiOkResponse({ description: "Config profile cloned." })
+  async cloneConfig(@Param("id") id: string, @Body() dto: CloneConfigDto = {}, @Req() req: any) {
+    const source = await this.assertConfigAccess(req, id);
+    const {
+      id: _id,
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      tenants: _tenants,
+      enterpriseKeys: _enterpriseKeys,
+      partner: _partner,
+      ...copyable
+    } = source as any;
+    const name = this.emptyToNull(dto?.name) ?? `Copy of ${source.name}`;
+    const profile = await this.prisma.configProfile.create({
+      data: {
+        ...copyable,
+        name
+      },
+      include: { partner: true }
+    });
+    await this.audit.log({
+      actorAdminId: req.user.sub,
+      actorEmail: req.user.email,
+      action: "config.clone",
+      targetType: "ConfigProfile",
+      targetId: profile.id,
+      metadata: { sourceConfigProfileId: id }
+    });
     return profile;
   }
 
