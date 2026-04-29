@@ -516,6 +516,25 @@ export class AdminController {
     return key;
   }
 
+  @Delete("single-keys/:id")
+  @ApiOperation({ summary: "Delete single-user license key", description: "Deletes a single-user key and any associated device activations." })
+  @ApiParam({ name: "id", description: "SingleLicenseKey UUID." })
+  @ApiOkResponse({ description: "Single-user key deleted.", schema: { example: { success: true, deletedActivations: 1 } } })
+  async deleteSingleKey(@Param("id") id: string, @Req() req: any) {
+    await this.assertSingleKeyAccess(req, id);
+    const deletedActivations = await this.prisma.deviceActivation.deleteMany({ where: { singleLicenseKeyId: id } });
+    await this.prisma.singleLicenseKey.delete({ where: { id } });
+    await this.audit.log({
+      actorAdminId: req.user.sub,
+      actorEmail: req.user.email,
+      action: "license.single.delete",
+      targetType: "SingleLicenseKey",
+      targetId: id,
+      metadata: { deletedActivations: deletedActivations.count }
+    });
+    return { success: true, deletedActivations: deletedActivations.count };
+  }
+
   @Get("enterprise-keys")
   @ApiOperation({ summary: "List enterprise license keys" })
   @ApiOkResponse({ description: "Enterprise license key list with tenant/config profile info." })
@@ -552,6 +571,25 @@ export class AdminController {
     });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "license.enterprise.generate", targetType: "EnterpriseLicenseKey", targetId: key.id });
     return { ...key, activationKey };
+  }
+
+  @Delete("enterprise-keys/:id")
+  @ApiOperation({ summary: "Delete enterprise license key", description: "Deletes an enterprise key and any registered device activations for that key." })
+  @ApiParam({ name: "id", description: "EnterpriseLicenseKey UUID." })
+  @ApiOkResponse({ description: "Enterprise key deleted.", schema: { example: { success: true, deletedActivations: 3 } } })
+  async deleteEnterpriseKey(@Param("id") id: string, @Req() req: any) {
+    await this.assertEnterpriseKeyAccess(req, id);
+    const deletedActivations = await this.prisma.deviceActivation.deleteMany({ where: { enterpriseLicenseKeyId: id } });
+    await this.prisma.enterpriseLicenseKey.delete({ where: { id } });
+    await this.audit.log({
+      actorAdminId: req.user.sub,
+      actorEmail: req.user.email,
+      action: "license.enterprise.delete",
+      targetType: "EnterpriseLicenseKey",
+      targetId: id,
+      metadata: { deletedActivations: deletedActivations.count }
+    });
+    return { success: true, deletedActivations: deletedActivations.count };
   }
 
   @Get("tenants")
@@ -909,9 +947,18 @@ export class AdminController {
 
   private async assertSingleKeyAccess(req: any, keyId: string) {
     const partnerId = this.scopedPartnerId(req);
-    if (!partnerId) return;
-    const key = await this.prisma.singleLicenseKey.findFirst({ where: { id: keyId, partnerId } });
+    const key = await this.prisma.singleLicenseKey.findFirst({ where: { id: keyId, ...(partnerId ? { partnerId } : {}) } });
     if (!key) throw new ForbiddenException("License key is not available to this admin user.");
+    return key;
+  }
+
+  private async assertEnterpriseKeyAccess(req: any, keyId: string) {
+    const partnerId = this.scopedPartnerId(req);
+    const key = await this.prisma.enterpriseLicenseKey.findFirst({
+      where: { id: keyId, ...(partnerId ? { OR: [{ partnerId }, { tenant: { partnerId } }] } : {}) }
+    });
+    if (!key) throw new ForbiddenException("License key is not available to this admin user.");
+    return key;
   }
 
   private async assertTemplateAccess(req: any, templateId: string) {
