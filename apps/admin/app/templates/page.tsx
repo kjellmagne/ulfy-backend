@@ -6,6 +6,8 @@ import * as yaml from "js-yaml";
 import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { IconPicker, TagEditor, presetToTemplateSection } from "../../components/TemplateControls";
+import type { TemplateSectionPresetOption } from "../../components/TemplateControls";
 import { useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 import { appPath } from "../../lib/base-path";
@@ -72,7 +74,7 @@ type SectionPreset = {
 };
 type DragItem = { kind: "preset"; preset: SectionPreset } | { kind: "section"; index: number };
 
-const blankFamily = { id: "", title: "", shortDescription: "", categoryId: "", icon: "doc.text", tagsText: "", isGlobal: false };
+const blankFamily = { id: "", title: "", shortDescription: "", categoryId: "", icon: "doc.text", tags: [] as string[], isGlobal: false };
 
 function IconLink({ label, href, children, tone = "secondary" }: { label: string; href: string; children: ReactNode; tone?: "primary" | "secondary" | "danger" }) {
   return (
@@ -84,7 +86,7 @@ function IconLink({ label, href, children, tone = "secondary" }: { label: string
   );
 }
 
-const sectionPresets: SectionPreset[] = [
+const fallbackSectionPresets: SectionPreset[] = [
   {
     title: "Summary",
     purpose: "Summarize the transcript into a short, useful overview.",
@@ -235,6 +237,8 @@ function listToText(value?: string[]) {
 export default function TemplatesPage() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [sectionPresetRows, setSectionPresetRows] = useState<TemplateSectionPresetOption[]>([]);
+  const [tagOptions, setTagOptions] = useState<string[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -265,6 +269,7 @@ export default function TemplatesPage() {
   }, [variantForm.yamlContent]);
   const templateIdentity = templateDoc?.identity ?? {};
   const templateSections = templateDoc?.structure?.sections ?? [];
+  const sectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
   const requiredSectionCount = templateSections.filter((section) => section.required !== false).length;
   const optionalSectionCount = Math.max(templateSections.length - requiredSectionCount, 0);
   const latestSelectedVersion = selectedFamily?.variants.find((variant) => variant.id === variantForm.variantId)?.publishedVersions?.[0]?.version ?? "Draft only";
@@ -379,14 +384,18 @@ export default function TemplatesPage() {
   async function load() {
     setLoading(true);
     try {
-      const [familyRows, categoryRows, tenantRows] = await Promise.all([
+      const [familyRows, categoryRows, tenantRows, sectionRows, tagRows] = await Promise.all([
         api("/admin/template-families"),
         api("/admin/template-categories"),
-        api("/admin/tenants")
+        api("/admin/tenants"),
+        api("/admin/template-section-presets"),
+        api("/admin/template-tags")
       ]);
       setFamilies(familyRows);
       setCategories(categoryRows);
       setTenants(tenantRows);
+      setSectionPresetRows(sectionRows);
+      setTagOptions(tagRows);
     } finally {
       setLoading(false);
     }
@@ -426,7 +435,7 @@ export default function TemplatesPage() {
       shortDescription: family.shortDescription,
       categoryId: family.categoryId ?? "",
       icon: family.icon,
-      tagsText: (family.tags ?? []).join(", "),
+      tags: family.tags ?? [],
       isGlobal: family.isGlobal
     } : { ...blankFamily, categoryId: categories[0]?.id ?? "" });
     setFamilyPanel(true);
@@ -471,7 +480,7 @@ export default function TemplatesPage() {
         shortDescription: familyForm.shortDescription,
         categoryId: familyForm.categoryId || undefined,
         icon: familyForm.icon || "doc.text",
-        tags: familyForm.tagsText.split(",").map((tag) => tag.trim()).filter(Boolean),
+        tags: familyForm.tags,
         isGlobal: familyForm.isGlobal
       };
       const path = familyForm.id ? `/admin/template-families/${familyForm.id}` : "/admin/template-families";
@@ -682,9 +691,13 @@ export default function TemplatesPage() {
             <div className="field"><FieldLabel>Short Description</FieldLabel><input className="input" value={familyForm.shortDescription} onChange={(e) => setFamilyForm({ ...familyForm, shortDescription: e.target.value })} /></div>
           </FormSection>
           <FormSection title="Catalog presentation" description="How this family appears in admin lists and tenant catalogs.">
-            <div className="grid two">
-              <div className="field"><FieldLabel>Icon</FieldLabel><input className="input" value={familyForm.icon} onChange={(e) => setFamilyForm({ ...familyForm, icon: e.target.value })} /></div>
-              <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" value={familyForm.tagsText} onChange={(e) => setFamilyForm({ ...familyForm, tagsText: e.target.value })} placeholder="dictation, personal" /></div>
+            <div className="field">
+              <FieldLabel help="These are SF Symbol names used by the iOS app. The admin stores the symbol name, for example waveform.and.mic.">Icon</FieldLabel>
+              <IconPicker value={familyForm.icon} onChange={(icon) => setFamilyForm({ ...familyForm, icon })} />
+            </div>
+            <div className="field">
+              <FieldLabel>Tags</FieldLabel>
+              <TagEditor value={familyForm.tags} options={tagOptions} onChange={(tags) => setFamilyForm({ ...familyForm, tags })} />
             </div>
             <label className="checkbox-row"><input type="checkbox" checked={familyForm.isGlobal} onChange={(e) => setFamilyForm({ ...familyForm, isGlobal: e.target.checked })} /> Global template family for all enterprise tenants</label>
           </FormSection>
@@ -748,9 +761,9 @@ export default function TemplatesPage() {
                     <div className="field"><FieldLabel>Template title</FieldLabel><input className="input" value={templateIdentity.title ?? ""} onChange={(e) => updateIdentity("title", e.target.value)} /></div>
                     <div className="field"><FieldLabel>Language</FieldLabel><input className="input" value={variantForm.language} onChange={(e) => updateLanguage(e.target.value)} /></div>
                     <div className="field"><FieldLabel>Short description</FieldLabel><input className="input" value={templateIdentity.short_description ?? ""} onChange={(e) => updateIdentity("short_description", e.target.value)} /></div>
-                    <div className="field"><FieldLabel>Category</FieldLabel><input className="input" value={templateIdentity.category ?? ""} onChange={(e) => updateIdentity("category", e.target.value)} /></div>
-                    <div className="field"><FieldLabel>Icon</FieldLabel><input className="input" value={templateIdentity.icon ?? ""} onChange={(e) => updateIdentity("icon", e.target.value)} /></div>
-                    <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" value={(templateIdentity.tags ?? []).join(", ")} onChange={(e) => updateIdentity("tags", textToList(e.target.value))} placeholder="dictation, personal" /></div>
+                    <div className="field"><FieldLabel>Category</FieldLabel><select value={templateIdentity.category ?? ""} onChange={(e) => updateIdentity("category", e.target.value)}><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.slug}>{category.title}</option>)}</select></div>
+                    <div className="field wide"><FieldLabel>Icon</FieldLabel><IconPicker value={templateIdentity.icon ?? "doc.text"} onChange={(icon) => updateIdentity("icon", icon)} /></div>
+                    <div className="field wide"><FieldLabel>Tags</FieldLabel><TagEditor value={templateIdentity.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} /></div>
                     <div className="field"><FieldLabel>Publish bump</FieldLabel><select value={variantForm.bump} onChange={(e) => setVariantForm({ ...variantForm, bump: e.target.value as any })}><option value="patch">Patch</option><option value="minor">Minor</option><option value="major">Major</option></select></div>
                   </div>
                 </div>

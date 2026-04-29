@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, KeyRound, LayoutDashboard, ScrollText, Settings, ShieldCheck, Users } from "lucide-react";
+import { Building2, KeyRound, LayoutDashboard, ScrollText, Settings, ShieldCheck, SlidersHorizontal, Users } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { appPath, basePath } from "../lib/base-path";
 import { AdminSession } from "./AdminSession";
@@ -14,6 +14,7 @@ const mainLinks = [
 ];
 
 const systemLinks = [
+  { href: "/settings", label: "Settings", icon: SlidersHorizontal },
   { href: "/users", label: "Users", icon: Users },
   { href: "/audit", label: "Audit", icon: ShieldCheck }
 ];

@@ -5,6 +5,8 @@ import type { KeyboardEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, IconAction, LoadingPanel, StatusBadge } from "../../../components/AdminUI";
+import { IconPicker, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
+import type { TemplateCategoryOption, TemplateSectionPresetOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../../components/ToastProvider";
 import { api } from "../../../lib/api";
@@ -92,7 +94,7 @@ type VariantForm = {
   preview: DraftPreview | null;
 };
 
-const sectionPresets: SectionPreset[] = [
+const fallbackSectionPresets: SectionPreset[] = [
   {
     title: "Summary",
     purpose: "Summarize the transcript into a short, useful overview.",
@@ -152,7 +154,7 @@ function previewFromDraft(draft?: Draft | null): DraftPreview | null {
   };
 }
 
-function starterYaml(family: Family): string {
+function starterYaml(family: Family, presets: SectionPreset[] = fallbackSectionPresets): string {
   const doc: TemplateYamlDoc = {
     identity: {
       id: uuid(),
@@ -173,7 +175,7 @@ function starterYaml(family: Family): string {
       audience: "internal"
     },
     structure: {
-      sections: sectionPresets.slice(0, 3)
+      sections: presets.slice(0, 3)
     },
     content_rules: {
       preserve_facts: true,
@@ -244,6 +246,9 @@ export default function TemplateDesignerRoute() {
 
   const [family, setFamily] = useState<Family | null>(null);
   const [variant, setVariant] = useState<Variant | null>(null);
+  const [categories, setCategories] = useState<TemplateCategoryOption[]>([]);
+  const [sectionPresetRows, setSectionPresetRows] = useState<TemplateSectionPresetOption[]>([]);
+  const [tagOptions, setTagOptions] = useState<string[]>([]);
   const [variantForm, setVariantForm] = useState<VariantForm>(blankVariantForm);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -267,7 +272,13 @@ export default function TemplateDesignerRoute() {
     setLoading(true);
     setError("");
     try {
-      const families = await api("/admin/template-families") as Family[];
+      const [families, categoryRows, sectionRows, tagRows] = await Promise.all([
+        api("/admin/template-families"),
+        api("/admin/template-categories"),
+        api("/admin/template-section-presets"),
+        api("/admin/template-tags")
+      ]) as [Family[], TemplateCategoryOption[], TemplateSectionPresetOption[], string[]];
+      const presetSections = sectionRows.length ? sectionRows.map(presetToTemplateSection) : fallbackSectionPresets;
       const nextFamily = families.find((item) => item.id === familyId) ?? null;
       if (!nextFamily) {
         setFamily(null);
@@ -281,6 +292,9 @@ export default function TemplateDesignerRoute() {
         : nextFamily.variants.find((item) => item.id === variantId) ?? null;
       const draft = nextVariant?.draft;
 
+      setCategories(categoryRows);
+      setSectionPresetRows(sectionRows);
+      setTagOptions(tagRows);
       setFamily(nextFamily);
       setVariant(nextVariant);
       setVariantForm({
@@ -288,7 +302,7 @@ export default function TemplateDesignerRoute() {
         variantId: nextVariant?.id ?? "",
         draftId: draft?.id ?? "",
         language: nextVariant?.language ?? "nb-NO",
-        yamlContent: draft?.yamlContent ?? starterYaml(nextFamily),
+        yamlContent: draft?.yamlContent ?? starterYaml(nextFamily, presetSections),
         sampleTranscript: draft?.sampleTranscript ?? "",
         bump: "patch",
         aiUseCase: nextFamily.title,
@@ -314,6 +328,7 @@ export default function TemplateDesignerRoute() {
   const templateDoc = useMemo(() => parseTemplateYaml(variantForm.yamlContent), [variantForm.yamlContent]);
   const templateIdentity = templateDoc?.identity;
   const templateSections = templateDoc?.structure?.sections ?? [];
+  const sectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
   const selectedSection = selectedSectionIndex === null ? null : templateSections[selectedSectionIndex] ?? null;
   const latestVersion = publishedVersion(variant);
   const requiredCount = templateSections.filter((section) => section.required).length;
@@ -755,11 +770,16 @@ export default function TemplateDesignerRoute() {
                   </div>
                   <div className="field">
                     <FieldLabel>Category</FieldLabel>
-                    <input className="input" value={templateIdentity?.category ?? ""} onChange={(event) => updateIdentity("category", event.target.value)} />
+                    <select value={templateIdentity?.category ?? ""} onChange={(event) => updateIdentity("category", event.target.value)}>
+                      <option value="">Uncategorized</option>
+                      {categories.map((category) => (
+                        <option key={category.id} value={category.slug}>{category.title}</option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="field">
-                    <FieldLabel>Icon</FieldLabel>
-                    <input className="input" value={templateIdentity?.icon ?? ""} onChange={(event) => updateIdentity("icon", event.target.value)} />
+                  <div className="field wide">
+                    <FieldLabel help="SF Symbol name used by the iOS app, for example waveform.and.mic.">Icon</FieldLabel>
+                    <IconPicker value={templateIdentity?.icon ?? "doc.text"} onChange={(icon) => updateIdentity("icon", icon)} />
                   </div>
                   <div className="field">
                     <FieldLabel>Version in YAML</FieldLabel>
@@ -767,7 +787,7 @@ export default function TemplateDesignerRoute() {
                   </div>
                   <div className="field wide">
                     <FieldLabel>Tags</FieldLabel>
-                    <textarea value={listToText(templateIdentity?.tags)} onChange={(event) => updateIdentity("tags", textToList(event.target.value))} />
+                    <TagEditor value={templateIdentity?.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} />
                   </div>
                 </div>
               </section>

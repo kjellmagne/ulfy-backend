@@ -316,6 +316,55 @@ class TemplateAiAssistDto {
   icon?: string;
 }
 
+class TemplateCategoryDto {
+  @ApiProperty({ example: "oppfolgingssamtale" })
+  @IsString()
+  slug!: string;
+
+  @ApiProperty({ example: "Oppfølgingssamtale" })
+  @IsString()
+  title!: string;
+
+  @ApiProperty({ required: false, example: "Templates for structured follow-up conversations." })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+class TemplateSectionPresetDto {
+  @ApiProperty({ example: "action-items" })
+  @IsString()
+  slug!: string;
+
+  @ApiProperty({ example: "Action items" })
+  @IsString()
+  title!: string;
+
+  @ApiProperty({ example: "Extract follow-up tasks with owner and deadline when present." })
+  @IsString()
+  purpose!: string;
+
+  @ApiProperty({ required: false, example: "table" })
+  @IsOptional()
+  @IsString()
+  format?: string;
+
+  @ApiProperty({ required: false, example: false })
+  @IsOptional()
+  @IsBoolean()
+  required?: boolean;
+
+  @ApiProperty({ required: false, example: ["task", "owner", "deadline"], type: [String] })
+  @IsOptional()
+  @IsArray()
+  extractionHints?: string[];
+
+  @ApiProperty({ required: false, example: 30 })
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+}
+
 class TenantDto {
   @ApiProperty({ example: "Acme Health" })
   @IsString()
@@ -1096,6 +1145,114 @@ export class AdminController {
     return this.prisma.templateCategory.findMany({ orderBy: { title: "asc" } });
   }
 
+  @Post("template-categories")
+  @ApiOperation({ summary: "Create template category", description: "Superadmin only. Categories are used by template families and YAML identity metadata." })
+  @ApiBody({ type: TemplateCategoryDto })
+  @ApiOkResponse({ description: "Template category created." })
+  async createTemplateCategory(@Body() dto: TemplateCategoryDto, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const category = await this.prisma.templateCategory.create({
+      data: { slug: this.normalizeSlug(dto.slug), title: dto.title, description: dto.description }
+    });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.category.create", targetType: "TemplateCategory", targetId: category.id });
+    return category;
+  }
+
+  @Patch("template-categories/:id")
+  @ApiOperation({ summary: "Update template category", description: "Superadmin only." })
+  @ApiParam({ name: "id", description: "TemplateCategory UUID." })
+  @ApiBody({ type: TemplateCategoryDto })
+  @ApiOkResponse({ description: "Template category updated." })
+  async updateTemplateCategory(@Param("id") id: string, @Body() dto: Partial<TemplateCategoryDto>, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const category = await this.prisma.templateCategory.update({
+      where: { id },
+      data: {
+        slug: dto.slug ? this.normalizeSlug(dto.slug) : undefined,
+        title: dto.title,
+        description: dto.description
+      }
+    });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.category.update", targetType: "TemplateCategory", targetId: id });
+    return category;
+  }
+
+  @Delete("template-categories/:id")
+  @ApiOperation({ summary: "Delete template category", description: "Superadmin only. Categories in use by templates or families cannot be deleted." })
+  @ApiParam({ name: "id", description: "TemplateCategory UUID." })
+  @ApiOkResponse({ description: "Template category deleted.", schema: { example: { success: true } } })
+  async deleteTemplateCategory(@Param("id") id: string, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const [templates, families] = await Promise.all([
+      this.prisma.template.count({ where: { categoryId: id } }),
+      this.prisma.templateFamily.count({ where: { categoryId: id } })
+    ]);
+    if (templates || families) throw new ConflictException("Cannot delete a category while templates or template families use it.");
+    await this.prisma.templateCategory.delete({ where: { id } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.category.delete", targetType: "TemplateCategory", targetId: id });
+    return { success: true };
+  }
+
+  @Get("template-section-presets")
+  @ApiOperation({ summary: "List template section presets", description: "Reusable section building blocks shown in the admin template designer." })
+  @ApiOkResponse({ description: "Template section presets." })
+  templateSectionPresets() {
+    return this.prisma.templateSectionPreset.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] });
+  }
+
+  @Post("template-section-presets")
+  @ApiOperation({ summary: "Create template section preset", description: "Superadmin only." })
+  @ApiBody({ type: TemplateSectionPresetDto })
+  @ApiOkResponse({ description: "Template section preset created." })
+  async createTemplateSectionPreset(@Body() dto: TemplateSectionPresetDto, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const preset = await this.prisma.templateSectionPreset.create({ data: this.cleanTemplateSectionPresetCreate(dto) });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.section_preset.create", targetType: "TemplateSectionPreset", targetId: preset.id });
+    return preset;
+  }
+
+  @Patch("template-section-presets/:id")
+  @ApiOperation({ summary: "Update template section preset", description: "Superadmin only." })
+  @ApiParam({ name: "id", description: "TemplateSectionPreset UUID." })
+  @ApiBody({ type: TemplateSectionPresetDto })
+  @ApiOkResponse({ description: "Template section preset updated." })
+  async updateTemplateSectionPreset(@Param("id") id: string, @Body() dto: Partial<TemplateSectionPresetDto>, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const preset = await this.prisma.templateSectionPreset.update({ where: { id }, data: this.cleanTemplateSectionPresetUpdate(dto) });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.section_preset.update", targetType: "TemplateSectionPreset", targetId: id });
+    return preset;
+  }
+
+  @Delete("template-section-presets/:id")
+  @ApiOperation({ summary: "Delete template section preset", description: "Superadmin only. Existing template YAML is not changed." })
+  @ApiParam({ name: "id", description: "TemplateSectionPreset UUID." })
+  @ApiOkResponse({ description: "Template section preset deleted.", schema: { example: { success: true } } })
+  async deleteTemplateSectionPreset(@Param("id") id: string, @Req() req: any) {
+    this.requireSuperadmin(req);
+    await this.prisma.templateSectionPreset.delete({ where: { id } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.section_preset.delete", targetType: "TemplateSectionPreset", targetId: id });
+    return { success: true };
+  }
+
+  @Get("template-tags")
+  @ApiOperation({ summary: "List known template tags", description: "Aggregates tags used by legacy templates and repository template families." })
+  @ApiOkResponse({ description: "Known template tags.", schema: { example: ["dictation", "personal", "meeting"] } })
+  async templateTags() {
+    const [families, templates] = await Promise.all([
+      this.prisma.templateFamily.findMany({ select: { tags: true } }),
+      this.prisma.template.findMany({ select: { tags: true } })
+    ]);
+    const tags = new Set<string>();
+    for (const row of [...families, ...templates]) {
+      if (Array.isArray(row.tags)) {
+        for (const tag of row.tags) {
+          if (typeof tag === "string" && tag.trim()) tags.add(tag.trim());
+        }
+      }
+    }
+    return [...tags].sort((a, b) => a.localeCompare(b));
+  }
+
   @Post("templates")
   @ApiOperation({ summary: "Create template draft/version", description: "Creates a template and initial YAML version after YAML/schema validation." })
   @ApiBody({ type: TemplateDto })
@@ -1255,6 +1412,36 @@ export class AdminController {
       email: dto.email,
       notes: dto.notes
     };
+  }
+
+  private normalizeSlug(value: string) {
+    const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    if (!slug) throw new ConflictException("Slug must contain at least one letter or number.");
+    return slug;
+  }
+
+  private cleanTemplateSectionPresetCreate(dto: TemplateSectionPresetDto) {
+    return {
+      slug: this.normalizeSlug(dto.slug),
+      title: dto.title,
+      purpose: dto.purpose,
+      format: dto.format ?? "prose",
+      required: dto.required ?? false,
+      extractionHints: dto.extractionHints ?? [],
+      sortOrder: dto.sortOrder ?? 0
+    };
+  }
+
+  private cleanTemplateSectionPresetUpdate(dto: Partial<TemplateSectionPresetDto>) {
+    const data: Record<string, unknown> = {};
+    if (dto.slug !== undefined) data.slug = this.normalizeSlug(dto.slug);
+    if (dto.title !== undefined) data.title = dto.title;
+    if (dto.purpose !== undefined) data.purpose = dto.purpose;
+    if (dto.format !== undefined) data.format = dto.format;
+    if (dto.required !== undefined) data.required = dto.required;
+    if (dto.extractionHints !== undefined) data.extractionHints = dto.extractionHints;
+    if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
+    return data;
   }
 
   private async cleanAdminUser(dto: AdminUserCreateDto | AdminUserUpdateDto, creating: boolean) {

@@ -178,6 +178,71 @@ const seedTemplates: SeedTemplate[] = [
   }
 ];
 
+const templateSectionPresets = [
+  {
+    slug: "summary",
+    title: "Summary",
+    purpose: "Summarize the transcript into a short, useful overview.",
+    format: "prose",
+    required: true,
+    extractionHints: ["main topic", "important context", "outcome"],
+    sortOrder: 10
+  },
+  {
+    slug: "decisions",
+    title: "Decisions",
+    purpose: "List clear decisions that were made during the conversation.",
+    format: "bullets",
+    required: false,
+    extractionHints: ["decision", "owner", "reason"],
+    sortOrder: 20
+  },
+  {
+    slug: "action-items",
+    title: "Action items",
+    purpose: "Extract follow-up tasks with owner and deadline when present.",
+    format: "table",
+    required: false,
+    extractionHints: ["task", "owner", "deadline"],
+    sortOrder: 30
+  },
+  {
+    slug: "risks",
+    title: "Risks",
+    purpose: "Capture blockers, uncertainty, or sensitive issues mentioned.",
+    format: "bullets",
+    required: false,
+    extractionHints: ["risk", "blocker", "dependency"],
+    sortOrder: 40
+  },
+  {
+    slug: "follow-up-plan",
+    title: "Follow-up plan",
+    purpose: "Describe recommended next steps based only on the transcript.",
+    format: "numbered_list",
+    required: false,
+    extractionHints: ["next step", "priority", "responsible party"],
+    sortOrder: 50
+  }
+];
+
+async function seedTemplateSectionPresets() {
+  for (const preset of templateSectionPresets) {
+    await prisma.templateSectionPreset.upsert({
+      where: { slug: preset.slug },
+      update: {
+        title: preset.title,
+        purpose: preset.purpose,
+        format: preset.format,
+        required: preset.required,
+        extractionHints: preset.extractionHints,
+        sortOrder: preset.sortOrder
+      },
+      create: preset
+    });
+  }
+}
+
 async function seedTemplateRepository(tenantId: string) {
   for (const template of seedTemplates) {
     const yamlContent = templateYaml(template);
@@ -413,6 +478,7 @@ async function main() {
     }
   });
 
+  await seedTemplateSectionPresets();
   await seedTemplateRepository(tenant.id);
 
   const singleKey = process.env.SEED_SINGLE_KEY ?? createActivationKey("ULFY-S");
