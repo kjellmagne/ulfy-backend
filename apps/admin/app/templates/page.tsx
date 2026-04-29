@@ -8,6 +8,7 @@ import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
 import { useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
+import { appPath } from "../../lib/base-path";
 
 type Category = { id: string; slug: string; title: string };
 type Tenant = { id: string; name: string; slug: string };
@@ -396,6 +397,14 @@ export default function TemplatesPage() {
     return variant.publishedVersions?.[0];
   }
 
+  function designerPath(family: Family, variant?: Variant) {
+    return appPath(`/templates/${family.id}/${variant?.id ?? "new"}`);
+  }
+
+  function openDesignerRoute(family: Family, variant?: Variant) {
+    window.location.href = designerPath(family, variant);
+  }
+
   function openFamilyEditor(family?: Family) {
     setError(""); setNotice("");
     setSelectedFamily(family ?? null);
@@ -615,13 +624,13 @@ export default function TemplatesPage() {
           </div>
 
           <div className="panel">
-            <PanelHeader title="Template repository" description="List first, designer in a slide-in panel. Double-click a row to open the first variant." />
+            <PanelHeader title="Template repository" description="List first, full-screen designer for focused authoring. Double-click a row to open the first variant." />
             {!families.length ? <EmptyState title="No template families" message="Create a family, add a language variant, then publish it." /> : (
               <div className="table-wrap">
                 <table className="table">
                   <thead><tr><th>Family</th><th>Availability</th><th>Variants</th><th>Latest</th><th className="actions">Actions</th></tr></thead>
                   <tbody>{families.map((family) => (
-                    <tr key={family.id} onDoubleClick={() => openDesigner(family, family.variants[0])}>
+                    <tr key={family.id} onDoubleClick={() => openDesignerRoute(family, family.variants[0])}>
                       <td><b>{family.title}</b><br /><span className="muted">{family.shortDescription}</span></td>
                       <td>
                         <div className="row">
@@ -632,8 +641,8 @@ export default function TemplatesPage() {
                       <td>{family.variants.length ? family.variants.map((variant) => <span key={variant.id} className="badge">{variant.language}</span>) : <span className="muted">No variants</span>}</td>
                       <td>{family.variants.map((variant) => latest(variant) ? <span key={variant.id} className="badge status-published">{variant.language} {latest(variant)?.version}</span> : <span key={variant.id} className="badge status-draft">{variant.language} draft</span>)}</td>
                       <td className="row actions">
-                        <IconAction label="Open designer" onClick={() => openDesigner(family, family.variants[0])}><FileText size={14} /></IconAction>
-                        <IconAction label="New language variant" onClick={() => openDesigner(family)}><Globe2 size={14} /></IconAction>
+                        <IconAction label="Open designer" onClick={() => openDesignerRoute(family, family.variants[0])}><FileText size={14} /></IconAction>
+                        <IconAction label="New language variant" onClick={() => openDesignerRoute(family)}><Globe2 size={14} /></IconAction>
                         <IconAction label="Edit family" onClick={() => openFamilyEditor(family)}><Pencil size={14} /></IconAction>
                         <IconAction label="Archive family" tone="danger" onClick={() => archiveFamily(family)}><Archive size={14} /></IconAction>
                       </td>
