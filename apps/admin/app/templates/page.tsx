@@ -409,7 +409,7 @@ export default function TemplatesPage() {
   }
 
   function designerPath(family: Family, variant?: Variant) {
-    return appPath(`/templates/${family.id}/${variant?.id ?? "new"}`);
+    return appPath(`/templates/designer?familyId=${encodeURIComponent(family.id)}&variantId=${encodeURIComponent(variant?.id ?? "new")}`);
   }
 
   function openDesignerRoute(family: Family, variant?: Variant) {

@@ -16,7 +16,7 @@ function normalizePath(value?: string) {
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@ulfy/contracts"],
-  basePath: publicBasePath || undefined,
+  assetPrefix: publicBasePath || undefined,
   async rewrites() {
     if (process.env.NEXT_PUBLIC_API_BASE_URL) return [];
     return [

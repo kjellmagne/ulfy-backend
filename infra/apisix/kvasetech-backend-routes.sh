@@ -43,6 +43,11 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin" \
     \"host\": \"${HOST}\",
     \"uris\": [\"/backend\", \"/backend/*\"],
     \"priority\": 100,
+    \"plugins\": {
+      \"proxy-rewrite\": {
+        \"regex_uri\": [\"^/backend/?(.*)\", \"/\$1\"]
+      }
+    },
     \"upstream\": {
       \"type\": \"roundrobin\",
       \"nodes\": {
@@ -53,4 +58,4 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin" \
 
 echo "Configured Ulfy routes:"
 echo "  https://${HOST}/backend/api/* -> http://${API_UPSTREAM}/api/*"
-echo "  https://${HOST}/backend/*     -> http://${ADMIN_UPSTREAM}/backend/*"
+echo "  https://${HOST}/backend/*     -> http://${ADMIN_UPSTREAM}/*"

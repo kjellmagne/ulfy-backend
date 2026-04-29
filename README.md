@@ -264,7 +264,7 @@ The Kvasetech/APISIX deployment serves Ulfy publicly at `https://kvasetech.com/b
 Important routing rule:
 
 - API route: `/backend/api/*` is proxied to the API after stripping `/backend`, so the API receives `/api/*`.
-- Admin route: `/backend` and `/backend/*` are proxied to the admin without stripping `/backend`. The admin image is built with Next.js `basePath=/backend`, so pages and `_next` assets must keep that prefix.
+- Admin route: `/backend` and `/backend/*` is proxied to the admin after stripping `/backend`, so Next.js receives `/`, `/templates`, and `/_next/*`. The admin image uses `NEXT_PUBLIC_BASE_PATH=/backend` as an asset/link prefix, not as a Next.js `basePath`.
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml pull
@@ -297,7 +297,7 @@ GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0
 - `ghcr.io/kjellmagne/ulfy-backend-api:sha-<commit>`
 - `ghcr.io/kjellmagne/ulfy-backend-admin:sha-<commit>`
 
-The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time and leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, include the complete public API prefix, for example `https://kvasetech.com/backend`.
+The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time for public links and `_next` asset URLs, while APISIX strips `/backend` before forwarding admin requests to Next.js. It leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, include the complete public API prefix, for example `https://kvasetech.com/backend`.
 
 Required deployment environment variables:
 
