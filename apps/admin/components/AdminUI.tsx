@@ -155,7 +155,7 @@ export function StatCard({ label, value, icon, sub }: { label: string; value: nu
         <span className="metric-icon">{icon}</span>
       </div>
       <div className="metric-value">{value}</div>
-      {sub && <div style={{ fontSize: '12px', color: '#64748b', marginTop: '5px' }}>{sub}</div>}
+      {sub && <div className="metric-subtitle">{sub}</div>}
     </div>
   );
 }

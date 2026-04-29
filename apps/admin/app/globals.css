@@ -126,11 +126,18 @@ button, input, textarea, select { font: inherit; }
   color: var(--sidebar-active);
   font-weight: 600;
 }
+.nav a.active:hover {
+  background: rgba(13,148,136,0.2);
+  color: var(--sidebar-active);
+}
 .nav-icon {
   font-size: 15px;
   width: 18px;
   text-align: center;
   line-height: 1;
+}
+.nav-icon svg {
+  display: block;
 }
 .nav-session {
   flex: 0 0 auto;
@@ -204,6 +211,10 @@ button, input, textarea, select { font: inherit; }
 .nav-logout:hover {
   background: rgba(255,255,255,0.1);
   color: #e2e8f0;
+}
+.nav-logout:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Page structure */
@@ -656,6 +667,11 @@ textarea {
   font-weight: 700;
   line-height: 1;
   color: var(--ink);
+}
+.metric-subtitle {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--muted);
 }
 .metric-card {
   background: white;
