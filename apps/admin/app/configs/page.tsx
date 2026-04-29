@@ -11,9 +11,11 @@ const helpText = {
   speechProviderType: "Choose where audio is converted to text. On-device and controlled-environment options keep more data under your control. Cloud providers may send audio or transcript content to an external service. Values: local, apple_online, openai, azure, gemini. Locks app UI. Full support.",
   speechEndpointUrl: "Endpoint URL for the selected speech provider. Use this for self-hosted or controlled-environment speech services such as Azure Speech containers or internal gateway routes. Locks app UI when set.",
   speechModelName: "Optional model identifier for speech providers that expose multiple models. Leave unset when the service does not use model names. Locks app UI when set.",
+  speechApiKey: "Optional API key for the selected speech provider. Prefer an internal gateway endpoint or tenant-scoped key when possible. If sent to the app, it should be treated as a managed credential.",
   documentGenerationProviderType: "Choose how Ulfy turns the transcript into a finished note. Self-hosted or internally routed providers keep content under your control. Values: apple_intelligence, openai, ollama, vllm, openai_compatible, gemini, claude. Locks app UI. Full support.",
   documentGenerationEndpointUrl: "Endpoint URL for the document-generation provider. Use this for internal gateways, self-hosted providers, or OpenAI-compatible services. Locks app UI when set.",
   documentGenerationModel: "Model identifier used for document generation. Choose the organization-approved model for note formatting. Locks app UI when set.",
+  documentGenerationApiKey: "Optional API key for the document-generation provider. Prefer internal gateways or tenant-scoped keys. If sent to the app, it should be treated as a managed credential.",
   privacyControlEnabled: "Enables privacy review before transcript content is sent to an external formatter. Values: true or false. Locks app UI. Full support.",
   privacyReviewProviderType: "Choose which provider reviews transcript text for privacy concerns before document generation. Best supported with local_heuristic, ollama, or openai_compatible. Other values are partial.",
   privacyReviewEndpointUrl: "Endpoint URL for the privacy-review provider. Use this for internal or self-hosted privacy-review services. Locks app UI when set.",
@@ -65,6 +67,7 @@ const empty = {
   speechProviderType: "",
   speechEndpointUrl: "",
   speechModelName: "",
+  speechApiKey: "",
   speechDiarizationEnabled: false,
   privacyControlEnabled: true,
   piiControlEnabled: true,
@@ -84,6 +87,7 @@ const empty = {
   documentGenerationProviderType: "apple_intelligence",
   documentGenerationEndpointUrl: "",
   documentGenerationModel: "",
+  documentGenerationApiKey: "",
   formatterPrivacyEmphasis: "safe",
   templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest",
   telemetryEndpointUrl: "",
@@ -171,6 +175,7 @@ export default function ConfigsPage() {
         speechProviderType: value,
         speechEndpointUrl: provider?.endpoint ? (provider?.endpointDefault && !current.speechEndpointUrl ? provider.endpointDefault : current.speechEndpointUrl) : "",
         speechModelName: provider?.model ? (provider?.modelDefault && !current.speechModelName ? provider.modelDefault : current.speechModelName) : "",
+        speechApiKey: provider?.endpoint ? current.speechApiKey : "",
         speechDiarizationEnabled: value === "openai" ? current.speechDiarizationEnabled : false
       }));
       return;
@@ -182,6 +187,7 @@ export default function ConfigsPage() {
         documentGenerationProviderType: value,
         documentGenerationEndpointUrl: provider?.endpoint ? (provider?.endpointDefault && !current.documentGenerationEndpointUrl ? provider.endpointDefault : current.documentGenerationEndpointUrl) : "",
         documentGenerationModel: provider?.model ? (provider?.modelDefault && !current.documentGenerationModel ? provider.modelDefault : current.documentGenerationModel) : "",
+        documentGenerationApiKey: provider?.endpoint ? current.documentGenerationApiKey : "",
         formatterPrivacyEmphasis: value === "apple_intelligence" ? "safe" : current.formatterPrivacyEmphasis
       }));
       return;
@@ -251,6 +257,7 @@ export default function ConfigsPage() {
         speechProviderType: form.speechProviderType || null,
         speechEndpointUrl: speechProvider?.endpoint ? form.speechEndpointUrl || null : null,
         speechModelName: speechProvider?.model ? form.speechModelName || null : null,
+        speechApiKey: speechProvider?.endpoint ? form.speechApiKey || null : null,
         privacyControlEnabled: Boolean(form.privacyControlEnabled),
         piiControlEnabled: Boolean(form.piiControlEnabled),
         presidioEndpointUrl: form.presidioEndpointUrl || null,
@@ -261,6 +268,7 @@ export default function ConfigsPage() {
         documentGenerationProviderType: form.documentGenerationProviderType || null,
         documentGenerationEndpointUrl: formatterProvider?.endpoint ? form.documentGenerationEndpointUrl || null : null,
         documentGenerationModel: formatterProvider?.model ? form.documentGenerationModel || null : null,
+        documentGenerationApiKey: formatterProvider?.endpoint ? form.documentGenerationApiKey || null : null,
         templateRepositoryUrl: form.templateRepositoryUrl || null,
         telemetryEndpointUrl: form.telemetryEndpointUrl || null,
         featureFlags,
@@ -339,10 +347,11 @@ export default function ConfigsPage() {
 
               <FormSection title="Speech provider" description="One selected speech source. This is separate from document generation and privacy review.">
                 <ProviderHint provider={speechProviders.find((item) => item.value === form.speechProviderType)} />
-                <div className="grid three">
+                <div className="grid four">
                   <div className="field"><FieldLabel help={helpText.speechProviderType}>Selected speech provider</FieldLabel><select value={form.speechProviderType ?? ""} onChange={(e) => applyProviderDefault("speech", e.target.value)}>{speechProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
                   <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.speechEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, speechEndpointUrl: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} /></div>
                   <div className="field"><FieldLabel help={helpText.speechModelName}>Model name</FieldLabel><input className="input" value={form.speechModelName ?? ""} onChange={(e) => setForm({ ...form, speechModelName: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.model} /></div>
+                  <div className="field"><FieldLabel help={helpText.speechApiKey}>API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.speechApiKey ?? ""} onChange={(e) => setForm({ ...form, speechApiKey: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} placeholder="Optional managed key" /></div>
                 </div>
                 <label className="checkbox-row"><input type="checkbox" checked={form.speechDiarizationEnabled} disabled={form.speechProviderType !== "openai"} onChange={(e) => setForm({ ...form, speechDiarizationEnabled: e.target.checked })} /> OpenAI saved-recording diarization enabled</label>
               </FormSection>
@@ -353,7 +362,8 @@ export default function ConfigsPage() {
                   <div className="field"><FieldLabel help={helpText.documentGenerationProviderType}>Selected formatter</FieldLabel><select value={form.documentGenerationProviderType ?? ""} onChange={(e) => applyProviderDefault("formatter", e.target.value)}>{formatterProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
                   <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.documentGenerationEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, documentGenerationEndpointUrl: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} /></div>
                   <div className="field"><FieldLabel help={helpText.documentGenerationModel}>Model name</FieldLabel><input className="input" value={form.documentGenerationModel ?? ""} onChange={(e) => setForm({ ...form, documentGenerationModel: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.model} /></div>
-                  <div className="field"><FieldLabel help="Stored for admin policy. Current mobile payload does not centrally inject provider secrets.">Privacy classification</FieldLabel><select value={form.formatterPrivacyEmphasis} onChange={(e) => setForm({ ...form, formatterPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
+                  <div className="field"><FieldLabel help={helpText.documentGenerationApiKey}>API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.documentGenerationApiKey ?? ""} onChange={(e) => setForm({ ...form, documentGenerationApiKey: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} placeholder="Optional managed key" /></div>
+                  <div className="field"><FieldLabel help="Stored for admin policy warnings and privacy summaries. Use safe only for controlled or explicitly approved providers.">Privacy classification</FieldLabel><select value={form.formatterPrivacyEmphasis} onChange={(e) => setForm({ ...form, formatterPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
                 </div>
               </FormSection>
 

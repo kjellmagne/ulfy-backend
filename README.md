@@ -139,8 +139,13 @@ Sample enterprise activation payload:
     "name": "Default Enterprise Profile",
     "speechProviderType": "azure",
     "speechEndpointUrl": "http://192.168.222.171:5000",
+    "speechApiKey": "optional-managed-speech-key",
     "privacyControlEnabled": true,
     "piiControlEnabled": true,
+    "documentGenerationProviderType": "openai_compatible",
+    "documentGenerationEndpointUrl": "http://localhost:8000/v1",
+    "documentGenerationModel": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "documentGenerationApiKey": "optional-managed-docgen-key",
     "templateRepositoryUrl": "http://localhost:4000/api/v1/templates/manifest",
     "featureFlags": { "enterpriseTemplates": true, "privacyReview": true, "developerMode": false },
     "allowedProviderRestrictions": ["azure", "openai_compatible", "local_heuristic"]
@@ -185,6 +190,7 @@ Config profiles keep provider domains separate:
 - Document generation / formatter: `apple_intelligence`, `openai`, `ollama`, `vllm`, `openai_compatible`, `gemini`, `claude`
 - Privacy review / guardrail: `local_heuristic`, `ollama`, `openai_compatible` are the recommended v1 choices
 - Presidio PII is configured separately from privacy review
+- Optional managed provider credentials are `speechApiKey` and `documentGenerationApiKey`. Prefer internal gateway endpoints or tenant-scoped keys when these fields are sent to mobile devices.
 
 Leave provider fields blank when the backend should not manage that setting for the tenant.
 

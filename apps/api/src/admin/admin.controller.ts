@@ -91,6 +91,10 @@ export class ConfigDto {
   @IsOptional()
   @IsString()
   speechModelName?: string;
+  @ApiProperty({ required: false, example: "sk-speech-provider-key", description: "Optional managed speech provider API key. Prefer internal gateway endpoints or short-lived tenant-scoped keys when possible." })
+  @IsOptional()
+  @IsString()
+  speechApiKey?: string;
   @ApiProperty({ required: false, example: true })
   @IsOptional()
   @IsBoolean()
@@ -131,6 +135,10 @@ export class ConfigDto {
   @IsOptional()
   @IsString()
   documentGenerationModel?: string;
+  @ApiProperty({ required: false, example: "sk-document-provider-key", description: "Optional managed document-generation provider API key. Prefer internal gateway endpoints or short-lived tenant-scoped keys when possible." })
+  @IsOptional()
+  @IsString()
+  documentGenerationApiKey?: string;
   @ApiProperty({ required: false, example: "https://kvasetech.com/backend/api/v1/templates/manifest" })
   @IsOptional()
   @IsString()
@@ -1378,6 +1386,7 @@ export class AdminController {
       speechProviderType: this.emptyToNull(dto.speechProviderType),
       speechEndpointUrl: this.emptyToNull(dto.speechEndpointUrl),
       speechModelName: this.emptyToNull(dto.speechModelName),
+      speechApiKey: this.emptyToNull(dto.speechApiKey),
       privacyControlEnabled: dto.privacyControlEnabled ?? false,
       piiControlEnabled: dto.piiControlEnabled ?? false,
       presidioEndpointUrl: this.emptyToNull(dto.presidioEndpointUrl),
@@ -1388,6 +1397,7 @@ export class AdminController {
       documentGenerationProviderType: this.emptyToNull(dto.documentGenerationProviderType),
       documentGenerationEndpointUrl: this.emptyToNull(dto.documentGenerationEndpointUrl),
       documentGenerationModel: this.emptyToNull(dto.documentGenerationModel),
+      documentGenerationApiKey: this.emptyToNull(dto.documentGenerationApiKey),
       templateRepositoryUrl: this.emptyToNull(dto.templateRepositoryUrl),
       telemetryEndpointUrl: this.emptyToNull(dto.telemetryEndpointUrl),
       featureFlags: dto.featureFlags ?? {},

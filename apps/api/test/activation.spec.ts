@@ -131,6 +131,10 @@ describe("ActivationService", () => {
         configProfile: {
           id: "profile-1",
           name: "Default Enterprise Profile",
+          speechProviderType: "openai",
+          speechApiKey: "speech-key",
+          documentGenerationProviderType: "openai_compatible",
+          documentGenerationApiKey: "docgen-key",
           featureFlags: { enterpriseTemplates: true },
           allowedProviderRestrictions: []
         }
@@ -153,6 +157,8 @@ describe("ActivationService", () => {
     expect(result.config).toMatchObject({
       id: "profile-1",
       name: "Default Enterprise Profile",
+      speechApiKey: "speech-key",
+      documentGenerationApiKey: "docgen-key",
       managedPolicy: { allowPolicyOverride: false }
     });
   });

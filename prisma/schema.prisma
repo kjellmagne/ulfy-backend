@@ -97,6 +97,7 @@ model ConfigProfile {
   speechProviderType               String?
   speechEndpointUrl                String?
   speechModelName                  String?
+  speechApiKey                     String?
   privacyControlEnabled            Boolean  @default(false)
   piiControlEnabled                Boolean  @default(false)
   presidioEndpointUrl              String?
@@ -107,6 +108,7 @@ model ConfigProfile {
   documentGenerationProviderType   String?
   documentGenerationEndpointUrl    String?
   documentGenerationModel          String?
+  documentGenerationApiKey         String?
   templateRepositoryUrl            String?
   telemetryEndpointUrl             String?
   featureFlags                     Json     @default("{}")
