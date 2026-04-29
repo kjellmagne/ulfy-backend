@@ -137,7 +137,8 @@ export function SidePanel({
   description,
   children,
   footer,
-  onClose
+  onClose,
+  wide = false
 }: {
   open: boolean;
   title: string;
@@ -145,6 +146,7 @@ export function SidePanel({
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
+  wide?: boolean;
 }) {
   const titleId = useId();
 
@@ -169,7 +171,7 @@ export function SidePanel({
 
   return (
     <div className="side-panel-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <aside className="side-panel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <aside className={`side-panel${wide ? " wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <div className="side-panel-header">
           <div>
             <h2 id={titleId}>{title}</h2>

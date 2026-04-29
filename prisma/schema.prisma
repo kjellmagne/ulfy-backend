@@ -85,6 +85,7 @@ model Tenant {
   enterpriseKeys EnterpriseLicenseKey[]
   activations    DeviceActivation[]
   templates      Template[]
+  templateEntitlements TenantTemplateEntitlement[]
 }
 
 model ConfigProfile {
@@ -212,6 +213,7 @@ model TemplateCategory {
   title       String
   description String?
   templates   Template[]
+  families    TemplateFamily[]
 }
 
 model Template {
@@ -245,4 +247,78 @@ model TemplateVersion {
   createdAt   DateTime      @default(now())
 
   @@unique([templateId, version])
+}
+
+model TemplateFamily {
+  id               String            @id @default(uuid())
+  title            String
+  shortDescription String
+  categoryId       String?
+  category         TemplateCategory? @relation(fields: [categoryId], references: [id])
+  icon             String            @default("doc.text")
+  tags             Json              @default("[]")
+  isGlobal         Boolean           @default(false)
+  state            TemplateState     @default(draft)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  variants     TemplateVariant[]
+  entitlements TenantTemplateEntitlement[]
+}
+
+model TemplateVariant {
+  id                 String   @id @default(uuid())
+  familyId           String
+  family             TemplateFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  language           String
+  templateIdentityId String   @unique
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  draft             TemplateDraft?
+  publishedVersions PublishedTemplateVersion[]
+
+  @@unique([familyId, language])
+}
+
+model TemplateDraft {
+  id                   String   @id @default(uuid())
+  variantId            String   @unique
+  variant              TemplateVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  yamlContent          String
+  sampleTranscript     String?
+  previewMarkdown      String?
+  previewStructured    Json?
+  previewProviderType  String?
+  previewProviderModel String?
+  previewGeneratedAt   DateTime?
+  previewError         String?
+  createdByAdminId     String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model PublishedTemplateVersion {
+  id               String   @id @default(uuid())
+  variantId        String
+  variant          TemplateVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  version          String
+  yamlContent      String
+  createdByAdminId String?
+  publishedAt      DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  @@unique([variantId, version])
+}
+
+model TenantTemplateEntitlement {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  familyId         String
+  family           TemplateFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  createdByAdminId String?
+  createdAt        DateTime @default(now())
+
+  @@unique([tenantId, familyId])
 }

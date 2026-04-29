@@ -74,15 +74,59 @@ export const TemplateMetadata = z.object({
 });
 
 export const TemplateYamlSchema = z.object({
-  id: z.string().optional(),
-  title: z.string().min(2),
-  language: z.string().min(2),
-  sections: z.array(z.object({
-    id: z.string().min(1),
-    title: z.string().min(1),
-    prompt: z.string().min(1)
-  })).min(1)
-});
+  identity: z.object({
+    id: z.string().uuid(),
+    title: z.string().min(1).max(80),
+    icon: z.string().optional().nullable(),
+    short_description: z.string().max(200).optional().nullable(),
+    category: z.string().min(1),
+    tags: z.array(z.string()).default([]),
+    language: z.string().min(2),
+    version: z.string().regex(/^\d+\.\d+\.\d+$/)
+  }).strict(),
+  context: z.object({
+    purpose: z.string().min(1),
+    typical_setting: z.string().optional().nullable(),
+    typical_participants: z.array(z.object({
+      role: z.string().min(1),
+      name: z.string().optional().nullable()
+    }).strict()).default([]).optional(),
+    goals: z.array(z.string()).default([]).optional(),
+    related_processes: z.array(z.string()).default([]).optional()
+  }).strict(),
+  perspective: z.object({
+    voice: z.string(),
+    audience: z.string(),
+    tone: z.string(),
+    style_rules: z.array(z.string()).default([]).optional(),
+    preserve_original_voice: z.boolean().optional()
+  }).strict(),
+  structure: z.object({
+    sections: z.array(z.object({
+      title: z.string().min(1),
+      purpose: z.string().min(1),
+      format: z.string(),
+      required: z.boolean(),
+      extraction_hints: z.array(z.string()).default([]).optional()
+    }).strict()).min(1)
+  }).strict(),
+  content_rules: z.object({
+    required_elements: z.array(z.string()).default([]).optional(),
+    exclusions: z.array(z.string()).default([]).optional(),
+    uncertainty_handling: z.string().optional().nullable(),
+    action_item_format: z.string().optional().nullable(),
+    decision_marker: z.string().optional().nullable(),
+    speaker_attribution: z.string().optional().nullable()
+  }).strict(),
+  llm_prompting: z.object({
+    system_prompt_additions: z.string().optional().nullable(),
+    fallback_behavior: z.string().optional().nullable(),
+    post_processing: z.object({
+      extract_action_items: z.boolean().optional(),
+      structured_output: z.record(z.any()).optional()
+    }).strict().default({}).optional()
+  }).strict()
+}).strict();
 
 export type ConfigProfilePayload = z.infer<typeof ConfigProfilePayload>;
 export type SingleActivationRequest = z.infer<typeof SingleActivationRequest>;

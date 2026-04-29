@@ -151,30 +151,33 @@ Sample enterprise activation payload:
 Template manifest:
 
 ```bash
-curl http://localhost:4000/api/v1/templates/manifest
+curl http://localhost:4000/api/v1/templates/manifest \
+  -H "Authorization: Bearer <enterprise-activation-token>"
 ```
 
 Sample manifest response:
 
 ```json
 {
-  "name": "Ulfy Templates",
+  "name": "Enterprise Templates",
   "templates": [
     {
-      "id": "00000000-0000-0000-0000-000000000201",
+      "id": "00000000-0000-4000-8000-000000000201",
       "title": "Personlig diktat / logg",
-      "short_description": "Kort beskrivelse",
+      "short_description": "Kort strukturert logg fra personlig diktat.",
       "category": "personlig_diktat",
       "language": "nb-NO",
       "version": "1.0.0",
       "icon": "waveform.and.mic",
       "tags": ["dictation", "personal"],
-      "download_url": "/api/v1/templates/00000000-0000-0000-0000-000000000201/download",
-      "updated_at": "2026-04-28T12:00:00.000Z"
+      "download_url": "/api/v1/templates/00000000-0000-4000-8000-000000000201/download",
+      "updated_at": "2026-04-29T12:00:00.000Z"
     }
   ]
 }
 ```
+
+Single-user activations are intentionally blocked from the central repository. Enterprise catalog and download calls are filtered by the tenant tied to the activation token. Internal/dev override access can be enabled with `TEMPLATE_REPOSITORY_API_KEY`.
 
 ## Admin UI
 
@@ -189,10 +192,11 @@ The admin UI supports:
 - Activation inspection
 - Single key revoke/reset
 - Config profile creation and editing
-- Template metadata and YAML editing
-- YAML validation before save
-- Template publish/archive
-- Version history display
+- Template family, language-variant and YAML draft editing
+- Tenant entitlement assignment for enterprise repository access
+- YAML validation before save and publish
+- Admin-chosen semver publish flow with immutable version history
+- Manual AI preview generation from a saved draft and sample transcript
 - Audit log listing
 
 There are no public signup, billing, self-service onboarding, or tenant portal routes.
@@ -275,10 +279,13 @@ Required deployment environment variables:
 - `JWT_SECRET`
 - `ACTIVATION_TOKEN_SECRET`
 - `NEXT_PUBLIC_API_BASE_URL`
+- `TEMPLATE_PREVIEW_ENDPOINT_URL`, `TEMPLATE_PREVIEW_API_KEY`, and `TEMPLATE_PREVIEW_MODEL` when AI preview is enabled
+- optional `TEMPLATE_REPOSITORY_API_KEY` for internal repository override access
 
 ## v1 Simplifications
 
 - Partner-admin scoping is represented in the model but not fully enforced on every admin list endpoint.
 - Config profiles are manually managed JSON-backed records, without an advanced policy engine.
 - Activation tokens are long-lived JWTs whose hashes are stored for lookup and revocation.
-- Template schema validation is intentionally small and focused on the current Ulfy YAML shape.
+- The mobile app still owns local template forking/update behavior; the backend provides the authoritative published repository, tenant filtering, history, and preview tooling.
+- AI preview uses one centrally configured OpenAI-compatible preview provider/model and fails cleanly when those environment variables are not configured.

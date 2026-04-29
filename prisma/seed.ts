@@ -13,6 +13,277 @@ function createActivationKey(prefix: "ULFY-S" | "ULFY-E") {
   return `${prefix}-${body.slice(0, 6)}-${body.slice(6, 12)}-${body.slice(12, 18)}-${body.slice(18, 24)}`;
 }
 
+type SeedTemplate = {
+  familyId: string;
+  variantId: string;
+  draftId: string;
+  publishedId: string;
+  templateId: string;
+  title: string;
+  shortDescription: string;
+  category: string;
+  categoryTitle: string;
+  icon: string;
+  tags: string[];
+  purpose: string;
+  sections: Array<{ title: string; purpose: string; format: "prose" | "bullet_list" | "numbered_list"; required: boolean }>;
+};
+
+function templateYaml(template: SeedTemplate) {
+  return `identity:
+  id: ${template.templateId}
+  title: ${template.title}
+  icon: ${template.icon}
+  short_description: ${template.shortDescription}
+  category: ${template.category}
+  tags:
+${template.tags.map((tag) => `    - ${tag}`).join("\n")}
+  language: nb-NO
+  version: 1.0.0
+context:
+  purpose: ${template.purpose}
+  typical_setting: Internt arbeid eller møte
+  typical_participants:
+    - role: speaker
+  goals:
+    - Lage et tydelig og etterprøvbart dokument fra transkripsjonen.
+  related_processes: []
+perspective:
+  voice: third_person
+  audience: self
+  tone: semi_formell
+  style_rules:
+    - Skriv klart, konkret og uten å finne på opplysninger.
+    - Behold viktig kontekst og usikkerhet fra transkripsjonen.
+  preserve_original_voice: false
+structure:
+  sections:
+${template.sections.map((section) => `    - title: ${section.title}
+      purpose: ${section.purpose}
+      format: ${section.format}
+      required: ${section.required}
+      extraction_hints: []`).join("\n")}
+content_rules:
+  required_elements:
+    - Ta bare med informasjon som støttes av transkripsjonen.
+  exclusions:
+    - Ikke legg til irrelevante eller usikre personopplysninger.
+  uncertainty_handling: Marker uklare eller manglende opplysninger i stedet for å gjette.
+  action_item_format: Bruk ansvarlig, tiltak og frist når det finnes i transkripsjonen.
+  decision_marker: Marker tydelige beslutninger eksplisitt.
+  speaker_attribution: none
+llm_prompting:
+  system_prompt_additions: ""
+  fallback_behavior: Hvis en påkrevd seksjon ikke har støtte i transkripsjonen, skriv at temaet ikke ble omtalt.
+  post_processing:
+    extract_action_items: true
+`;
+}
+
+const seedTemplates: SeedTemplate[] = [
+  {
+    familyId: "00000000-0000-4000-8000-000000000301",
+    variantId: "00000000-0000-4000-8000-000000000401",
+    draftId: "00000000-0000-4000-8000-000000000501",
+    publishedId: "00000000-0000-4000-8000-000000000601",
+    templateId: "00000000-0000-4000-8000-000000000201",
+    title: "Personlig diktat / logg",
+    shortDescription: "Kort strukturert logg fra personlig diktat.",
+    category: "personlig_diktat",
+    categoryTitle: "Personlig diktat",
+    icon: "waveform.and.mic",
+    tags: ["dictation", "personal"],
+    purpose: "Gjør et personlig diktat om til en tydelig logg eller notat.",
+    sections: [
+      { title: "Sammendrag", purpose: "Oppsummer hovedinnholdet kort.", format: "prose", required: true },
+      { title: "Detaljer", purpose: "Ta med viktige detaljer og observasjoner.", format: "bullet_list", required: true },
+      { title: "Oppfølging", purpose: "List opp eventuelle videre tiltak.", format: "bullet_list", required: false }
+    ]
+  },
+  {
+    familyId: "00000000-0000-4000-8000-000000000302",
+    variantId: "00000000-0000-4000-8000-000000000402",
+    draftId: "00000000-0000-4000-8000-000000000502",
+    publishedId: "00000000-0000-4000-8000-000000000602",
+    templateId: "00000000-0000-4000-8000-000000000202",
+    title: "Avdelingsmøte",
+    shortDescription: "Referat med beslutninger og oppgaver fra avdelingsmøte.",
+    category: "avdelingsmote",
+    categoryTitle: "Avdelingsmøte",
+    icon: "person.3.sequence.fill",
+    tags: ["meeting", "department"],
+    purpose: "Lage et presist møtereferat for intern oppfølging.",
+    sections: [
+      { title: "Temaer", purpose: "Oppsummer de viktigste temaene i møtet.", format: "bullet_list", required: true },
+      { title: "Beslutninger", purpose: "List tydelige beslutninger.", format: "bullet_list", required: true },
+      { title: "Tiltak", purpose: "List oppgaver med ansvarlig og frist når tilgjengelig.", format: "bullet_list", required: false }
+    ]
+  },
+  {
+    familyId: "00000000-0000-4000-8000-000000000303",
+    variantId: "00000000-0000-4000-8000-000000000403",
+    draftId: "00000000-0000-4000-8000-000000000503",
+    publishedId: "00000000-0000-4000-8000-000000000603",
+    templateId: "00000000-0000-4000-8000-000000000203",
+    title: "Oppfølgingssamtale",
+    shortDescription: "Strukturert notat fra oppfølgingssamtale.",
+    category: "oppfolgingssamtale",
+    categoryTitle: "Oppfølgingssamtale",
+    icon: "arrow.triangle.2.circlepath",
+    tags: ["follow-up", "conversation"],
+    purpose: "Dokumentere status, avklaringer og videre oppfølging etter en samtale.",
+    sections: [
+      { title: "Status", purpose: "Beskriv nåsituasjonen og viktig bakgrunn.", format: "prose", required: true },
+      { title: "Avklaringer", purpose: "List viktige avklaringer fra samtalen.", format: "bullet_list", required: true },
+      { title: "Neste steg", purpose: "List neste steg med ansvar når det er kjent.", format: "bullet_list", required: true }
+    ]
+  },
+  {
+    familyId: "00000000-0000-4000-8000-000000000304",
+    variantId: "00000000-0000-4000-8000-000000000404",
+    draftId: "00000000-0000-4000-8000-000000000504",
+    publishedId: "00000000-0000-4000-8000-000000000604",
+    templateId: "00000000-0000-4000-8000-000000000204",
+    title: "Jobbintervju",
+    shortDescription: "Intervjunotat med vurderinger og oppfølging.",
+    category: "jobbintervju",
+    categoryTitle: "Jobbintervju",
+    icon: "person.text.rectangle",
+    tags: ["interview", "hr"],
+    purpose: "Lage et ryddig intervjunotat for videre rekrutteringsarbeid.",
+    sections: [
+      { title: "Kandidatprofil", purpose: "Oppsummer kandidatens relevante bakgrunn.", format: "prose", required: true },
+      { title: "Kompetanse og motivasjon", purpose: "List funn knyttet til kompetanse, motivasjon og rolleforståelse.", format: "bullet_list", required: true },
+      { title: "Videre vurdering", purpose: "Oppsummer anbefalt videre oppfølging.", format: "prose", required: false }
+    ]
+  },
+  {
+    familyId: "00000000-0000-4000-8000-000000000305",
+    variantId: "00000000-0000-4000-8000-000000000405",
+    draftId: "00000000-0000-4000-8000-000000000505",
+    publishedId: "00000000-0000-4000-8000-000000000605",
+    templateId: "00000000-0000-4000-8000-000000000205",
+    title: "Kartleggingssamtale bruker",
+    shortDescription: "Kartleggingsnotat med behov, ressurser og tiltak.",
+    category: "kartleggingssamtale",
+    categoryTitle: "Kartleggingssamtale",
+    icon: "clipboard.fill",
+    tags: ["mapping", "user"],
+    purpose: "Dokumentere brukerens behov, ressurser og mulige tiltak.",
+    sections: [
+      { title: "Bakgrunn", purpose: "Oppsummer relevant bakgrunn.", format: "prose", required: true },
+      { title: "Behov og ressurser", purpose: "List behov, ressurser og begrensninger som fremkommer.", format: "bullet_list", required: true },
+      { title: "Anbefalt oppfølging", purpose: "List foreslåtte tiltak eller videre kartlegging.", format: "bullet_list", required: true }
+    ]
+  }
+];
+
+async function seedTemplateRepository(tenantId: string) {
+  for (const template of seedTemplates) {
+    const yamlContent = templateYaml(template);
+    const category = await prisma.templateCategory.upsert({
+      where: { slug: template.category },
+      update: { title: template.categoryTitle },
+      create: { slug: template.category, title: template.categoryTitle, description: `${template.categoryTitle} templates.` }
+    });
+
+    await prisma.templateFamily.upsert({
+      where: { id: template.familyId },
+      update: {
+        title: template.title,
+        shortDescription: template.shortDescription,
+        categoryId: category.id,
+        icon: template.icon,
+        tags: template.tags,
+        isGlobal: true,
+        state: "published"
+      },
+      create: {
+        id: template.familyId,
+        title: template.title,
+        shortDescription: template.shortDescription,
+        categoryId: category.id,
+        icon: template.icon,
+        tags: template.tags,
+        isGlobal: true,
+        state: "published"
+      }
+    });
+
+    await prisma.templateVariant.upsert({
+      where: { id: template.variantId },
+      update: { familyId: template.familyId, language: "nb-NO", templateIdentityId: template.templateId },
+      create: { id: template.variantId, familyId: template.familyId, language: "nb-NO", templateIdentityId: template.templateId }
+    });
+
+    await prisma.templateDraft.upsert({
+      where: { variantId: template.variantId },
+      update: { yamlContent, sampleTranscript: "Deltaker: Dette er en kort eksempeltranskripsjon for forhåndsvisning." },
+      create: {
+        id: template.draftId,
+        variantId: template.variantId,
+        yamlContent,
+        sampleTranscript: "Deltaker: Dette er en kort eksempeltranskripsjon for forhåndsvisning."
+      }
+    });
+
+    await prisma.publishedTemplateVersion.upsert({
+      where: { variantId_version: { variantId: template.variantId, version: "1.0.0" } },
+      update: { yamlContent },
+      create: {
+        id: template.publishedId,
+        variantId: template.variantId,
+        version: "1.0.0",
+        yamlContent,
+        publishedAt: new Date()
+      }
+    });
+
+    await prisma.tenantTemplateEntitlement.upsert({
+      where: { tenantId_familyId: { tenantId, familyId: template.familyId } },
+      update: {},
+      create: { tenantId, familyId: template.familyId }
+    });
+  }
+
+  const legacy = seedTemplates[0];
+  const legacyCategory = await prisma.templateCategory.findUniqueOrThrow({ where: { slug: legacy.category } });
+  const legacyTemplate = await prisma.template.upsert({
+    where: { id: legacy.templateId },
+    update: {
+      title: legacy.title,
+      shortDescription: legacy.shortDescription,
+      categoryId: legacyCategory.id,
+      language: "nb-NO",
+      icon: legacy.icon,
+      tags: legacy.tags,
+      state: "published"
+    },
+    create: {
+      id: legacy.templateId,
+      title: legacy.title,
+      shortDescription: legacy.shortDescription,
+      categoryId: legacyCategory.id,
+      language: "nb-NO",
+      icon: legacy.icon,
+      tags: legacy.tags,
+      state: "published"
+    }
+  });
+  const legacyVersion = await prisma.templateVersion.upsert({
+    where: { templateId_version: { templateId: legacyTemplate.id, version: "1.0.0" } },
+    update: { yamlContent: templateYaml(legacy), state: "published", publishedAt: new Date() },
+    create: {
+      templateId: legacyTemplate.id,
+      version: "1.0.0",
+      yamlContent: templateYaml(legacy),
+      state: "published",
+      publishedAt: new Date()
+    }
+  });
+  await prisma.template.update({ where: { id: legacyTemplate.id }, data: { publishedVersionId: legacyVersion.id } });
+}
+
 async function main() {
   const maintenanceUntil = new Date("2027-04-29T00:00:00.000Z");
   const passwordHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!", 12);
@@ -27,15 +298,12 @@ async function main() {
     }
   });
 
-  const category = await prisma.templateCategory.upsert({
-    where: { slug: "personlig_diktat" },
-    update: {},
-    create: { slug: "personlig_diktat", title: "Personlig diktat", description: "Personal dictation and logging templates." }
-  });
-
   const profile = await prisma.configProfile.upsert({
     where: { id: "00000000-0000-0000-0000-000000000101" },
-    update: {},
+    update: {
+      templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest",
+      featureFlags: { enterpriseTemplates: true, privacyReview: true }
+    },
     create: {
       id: "00000000-0000-0000-0000-000000000101",
       name: "Default Enterprise Profile",
@@ -70,7 +338,8 @@ async function main() {
       billingEmail: "billing@acme-health.example",
       city: "Oslo",
       country: "NO",
-      status: "active"
+      status: "active",
+      configProfileId: profile.id
     },
     create: {
       name: "Acme Health",
@@ -87,41 +356,7 @@ async function main() {
     }
   });
 
-  const yamlContent = `title: Personlig diktat / logg
-language: nb-NO
-sections:
-  - id: context
-    title: Kontekst
-    prompt: Oppsummer relevant kontekst kort.
-  - id: dictation
-    title: Diktat
-    prompt: Skriv en strukturert logg basert på brukerens diktat.
-`;
-
-  const template = await prisma.template.upsert({
-    where: { id: "00000000-0000-0000-0000-000000000201" },
-    update: {},
-    create: {
-      id: "00000000-0000-0000-0000-000000000201",
-      title: "Personlig diktat / logg",
-      shortDescription: "Kort beskrivelse",
-      categoryId: category.id,
-      language: "nb-NO",
-      icon: "waveform.and.mic",
-      tags: ["dictation", "personal"],
-      state: "published",
-      versions: {
-        create: {
-          id: "00000000-0000-0000-0000-000000000202",
-          version: "1.0.0",
-          yamlContent,
-          state: "published",
-          publishedAt: new Date()
-        }
-      }
-    }
-  });
-  await prisma.template.update({ where: { id: template.id }, data: { publishedVersionId: "00000000-0000-0000-0000-000000000202" } });
+  await seedTemplateRepository(tenant.id);
 
   const singleKey = process.env.SEED_SINGLE_KEY ?? createActivationKey("ULFY-S");
   await prisma.singleLicenseKey.upsert({

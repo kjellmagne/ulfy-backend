@@ -1,5 +1,5 @@
 import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
-import { IsArray, IsEmail, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
 import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../prisma/prisma.service";
@@ -156,6 +156,106 @@ class TemplateDto {
   @ApiProperty({ example: "title: Personlig diktat / logg\nlanguage: nb-NO\nsections:\n  - id: context\n    title: Kontekst\n    prompt: Oppsummer relevant kontekst kort.\n" })
   @IsString()
   yamlContent!: string;
+}
+
+class TemplateFamilyDto {
+  @ApiProperty({ example: "Personlig diktat / logg" })
+  @IsString()
+  title!: string;
+
+  @ApiProperty({ example: "Core personal dictation template." })
+  @IsString()
+  shortDescription!: string;
+
+  @ApiProperty({ required: false, example: "template-category-uuid" })
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @ApiProperty({ required: false, example: "waveform.and.mic" })
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @ApiProperty({ required: false, example: ["dictation", "personal"], type: [String] })
+  @IsOptional()
+  @IsArray()
+  tags?: string[];
+
+  @ApiProperty({ required: false, example: false, description: "When true, all enterprise tenants can see this family." })
+  @IsOptional()
+  @IsBoolean()
+  isGlobal?: boolean;
+}
+
+class TemplateVariantDto {
+  @ApiProperty({ example: "nb-NO" })
+  @IsString()
+  language!: string;
+
+  @ApiProperty({ description: "One language-specific YAML template using the iOS app schema." })
+  @IsString()
+  yamlContent!: string;
+
+  @ApiProperty({ required: false, description: "Sample transcript used by manual preview generation." })
+  @IsOptional()
+  @IsString()
+  sampleTranscript?: string;
+}
+
+class TemplateDraftDto {
+  @ApiProperty({ description: "Mutable draft YAML using the iOS app schema." })
+  @IsString()
+  yamlContent!: string;
+
+  @ApiProperty({ required: false, description: "Sample transcript used by manual preview generation." })
+  @IsOptional()
+  @IsString()
+  sampleTranscript?: string;
+}
+
+class TemplatePublishDto {
+  @ApiProperty({ required: false, example: "patch", enum: ["patch", "minor", "major"] })
+  @IsOptional()
+  @IsIn(["patch", "minor", "major"])
+  bump?: "patch" | "minor" | "major";
+
+  @ApiProperty({ required: false, example: "1.0.0", description: "Exact semver override. Used mostly for first publish." })
+  @IsOptional()
+  @IsString()
+  version?: string;
+}
+
+class TemplateEntitlementDto {
+  @ApiProperty({ example: "tenant-uuid" })
+  @IsString()
+  tenantId!: string;
+}
+
+class TemplateAiAssistDto {
+  @ApiProperty({ example: "Follow-up conversation with a user after a service meeting." })
+  @IsString()
+  useCase!: string;
+
+  @ApiProperty({ required: false, example: "nb-NO" })
+  @IsOptional()
+  @IsString()
+  language?: string;
+
+  @ApiProperty({ required: false, example: "oppfolgingssamtale" })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @ApiProperty({ required: false, example: "Oppfølgingssamtale" })
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiProperty({ required: false, example: "arrow.triangle.2.circlepath" })
+  @IsOptional()
+  @IsString()
+  icon?: string;
 }
 
 class TenantDto {
@@ -448,13 +548,13 @@ export class AdminController {
     const singleWhere = partnerId ? { partnerId } : {};
     const enterpriseWhere = partnerId ? { OR: [{ partnerId }, { tenant: { partnerId } }] } : {};
     const activationWhere = partnerId ? { OR: [{ tenant: { partnerId } }, { singleLicenseKey: { partnerId } }] } : {};
-    const templateWhere = partnerId ? { tenant: { partnerId } } : {};
+    const templateWhere = partnerId ? { entitlements: { some: { tenant: { partnerId } } } } : {};
     const [singleKeys, enterpriseKeys, activations, activeUniqueDevices, templates, audits] = await Promise.all([
       this.prisma.singleLicenseKey.count({ where: singleWhere }),
       this.prisma.enterpriseLicenseKey.count({ where: enterpriseWhere }),
       this.prisma.deviceActivation.count({ where: activationWhere }),
       this.prisma.deviceActivation.findMany({ where: { ...activationWhere, status: "active" }, select: { deviceIdentifier: true } }),
-      this.prisma.template.count({ where: templateWhere }),
+      this.prisma.templateFamily.count({ where: templateWhere }),
       this.prisma.activationAuditLog.findMany({ where: partnerId ? { actorAdminId: req.user.sub } : {}, orderBy: { createdAt: "desc" }, take: 25 })
     ]);
     return { singleKeys, enterpriseKeys, activations, activeUniqueDevices: new Set(activeUniqueDevices.map((item) => item.deviceIdentifier)).size, templates, audits };
@@ -641,13 +741,14 @@ export class AdminController {
   @ApiConflictResponse({ description: "Tenant is in use and cannot be deleted." })
   async tenantsDelete(@Param("id") id: string, @Req() req: any) {
     await this.assertTenantAccess(req, id);
-    const [enterpriseKeys, activations, templates] = await Promise.all([
+    const [enterpriseKeys, activations, templates, entitlements] = await Promise.all([
       this.prisma.enterpriseLicenseKey.count({ where: { tenantId: id } }),
       this.prisma.deviceActivation.count({ where: { tenantId: id } }),
-      this.prisma.template.count({ where: { tenantId: id } })
+      this.prisma.template.count({ where: { tenantId: id } }),
+      this.prisma.tenantTemplateEntitlement.count({ where: { tenantId: id } })
     ]);
-    if (enterpriseKeys || activations || templates) {
-      throw new ConflictException("Cannot delete tenant with enterprise keys, activations, or templates. Disable it instead.");
+    if (enterpriseKeys || activations || templates || entitlements) {
+      throw new ConflictException("Cannot delete tenant with enterprise keys, activations, or template entitlements. Disable it instead.");
     }
     await this.prisma.tenant.delete({ where: { id } });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "tenant.delete", targetType: "Tenant", targetId: id });
@@ -720,6 +821,202 @@ export class AdminController {
     await this.prisma.configProfile.delete({ where: { id } });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "config.delete", targetType: "ConfigProfile", targetId: id });
     return { success: true };
+  }
+
+  @Get("template-families")
+  @ApiOperation({ summary: "Template repository families", description: "Lists template families with language variants, mutable drafts, published version history and tenant entitlements." })
+  @ApiOkResponse({ description: "Template repository family list." })
+  templateFamilies(@Req() req: any) {
+    const partnerId = this.scopedPartnerId(req);
+    return this.prisma.templateFamily.findMany({
+      where: partnerId ? { OR: [{ isGlobal: true }, { entitlements: { some: { tenant: { partnerId } } } }] } : {},
+      orderBy: { updatedAt: "desc" },
+      include: this.templateFamilyInclude()
+    });
+  }
+
+  @Post("template-families")
+  @ApiOperation({ summary: "Create template family", description: "Creates the logical use-case family that groups language-specific template variants." })
+  @ApiBody({ type: TemplateFamilyDto })
+  @ApiOkResponse({ description: "Template family created." })
+  async createTemplateFamily(@Body() dto: TemplateFamilyDto, @Req() req: any) {
+    const family = await this.prisma.templateFamily.create({
+      data: {
+        title: dto.title,
+        shortDescription: dto.shortDescription,
+        categoryId: dto.categoryId || undefined,
+        icon: dto.icon || "doc.text",
+        tags: dto.tags ?? [],
+        isGlobal: dto.isGlobal ?? false
+      },
+      include: this.templateFamilyInclude()
+    });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.family.create", targetType: "TemplateFamily", targetId: family.id });
+    return family;
+  }
+
+  @Patch("template-families/:id")
+  @ApiOperation({ summary: "Update template family metadata" })
+  @ApiParam({ name: "id", description: "TemplateFamily UUID." })
+  @ApiBody({ type: TemplateFamilyDto })
+  @ApiOkResponse({ description: "Template family updated." })
+  async updateTemplateFamily(@Param("id") id: string, @Body() dto: Partial<TemplateFamilyDto>, @Req() req: any) {
+    await this.assertTemplateFamilyAccess(req, id);
+    const family = await this.prisma.templateFamily.update({
+      where: { id },
+      data: {
+        title: dto.title,
+        shortDescription: dto.shortDescription,
+        categoryId: dto.categoryId || undefined,
+        icon: dto.icon,
+        tags: dto.tags as any,
+        isGlobal: dto.isGlobal
+      },
+      include: this.templateFamilyInclude()
+    });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.family.update", targetType: "TemplateFamily", targetId: id });
+    return family;
+  }
+
+  @Patch("template-families/:id/archive")
+  @ApiOperation({ summary: "Archive template family", description: "Archived families are hidden from the mobile manifest." })
+  @ApiParam({ name: "id", description: "TemplateFamily UUID." })
+  @ApiOkResponse({ description: "Template family archived." })
+  async archiveTemplateFamily(@Param("id") id: string, @Req() req: any) {
+    await this.assertTemplateFamilyAccess(req, id);
+    const family = await this.prisma.templateFamily.update({ where: { id }, data: { state: "archived" }, include: this.templateFamilyInclude() });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.family.archive", targetType: "TemplateFamily", targetId: id });
+    return family;
+  }
+
+  @Post("template-families/:id/variants")
+  @ApiOperation({ summary: "Create language variant draft", description: "Creates one language-specific YAML track inside a template family." })
+  @ApiParam({ name: "id", description: "TemplateFamily UUID." })
+  @ApiBody({ type: TemplateVariantDto })
+  @ApiOkResponse({ description: "Template variant created." })
+  async createTemplateVariant(@Param("id") id: string, @Body() dto: TemplateVariantDto, @Req() req: any) {
+    await this.assertTemplateFamilyAccess(req, id);
+    const metadata = this.templates.metadataFromYaml(dto.yamlContent);
+    if (metadata.language !== dto.language) throw new ConflictException("Variant language must match identity.language in the YAML.");
+    const variant = await this.prisma.templateVariant.create({
+      data: {
+        familyId: id,
+        language: metadata.language,
+        templateIdentityId: metadata.id,
+        draft: { create: { yamlContent: dto.yamlContent, sampleTranscript: dto.sampleTranscript, createdByAdminId: req.user.sub } }
+      },
+      include: { family: true, draft: true, publishedVersions: { orderBy: { publishedAt: "desc" } } }
+    });
+    await this.prisma.templateFamily.update({
+      where: { id },
+      data: { title: metadata.title, shortDescription: metadata.shortDescription, icon: metadata.icon, tags: metadata.tags }
+    });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.variant.create", targetType: "TemplateVariant", targetId: variant.id });
+    return variant;
+  }
+
+  @Patch("template-variants/:id/draft")
+  @ApiOperation({ summary: "Update template variant draft", description: "Updates the mutable draft YAML and sample transcript. This does not affect the mobile app until published." })
+  @ApiParam({ name: "id", description: "TemplateVariant UUID." })
+  @ApiBody({ type: TemplateDraftDto })
+  @ApiOkResponse({ description: "Template draft updated." })
+  async updateTemplateDraft(@Param("id") id: string, @Body() dto: TemplateDraftDto, @Req() req: any) {
+    const variant = await this.assertTemplateVariantAccess(req, id);
+    const metadata = this.templates.metadataFromYaml(dto.yamlContent);
+    const draft = await this.prisma.templateDraft.upsert({
+      where: { variantId: id },
+      update: {
+        yamlContent: dto.yamlContent,
+        sampleTranscript: dto.sampleTranscript,
+        previewError: null
+      },
+      create: {
+        variantId: id,
+        yamlContent: dto.yamlContent,
+        sampleTranscript: dto.sampleTranscript,
+        createdByAdminId: req.user.sub
+      }
+    });
+    await this.prisma.templateVariant.update({ where: { id }, data: { language: metadata.language, templateIdentityId: metadata.id } });
+    await this.prisma.templateFamily.update({ where: { id: variant.familyId }, data: { title: metadata.title, shortDescription: metadata.shortDescription, icon: metadata.icon, tags: metadata.tags } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.draft.update", targetType: "TemplateDraft", targetId: draft.id });
+    return draft;
+  }
+
+  @Post("template-variants/:id/publish")
+  @ApiOperation({ summary: "Publish template variant draft", description: "Validates the current draft, applies the selected semver bump, and stores an immutable published YAML snapshot." })
+  @ApiParam({ name: "id", description: "TemplateVariant UUID." })
+  @ApiBody({ type: TemplatePublishDto })
+  @ApiOkResponse({ description: "Template variant published.", schema: { example: { success: true, version: "1.0.1" } } })
+  async publishTemplateVariant(@Param("id") id: string, @Body() dto: TemplatePublishDto, @Req() req: any) {
+    await this.assertTemplateVariantAccess(req, id);
+    return this.templates.publishVariantDraft(id, dto, { id: req.user.sub, email: req.user.email });
+  }
+
+  @Get("template-variants/:id/versions")
+  @ApiOperation({ summary: "Published version history for a template variant" })
+  @ApiParam({ name: "id", description: "TemplateVariant UUID." })
+  @ApiOkResponse({ description: "Published template versions." })
+  async templateVariantVersions(@Param("id") id: string, @Req() req: any) {
+    await this.assertTemplateVariantAccess(req, id);
+    return this.prisma.publishedTemplateVersion.findMany({ where: { variantId: id }, orderBy: { publishedAt: "desc" } });
+  }
+
+  @Post("template-families/:id/entitlements")
+  @ApiOperation({ summary: "Assign template family to tenant" })
+  @ApiParam({ name: "id", description: "TemplateFamily UUID." })
+  @ApiBody({ type: TemplateEntitlementDto })
+  @ApiOkResponse({ description: "Tenant entitlement assigned." })
+  async addTemplateEntitlement(@Param("id") id: string, @Body() dto: TemplateEntitlementDto, @Req() req: any) {
+    await this.assertTemplateFamilyAccess(req, id);
+    await this.assertTenantAccess(req, dto.tenantId);
+    const entitlement = await this.prisma.tenantTemplateEntitlement.upsert({
+      where: { tenantId_familyId: { tenantId: dto.tenantId, familyId: id } },
+      update: {},
+      create: { tenantId: dto.tenantId, familyId: id, createdByAdminId: req.user.sub },
+      include: { tenant: true, family: true }
+    });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.entitlement.assign", targetType: "TemplateFamily", targetId: id, metadata: { tenantId: dto.tenantId } });
+    return entitlement;
+  }
+
+  @Delete("template-families/:familyId/entitlements/:tenantId")
+  @ApiOperation({ summary: "Remove template family tenant assignment" })
+  @ApiParam({ name: "familyId", description: "TemplateFamily UUID." })
+  @ApiParam({ name: "tenantId", description: "Tenant UUID." })
+  @ApiOkResponse({ description: "Tenant entitlement removed.", schema: { example: { success: true } } })
+  async removeTemplateEntitlement(@Param("familyId") familyId: string, @Param("tenantId") tenantId: string, @Req() req: any) {
+    await this.assertTemplateFamilyAccess(req, familyId);
+    await this.assertTenantAccess(req, tenantId);
+    await this.prisma.tenantTemplateEntitlement.deleteMany({ where: { familyId, tenantId } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.entitlement.remove", targetType: "TemplateFamily", targetId: familyId, metadata: { tenantId } });
+    return { success: true };
+  }
+
+  @Post("template-drafts/ai-assist")
+  @ApiOperation({ summary: "Generate AI-assisted draft proposal", description: "Creates a reviewable YAML draft proposal from a use-case description. The proposal is never auto-published." })
+  @ApiBody({ type: TemplateAiAssistDto })
+  @ApiOkResponse({ description: "Draft proposal generated." })
+  aiAssistTemplateDraft(@Body() dto: TemplateAiAssistDto) {
+    return this.templates.buildAssistedDraft(dto);
+  }
+
+  @Post("template-drafts/:id/preview")
+  @ApiOperation({ summary: "Generate real AI preview for a draft", description: "Runs the centrally configured preview provider/model against the current draft and sample transcript. This is manual and never runs on every edit." })
+  @ApiParam({ name: "id", description: "TemplateDraft UUID." })
+  @ApiOkResponse({ description: "Generated preview metadata and markdown." })
+  async generateTemplatePreview(@Param("id") id: string, @Req() req: any) {
+    await this.assertTemplateDraftAccess(req, id);
+    return this.templates.generatePreview(id, { id: req.user.sub, email: req.user.email });
+  }
+
+  @Get("template-drafts/:id/preview")
+  @ApiOperation({ summary: "Get latest stored draft preview" })
+  @ApiParam({ name: "id", description: "TemplateDraft UUID." })
+  @ApiOkResponse({ description: "Latest preview metadata and markdown." })
+  async getTemplatePreview(@Param("id") id: string, @Req() req: any) {
+    const draft = await this.assertTemplateDraftAccess(req, id);
+    return this.templates.mapPreview(draft);
   }
 
   @Get("templates")
@@ -960,6 +1257,56 @@ export class AdminController {
     });
     if (!key) throw new ForbiddenException("License key is not available to this admin user.");
     return key;
+  }
+
+  private templateFamilyInclude() {
+    return {
+      category: true,
+      entitlements: { include: { tenant: true }, orderBy: { createdAt: "desc" as const } },
+      variants: {
+        orderBy: { language: "asc" as const },
+        include: {
+          draft: true,
+          publishedVersions: { orderBy: [{ publishedAt: "desc" as const }, { createdAt: "desc" as const }] }
+        }
+      }
+    };
+  }
+
+  private async assertTemplateFamilyAccess(req: any, familyId: string) {
+    const partnerId = this.scopedPartnerId(req);
+    const family = await this.prisma.templateFamily.findFirst({
+      where: {
+        id: familyId,
+        ...(partnerId ? { entitlements: { some: { tenant: { partnerId } } } } : {})
+      }
+    });
+    if (!family) throw new ForbiddenException("Template family is not available to this admin user.");
+    return family;
+  }
+
+  private async assertTemplateVariantAccess(req: any, variantId: string) {
+    const partnerId = this.scopedPartnerId(req);
+    const variant = await this.prisma.templateVariant.findFirst({
+      where: {
+        id: variantId,
+        ...(partnerId ? { family: { entitlements: { some: { tenant: { partnerId } } } } } : {})
+      }
+    });
+    if (!variant) throw new ForbiddenException("Template variant is not available to this admin user.");
+    return variant;
+  }
+
+  private async assertTemplateDraftAccess(req: any, draftId: string) {
+    const partnerId = this.scopedPartnerId(req);
+    const draft = await this.prisma.templateDraft.findFirst({
+      where: {
+        id: draftId,
+        ...(partnerId ? { variant: { family: { entitlements: { some: { tenant: { partnerId } } } } } } : {})
+      }
+    });
+    if (!draft) throw new ForbiddenException("Template draft is not available to this admin user.");
+    return draft;
   }
 
   private async assertTemplateAccess(req: any, templateId: string) {
