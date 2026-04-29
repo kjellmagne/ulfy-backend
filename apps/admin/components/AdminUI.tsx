@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useId } from "react";
+import { ButtonHTMLAttributes, ReactNode, useEffect, useId } from "react";
 import { Info, Loader2, X } from "lucide-react";
 
 export function PageHeader({ title, description, meta }: { title: string; description?: string; meta?: ReactNode }) {
@@ -24,6 +24,21 @@ export function PanelHeader({ title, description, actions }: { title: string; de
       </div>
       {actions && <div className="panel-actions">{actions}</div>}
     </div>
+  );
+}
+
+export function FormSection({ title, description, children, actions }: { title: string; description?: string; children: ReactNode; actions?: ReactNode }) {
+  return (
+    <section className="form-section">
+      <div className="form-section-header">
+        <div>
+          <h3>{title}</h3>
+          {description && <p>{description}</p>}
+        </div>
+        {actions && <div className="panel-actions">{actions}</div>}
+      </div>
+      <div className="form-section-body">{children}</div>
+    </section>
   );
 }
 
@@ -72,6 +87,33 @@ export function LoadingPanel({ label = "Loading" }: { label?: string }) {
 
 export function Alert({ tone = "info", children }: { tone?: "info" | "success" | "danger"; children: ReactNode }) {
   return <div className={`alert ${tone}`}>{children}</div>;
+}
+
+export function IconAction({
+  label,
+  tone = "secondary",
+  children,
+  className,
+  type = "button",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  tone?: "primary" | "secondary" | "danger";
+  children: ReactNode;
+}) {
+  return (
+    <button
+      {...props}
+      type={type}
+      className={["icon-action", `tone-${tone}`, className].filter(Boolean).join(" ")}
+      aria-label={label}
+      title={label}
+    >
+      <span className="sr-only">{label}</span>
+      {children}
+      <span className="icon-action-tooltip" role="tooltip">{label}</span>
+    </button>
+  );
 }
 
 export function Modal({

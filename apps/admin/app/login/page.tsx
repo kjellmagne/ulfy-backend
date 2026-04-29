@@ -1,27 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, FieldLabel, PanelHeader } from "../../components/AdminUI";
+import { FieldLabel, PanelHeader } from "../../components/AdminUI";
+import { useToast } from "../../components/ToastProvider";
 import { appPath } from "../../lib/base-path";
+import { apiUrl } from "../../lib/api-url";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("admin@ulfy.local");
   const [password, setPassword] = useState("ChangeMe123!");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const { notify } = useToast();
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    setError("");
     setLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL ?? ""}${appPath("/api/v1/auth/login")}`, {
+      const res = await fetch(apiUrl("/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
       });
       if (!res.ok) {
-        setError("Email or password is incorrect.");
+        notify({ tone: "danger", title: "Could not sign in", message: "Email or password is incorrect." });
         return;
       }
       const data = await res.json();
@@ -38,7 +39,6 @@ export default function LoginPage() {
       <form onSubmit={submit}>
         <div className="field"><FieldLabel>Email</FieldLabel><input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         <div className="field"><FieldLabel>Password</FieldLabel><input className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
-        {error && <Alert tone="danger">{error}</Alert>}
         <button className="button" disabled={loading}>{loading ? "Signing in..." : "Sign in"}</button>
       </form>
     </div>

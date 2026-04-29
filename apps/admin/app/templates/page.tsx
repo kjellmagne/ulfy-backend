@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { DragEvent } from "react";
 import * as yaml from "js-yaml";
-import { Archive, Bot, CheckCircle, Download, FileText, Globe2, Plus, Save, Wand2 } from "lucide-react";
+import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
 type Category = { id: string; slug: string; title: string };
@@ -35,8 +37,85 @@ type Family = {
   variants: Variant[];
   entitlements: Array<{ id: string; tenantId: string; tenant: Tenant }>;
 };
+type TemplateSection = {
+  title?: string;
+  purpose?: string;
+  format?: string;
+  required?: boolean;
+  extraction_hints?: string[];
+};
+type TemplateYamlDoc = {
+  identity?: {
+    id?: string;
+    title?: string;
+    icon?: string;
+    short_description?: string;
+    category?: string;
+    tags?: string[];
+    language?: string;
+    version?: string;
+  };
+  context?: Record<string, unknown>;
+  perspective?: Record<string, unknown>;
+  structure?: { sections?: TemplateSection[] };
+  content_rules?: Record<string, unknown>;
+  llm_prompting?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+type SectionPreset = {
+  title: string;
+  purpose: string;
+  format: string;
+  required: boolean;
+  extraction_hints: string[];
+};
+type DragItem = { kind: "preset"; preset: SectionPreset } | { kind: "section"; index: number };
 
 const blankFamily = { id: "", title: "", shortDescription: "", categoryId: "", icon: "doc.text", tagsText: "", isGlobal: false };
+const sectionPresets: SectionPreset[] = [
+  {
+    title: "Summary",
+    purpose: "Summarize the transcript into a short, useful overview.",
+    format: "prose",
+    required: true,
+    extraction_hints: ["main topic", "important context", "outcome"]
+  },
+  {
+    title: "Decisions",
+    purpose: "List clear decisions that were made during the conversation.",
+    format: "bullets",
+    required: false,
+    extraction_hints: ["decision", "owner", "reason"]
+  },
+  {
+    title: "Action items",
+    purpose: "Extract follow-up tasks with owner and due date when available.",
+    format: "table",
+    required: false,
+    extraction_hints: ["owner", "action", "due date"]
+  },
+  {
+    title: "Open questions",
+    purpose: "Capture unresolved questions or topics that need clarification.",
+    format: "bullets",
+    required: false,
+    extraction_hints: ["question", "missing information", "next step"]
+  },
+  {
+    title: "Risks and concerns",
+    purpose: "Highlight risks, concerns or blockers mentioned in the transcript.",
+    format: "bullets",
+    required: false,
+    extraction_hints: ["risk", "impact", "mitigation"]
+  },
+  {
+    title: "Follow-up plan",
+    purpose: "Describe recommended next steps based only on the transcript.",
+    format: "numbered_list",
+    required: false,
+    extraction_hints: ["next step", "priority", "responsible party"]
+  }
+];
 
 function uuid() {
   return globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000999";
@@ -106,14 +185,47 @@ function previewFromDraft(draft?: Draft | null) {
   } : null;
 }
 
+function parseTemplateYaml(content: string): TemplateYamlDoc | null {
+  const parsed = yaml.load(content);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  return parsed as TemplateYamlDoc;
+}
+
+function ensureTemplateDoc(content: string, family?: Partial<Family> | null, language = "nb-NO") {
+  const fallback = parseTemplateYaml(starterYaml(family ?? undefined)) ?? {};
+  const parsed = parseTemplateYaml(content) ?? fallback;
+  parsed.identity = { ...(parsed.identity ?? {}) };
+  parsed.identity.id = parsed.identity.id || uuid();
+  parsed.identity.title = parsed.identity.title || family?.title || "New Ulfy template";
+  parsed.identity.short_description = parsed.identity.short_description || family?.shortDescription || "";
+  parsed.identity.icon = parsed.identity.icon || family?.icon || "doc.text";
+  parsed.identity.category = parsed.identity.category || family?.category?.slug || "annet";
+  parsed.identity.tags = Array.isArray(parsed.identity.tags) ? parsed.identity.tags : [];
+  parsed.identity.language = parsed.identity.language || language;
+  parsed.identity.version = parsed.identity.version || "1.0.0";
+  parsed.structure = { ...(parsed.structure ?? {}) };
+  parsed.structure.sections = Array.isArray(parsed.structure.sections) ? parsed.structure.sections : [];
+  return parsed;
+}
+
+function dumpTemplateYaml(doc: TemplateYamlDoc) {
+  return yaml.dump(doc, { noRefs: true, lineWidth: 100, sortKeys: false });
+}
+
+function textToList(value: string) {
+  return value.split(/\n|,/).map((item) => item.trim()).filter(Boolean);
+}
+
+function listToText(value?: string[]) {
+  return (value ?? []).join("\n");
+}
+
 export default function TemplatesPage() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [familyPanel, setFamilyPanel] = useState(false);
   const [variantPanel, setVariantPanel] = useState(false);
   const [selectedFamily, setSelectedFamily] = useState<Family | null>(null);
@@ -130,6 +242,124 @@ export default function TemplatesPage() {
     aiUseCase: "",
     preview: null as any
   });
+  const [dragItem, setDragItem] = useState<DragItem | null>(null);
+  const { notify } = useToast();
+  const templateDoc = useMemo(() => {
+    try {
+      return parseTemplateYaml(variantForm.yamlContent);
+    } catch {
+      return null;
+    }
+  }, [variantForm.yamlContent]);
+  const templateIdentity = templateDoc?.identity ?? {};
+  const templateSections = templateDoc?.structure?.sections ?? [];
+
+  function setNotice(message: string) {
+    if (message) notify({ tone: "success", title: message });
+  }
+
+  function setError(message: string) {
+    if (message) notify({ tone: "danger", title: "Action failed", message });
+  }
+
+  function updateTemplate(mutator: (doc: TemplateYamlDoc) => void) {
+    try {
+      setVariantForm((current) => {
+        const doc = ensureTemplateDoc(current.yamlContent, selectedFamily, current.language);
+        mutator(doc);
+        return { ...current, yamlContent: dumpTemplateYaml(doc) };
+      });
+    } catch (err: any) {
+      setError(err.message ?? "Template YAML could not be updated.");
+    }
+  }
+
+  function updateIdentity(field: keyof NonNullable<TemplateYamlDoc["identity"]>, value: string | string[]) {
+    updateTemplate((doc) => {
+      doc.identity = { ...(doc.identity ?? {}), [field]: value };
+    });
+  }
+
+  function updateLanguage(language: string) {
+    try {
+      setVariantForm((current) => {
+        const doc = ensureTemplateDoc(current.yamlContent, selectedFamily, language);
+        doc.identity = { ...(doc.identity ?? {}), language };
+        return { ...current, language, yamlContent: dumpTemplateYaml(doc) };
+      });
+    } catch (err: any) {
+      setError(err.message ?? "Template YAML could not be updated.");
+    }
+  }
+
+  function updateSection(index: number, patch: Partial<TemplateSection>) {
+    updateTemplate((doc) => {
+      const sections = doc.structure?.sections ?? [];
+      sections[index] = { ...(sections[index] ?? {}), ...patch };
+      doc.structure = { ...(doc.structure ?? {}), sections };
+    });
+  }
+
+  function addSection(preset: SectionPreset, index = templateSections.length) {
+    updateTemplate((doc) => {
+      const sections = [...(doc.structure?.sections ?? [])];
+      sections.splice(index, 0, {
+        title: preset.title,
+        purpose: preset.purpose,
+        format: preset.format,
+        required: preset.required,
+        extraction_hints: preset.extraction_hints
+      });
+      doc.structure = { ...(doc.structure ?? {}), sections };
+    });
+    notify({ tone: "success", title: `${preset.title} section added` });
+  }
+
+  function duplicateSection(index: number) {
+    updateTemplate((doc) => {
+      const sections = [...(doc.structure?.sections ?? [])];
+      const source = sections[index];
+      if (!source) return;
+      sections.splice(index + 1, 0, { ...source, title: `${source.title ?? "Section"} copy` });
+      doc.structure = { ...(doc.structure ?? {}), sections };
+    });
+  }
+
+  function removeSection(index: number) {
+    updateTemplate((doc) => {
+      const sections = [...(doc.structure?.sections ?? [])];
+      sections.splice(index, 1);
+      doc.structure = { ...(doc.structure ?? {}), sections };
+    });
+  }
+
+  function moveSection(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    updateTemplate((doc) => {
+      const sections = [...(doc.structure?.sections ?? [])];
+      const [item] = sections.splice(fromIndex, 1);
+      if (!item) return;
+      const nextIndex = Math.max(0, Math.min(toIndex, sections.length));
+      sections.splice(nextIndex, 0, item);
+      doc.structure = { ...(doc.structure ?? {}), sections };
+    });
+  }
+
+  function dropOnSection(event: DragEvent<HTMLDivElement>, index: number) {
+    event.preventDefault();
+    if (!dragItem) return;
+    if (dragItem.kind === "preset") addSection(dragItem.preset, index);
+    else moveSection(dragItem.index, index);
+    setDragItem(null);
+  }
+
+  function dropOnCanvas(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    if (!dragItem) return;
+    if (dragItem.kind === "preset") addSection(dragItem.preset, templateSections.length);
+    else moveSection(dragItem.index, templateSections.length);
+    setDragItem(null);
+  }
 
   async function load() {
     setLoading(true);
@@ -370,10 +600,8 @@ export default function TemplatesPage() {
       <PageHeader
         title="Templates"
         description="Authoritative repository for enterprise YAML templates. Drafts are private until published, and mobile access is filtered by tenant entitlement."
-        meta={<button className="button" onClick={() => openFamilyEditor()}><Plus size={16} /> New family</button>}
+        meta={<IconAction label="New template family" tone="primary" onClick={() => openFamilyEditor()}><Plus size={16} /></IconAction>}
       />
-      {error && <Alert tone="danger">{error}</Alert>}
-      {notice && <Alert tone="success">{notice}</Alert>}
       {loading ? <LoadingPanel label="Loading templates" /> : (
         <div className="page-stack">
           <div className="grid four">
@@ -401,10 +629,10 @@ export default function TemplatesPage() {
                       <td>{family.variants.length ? family.variants.map((variant) => <span key={variant.id} className="badge">{variant.language}</span>) : <span className="muted">No variants</span>}</td>
                       <td>{family.variants.map((variant) => latest(variant) ? <span key={variant.id} className="badge status-published">{variant.language} {latest(variant)?.version}</span> : <span key={variant.id} className="badge status-draft">{variant.language} draft</span>)}</td>
                       <td className="row actions">
-                        <button className="button secondary" onClick={() => openDesigner(family, family.variants[0])}>Designer</button>
-                        <button className="button secondary" onClick={() => openDesigner(family)}>New variant</button>
-                        <button className="button secondary" onClick={() => openFamilyEditor(family)}>Edit</button>
-                        <button className="button danger" onClick={() => archiveFamily(family)}><Archive size={14} /> Archive</button>
+                        <IconAction label="Open designer" onClick={() => openDesigner(family, family.variants[0])}><FileText size={14} /></IconAction>
+                        <IconAction label="New language variant" onClick={() => openDesigner(family)}><Globe2 size={14} /></IconAction>
+                        <IconAction label="Edit family" onClick={() => openFamilyEditor(family)}><Pencil size={14} /></IconAction>
+                        <IconAction label="Archive family" tone="danger" onClick={() => archiveFamily(family)}><Archive size={14} /></IconAction>
                       </td>
                     </tr>
                   ))}</tbody>
@@ -422,33 +650,40 @@ export default function TemplatesPage() {
         onClose={() => setFamilyPanel(false)}
         footer={<><button className="button secondary" onClick={() => setFamilyPanel(false)}>Close</button><button className="button" disabled={saving} onClick={saveFamily}><Save size={16} /> Save</button></>}
       >
-        <div className="grid two">
-          <div className="field"><FieldLabel>Title</FieldLabel><input className="input" value={familyForm.title} onChange={(e) => setFamilyForm({ ...familyForm, title: e.target.value })} /></div>
-          <div className="field"><FieldLabel>Category</FieldLabel><select value={familyForm.categoryId} onChange={(e) => setFamilyForm({ ...familyForm, categoryId: e.target.value })}><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></div>
-          <div className="field"><FieldLabel>Icon</FieldLabel><input className="input" value={familyForm.icon} onChange={(e) => setFamilyForm({ ...familyForm, icon: e.target.value })} /></div>
-          <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" value={familyForm.tagsText} onChange={(e) => setFamilyForm({ ...familyForm, tagsText: e.target.value })} placeholder="dictation, personal" /></div>
-        </div>
-        <div className="field"><FieldLabel>Short Description</FieldLabel><input className="input" value={familyForm.shortDescription} onChange={(e) => setFamilyForm({ ...familyForm, shortDescription: e.target.value })} /></div>
-        <label className="checkbox-row"><input type="checkbox" checked={familyForm.isGlobal} onChange={(e) => setFamilyForm({ ...familyForm, isGlobal: e.target.checked })} /> Global template family for all enterprise tenants</label>
+        <div className="form-stack">
+          <FormSection title="Family metadata" description="Repository-level information shared by all language variants.">
+            <div className="grid two">
+              <div className="field"><FieldLabel>Title</FieldLabel><input className="input" value={familyForm.title} onChange={(e) => setFamilyForm({ ...familyForm, title: e.target.value })} /></div>
+              <div className="field"><FieldLabel>Category</FieldLabel><select value={familyForm.categoryId} onChange={(e) => setFamilyForm({ ...familyForm, categoryId: e.target.value })}><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></div>
+            </div>
+            <div className="field"><FieldLabel>Short Description</FieldLabel><input className="input" value={familyForm.shortDescription} onChange={(e) => setFamilyForm({ ...familyForm, shortDescription: e.target.value })} /></div>
+          </FormSection>
+          <FormSection title="Catalog presentation" description="How this family appears in admin lists and tenant catalogs.">
+            <div className="grid two">
+              <div className="field"><FieldLabel>Icon</FieldLabel><input className="input" value={familyForm.icon} onChange={(e) => setFamilyForm({ ...familyForm, icon: e.target.value })} /></div>
+              <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" value={familyForm.tagsText} onChange={(e) => setFamilyForm({ ...familyForm, tagsText: e.target.value })} placeholder="dictation, personal" /></div>
+            </div>
+            <label className="checkbox-row"><input type="checkbox" checked={familyForm.isGlobal} onChange={(e) => setFamilyForm({ ...familyForm, isGlobal: e.target.checked })} /> Global template family for all enterprise tenants</label>
+          </FormSection>
 
-        {selectedFamily && (
-          <div className="panel-subsection">
-            <PanelHeader title="Tenant entitlements" description="Assign this family directly to tenants. Global families do not need assignments." />
-            <div className="row">
-              <select value={selectedTenantId} onChange={(e) => setSelectedTenantId(e.target.value)}>
-                <option value="">Select tenant</option>
-                {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
-              </select>
-              <button className="button secondary" onClick={addEntitlement} disabled={!selectedTenantId || saving}>Assign</button>
-            </div>
-            <div className="tag-cloud">
-              {selectedFamily.entitlements.map((entitlement) => (
-                <button key={entitlement.id} className="badge" onClick={() => removeEntitlement(entitlement.tenantId)}>{entitlement.tenant.name} x</button>
-              ))}
-              {!selectedFamily.entitlements.length && <span className="muted">No tenant-specific assignments.</span>}
-            </div>
-          </div>
-        )}
+          {selectedFamily && (
+            <FormSection title="Tenant entitlements" description="Assign this family directly to tenants. Global families do not need assignments.">
+              <div className="row">
+                <select value={selectedTenantId} onChange={(e) => setSelectedTenantId(e.target.value)}>
+                  <option value="">Select tenant</option>
+                  {tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}
+                </select>
+                <IconAction label="Assign tenant" onClick={addEntitlement} disabled={!selectedTenantId || saving}><Plus size={15} /></IconAction>
+              </div>
+              <div className="tag-cloud">
+                {selectedFamily.entitlements.map((entitlement) => (
+                  <button key={entitlement.id} className="badge" onClick={() => removeEntitlement(entitlement.tenantId)}>{entitlement.tenant.name} x</button>
+                ))}
+                {!selectedFamily.entitlements.length && <span className="muted">No tenant-specific assignments.</span>}
+              </div>
+            </FormSection>
+          )}
+        </div>
       </SidePanel>
 
       <SidePanel
@@ -460,21 +695,113 @@ export default function TemplatesPage() {
         footer={<><button className="button secondary" onClick={() => setVariantPanel(false)}>Close</button><button className="button secondary" onClick={validateYaml}>Validate YAML</button><button className="button" disabled={saving} onClick={saveDraft}><Save size={16} /> Save draft</button><button className="button" disabled={saving || !variantForm.variantId} onClick={publishDraft}><CheckCircle size={16} /> Publish</button></>}
       >
         <div className="template-designer">
-          <section className="designer-editor">
-            <div className="grid three">
-              <div className="field"><FieldLabel>Family</FieldLabel><input className="input" value={selectedFamily?.title ?? ""} disabled /></div>
-              <div className="field"><FieldLabel>Language</FieldLabel><input className="input" value={variantForm.language} onChange={(e) => setVariantForm({ ...variantForm, language: e.target.value })} /></div>
-              <div className="field"><FieldLabel>Publish bump</FieldLabel><select value={variantForm.bump} onChange={(e) => setVariantForm({ ...variantForm, bump: e.target.value as any })}><option value="patch">Patch</option><option value="minor">Minor</option><option value="major">Major</option></select></div>
-            </div>
-            <div className="field"><FieldLabel help="The assistant proposes draft YAML only. Review before saving or publishing.">AI assist use case</FieldLabel><div className="row"><input className="input" value={variantForm.aiUseCase} onChange={(e) => setVariantForm({ ...variantForm, aiUseCase: e.target.value })} /><button className="button secondary" onClick={aiAssist} disabled={saving}><Wand2 size={15} /> Propose</button></div></div>
-            <div className="field"><FieldLabel help="Must use the app schema: identity, context, perspective, structure, content_rules, llm_prompting.">YAML Draft</FieldLabel><textarea className="yaml-editor" value={variantForm.yamlContent} onChange={(e) => setVariantForm({ ...variantForm, yamlContent: e.target.value })} /></div>
-            <div className="field"><FieldLabel>Sample Transcript</FieldLabel><textarea value={variantForm.sampleTranscript} onChange={(e) => setVariantForm({ ...variantForm, sampleTranscript: e.target.value })} placeholder="Paste a realistic sample transcript for preview generation." /></div>
+          <section className="designer-editor form-stack">
+            <FormSection title="Template basics" description="Edit the app-facing identity fields. These values are written directly into YAML.">
+              <div className="grid three">
+                <div className="field"><FieldLabel>Family</FieldLabel><input className="input" value={selectedFamily?.title ?? ""} disabled /></div>
+                <div className="field"><FieldLabel>Template title</FieldLabel><input className="input" value={templateIdentity.title ?? ""} onChange={(e) => updateIdentity("title", e.target.value)} /></div>
+                <div className="field"><FieldLabel>Language</FieldLabel><input className="input" value={variantForm.language} onChange={(e) => updateLanguage(e.target.value)} /></div>
+                <div className="field"><FieldLabel>Short description</FieldLabel><input className="input" value={templateIdentity.short_description ?? ""} onChange={(e) => updateIdentity("short_description", e.target.value)} /></div>
+                <div className="field"><FieldLabel>Category</FieldLabel><input className="input" value={templateIdentity.category ?? ""} onChange={(e) => updateIdentity("category", e.target.value)} /></div>
+                <div className="field"><FieldLabel>Icon</FieldLabel><input className="input" value={templateIdentity.icon ?? ""} onChange={(e) => updateIdentity("icon", e.target.value)} /></div>
+                <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" value={(templateIdentity.tags ?? []).join(", ")} onChange={(e) => updateIdentity("tags", textToList(e.target.value))} placeholder="dictation, personal" /></div>
+                <div className="field"><FieldLabel>Publish bump</FieldLabel><select value={variantForm.bump} onChange={(e) => setVariantForm({ ...variantForm, bump: e.target.value as any })}><option value="patch">Patch</option><option value="minor">Minor</option><option value="major">Major</option></select></div>
+              </div>
+            </FormSection>
+            <FormSection title="Section builder" description="Drag sections from the palette into the template. Reorder cards by dragging the handle. Mark sections as required or optional.">
+              {!templateDoc && <Alert tone="danger">The YAML source cannot be parsed. Fix it in YAML source before using the builder.</Alert>}
+              <div className="builder-workspace">
+                <aside className="section-palette" aria-label="Section palette">
+                  <div className="builder-subhead">
+                    <h4>Section palette</h4>
+                    <p>Drag into the template, or click add.</p>
+                  </div>
+                  <div className="section-preset-list">
+                    {sectionPresets.map((preset) => (
+                      <div
+                        key={preset.title}
+                        className="section-preset"
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "copy";
+                          setDragItem({ kind: "preset", preset });
+                        }}
+                        onDragEnd={() => setDragItem(null)}
+                      >
+                        <div>
+                          <strong>{preset.title}</strong>
+                          <span>{preset.required ? "Required by default" : "Optional by default"}</span>
+                        </div>
+                        <IconAction label={`Add ${preset.title}`} onClick={() => addSection(preset)}><Plus size={14} /></IconAction>
+                      </div>
+                    ))}
+                  </div>
+                </aside>
+                <div className="section-canvas" onDragOver={(event) => event.preventDefault()} onDrop={dropOnCanvas}>
+                  <div className="builder-subhead">
+                    <h4>Template sections</h4>
+                    <p>{templateSections.length} sections in output order</p>
+                  </div>
+                  {!templateSections.length ? (
+                    <div className="builder-empty">Drop sections here to build the output structure.</div>
+                  ) : (
+                    <div className="section-card-list">
+                      {templateSections.map((section, index) => (
+                        <div
+                          key={`${section.title ?? "section"}-${index}`}
+                          className="section-card"
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => dropOnSection(event, index)}
+                        >
+                          <div className="section-card-header">
+                            <div
+                              className="section-drag-handle"
+                              draggable
+                              onDragStart={(event) => {
+                                event.dataTransfer.effectAllowed = "move";
+                                setDragItem({ kind: "section", index });
+                              }}
+                              onDragEnd={() => setDragItem(null)}
+                              title="Drag to reorder"
+                            >
+                              <GripVertical size={16} />
+                            </div>
+                            <div className="section-number">{index + 1}</div>
+                            <input className="input section-title-input" value={section.title ?? ""} onChange={(e) => updateSection(index, { title: e.target.value })} placeholder="Section title" />
+                            <span className={`badge ${section.required !== false ? "status-active" : "status-draft"}`}>{section.required !== false ? "Required" : "Optional"}</span>
+                            <IconAction label="Duplicate section" onClick={() => duplicateSection(index)}><CopyPlus size={14} /></IconAction>
+                            <IconAction label="Remove section" tone="danger" onClick={() => removeSection(index)}><Trash2 size={14} /></IconAction>
+                          </div>
+                          <div className="section-card-body">
+                            <div className="field"><FieldLabel>Purpose</FieldLabel><textarea value={section.purpose ?? ""} onChange={(e) => updateSection(index, { purpose: e.target.value })} placeholder="What this section should capture" /></div>
+                            <div className="grid three">
+                              <div className="field"><FieldLabel>Format</FieldLabel><select value={section.format ?? "prose"} onChange={(e) => updateSection(index, { format: e.target.value })}><option value="prose">Prose</option><option value="bullets">Bullets</option><option value="numbered_list">Numbered list</option><option value="table">Table</option><option value="checklist">Checklist</option></select></div>
+                              <label className="checkbox-row section-required-toggle"><input type="checkbox" checked={section.required !== false} onChange={(e) => updateSection(index, { required: e.target.checked })} /> Required section</label>
+                              <div className="field"><FieldLabel>Extraction hints</FieldLabel><textarea value={listToText(section.extraction_hints)} onChange={(e) => updateSection(index, { extraction_hints: textToList(e.target.value) })} placeholder="One hint per line" /></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </FormSection>
+            <FormSection title="AI assist" description="Generate a suggested draft from a use-case description, then review before publishing.">
+              <div className="field"><FieldLabel help="The assistant proposes draft YAML only. Review before saving or publishing.">Use case</FieldLabel><div className="row"><input className="input" value={variantForm.aiUseCase} onChange={(e) => setVariantForm({ ...variantForm, aiUseCase: e.target.value })} /><IconAction label="Propose draft with AI" onClick={aiAssist} disabled={saving}><Wand2 size={15} /></IconAction></div></div>
+            </FormSection>
+            <FormSection title="YAML source" description="Advanced source view. Changes here immediately update the builder when YAML is valid.">
+              <div className="field"><FieldLabel help="Must use the app schema: identity, context, perspective, structure, content_rules, llm_prompting.">YAML Draft</FieldLabel><textarea className="yaml-editor" value={variantForm.yamlContent} onChange={(e) => setVariantForm({ ...variantForm, yamlContent: e.target.value })} /></div>
+            </FormSection>
+            <FormSection title="Preview fixture" description="Sample transcript used only when an admin manually generates or refreshes preview.">
+              <div className="field"><FieldLabel>Sample Transcript</FieldLabel><textarea value={variantForm.sampleTranscript} onChange={(e) => setVariantForm({ ...variantForm, sampleTranscript: e.target.value })} placeholder="Paste a realistic sample transcript for preview generation." /></div>
+            </FormSection>
           </section>
 
           <aside className="designer-preview">
             <div className="panel-header compact">
               <div><h2>AI Preview</h2><p>Generated manually from the saved draft and sample transcript.</p></div>
-              <button className="button secondary" onClick={generatePreview} disabled={saving || !variantForm.draftId}><Bot size={15} /> Preview</button>
+              <IconAction label="Generate preview" onClick={generatePreview} disabled={saving || !variantForm.draftId}><Bot size={15} /></IconAction>
             </div>
             {variantForm.preview?.error && <Alert tone="danger">{variantForm.preview.error}</Alert>}
             {variantForm.preview?.markdown ? (
@@ -496,7 +823,7 @@ export default function TemplatesPage() {
                   <div key={variant.id} className="version-row">
                     <strong>{variant.language}</strong>
                     <span>{variant.publishedVersions.length ? `${variant.publishedVersions.length} versions` : "No published versions"}</span>
-                    {latest(variant) && <button className="button secondary" onClick={() => downloadYaml(variant)}><Download size={14} /> YAML</button>}
+                    {latest(variant) && <IconAction label="Download YAML" onClick={() => downloadYaml(variant)}><Download size={14} /></IconAction>}
                   </div>
                 ))}
               </div>

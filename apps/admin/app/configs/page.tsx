@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Save, Settings, ShieldCheck, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { getErrorMessage, useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
 const speechProviders = [
@@ -80,11 +81,10 @@ export default function ConfigsPage() {
   const [partners, setPartners] = useState<any[]>([]);
   const [form, setForm] = useState<any>(empty);
   const [selected, setSelected] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const { notify } = useToast();
 
   async function load() {
     try {
@@ -95,7 +95,7 @@ export default function ConfigsPage() {
       setLoading(false);
     }
   }
-  useEffect(() => { load().catch(console.error); }, []);
+  useEffect(() => { load().catch((err) => notify({ tone: "danger", title: "Could not load profiles", message: getErrorMessage(err) })); }, []);
 
   const stats = useMemo(() => ({
     total: profiles.length,
@@ -131,16 +131,12 @@ export default function ConfigsPage() {
       allowedProviderRestrictionsText: JSON.stringify(profile.allowedProviderRestrictions ?? [], null, 2),
       defaultTemplateId: profile.defaultTemplateId ?? ""
     });
-    setMessage(`Editing ${profile.name}`);
-    setError("");
     setEditorOpen(true);
   }
 
   function createNew() {
     setSelected("");
     setForm(empty);
-    setMessage("Creating new profile");
-    setError("");
     setEditorOpen(true);
   }
 
@@ -180,7 +176,6 @@ export default function ConfigsPage() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setError("");
     try {
       const allowedProviderRestrictions = JSON.parse(form.allowedProviderRestrictionsText || "[]");
       const featureFlags = {
@@ -252,13 +247,13 @@ export default function ConfigsPage() {
       };
 
       await api(selected ? `/admin/config-profiles/${selected}` : "/admin/config-profiles", { method: selected ? "PATCH" : "POST", body: JSON.stringify(payload) });
-      setMessage(selected ? "Profile updated" : "Profile created");
+      notify({ tone: "success", title: selected ? "Profile updated" : "Profile created" });
       setSelected("");
       setForm(empty);
       setEditorOpen(false);
       await load();
     } catch (err: any) {
-      setError(err instanceof SyntaxError ? "Allowed providers must be valid JSON." : err.message);
+      notify({ tone: "danger", title: "Could not save profile", message: err instanceof SyntaxError ? "Allowed providers must be valid JSON." : getErrorMessage(err) });
     } finally {
       setSaving(false);
     }
@@ -266,7 +261,6 @@ export default function ConfigsPage() {
 
   async function deleteProfile(profile: any) {
     if (!window.confirm(`Delete ${profile.name}? This cannot be undone.`)) return;
-    setError("");
     try {
       await api(`/admin/config-profiles/${profile.id}`, { method: "DELETE" });
       if (selected === profile.id) {
@@ -274,17 +268,16 @@ export default function ConfigsPage() {
         setForm(empty);
         setEditorOpen(false);
       }
-      setMessage("Profile deleted");
+      notify({ tone: "success", title: "Profile deleted" });
       await load();
     } catch (err: any) {
-      setError(err.message);
+      notify({ tone: "danger", title: "Could not delete profile", message: getErrorMessage(err) });
     }
   }
 
   return (
     <RequireAuth>
-      <PageHeader title="Config profiles" description="Enterprise app settings with speech, formatter, Presidio and privacy review kept as separate provider domains." meta={message && <span className="badge status-active">{message}</span>} />
-      {error && <Alert tone="danger">{error}</Alert>}
+      <PageHeader title="Config profiles" description="Enterprise app settings with speech, formatter, Presidio and privacy review kept as separate provider domains." />
       {loading ? <LoadingPanel label="Loading config profiles" /> : (
         <>
           <div className="page-stack">
@@ -296,9 +289,9 @@ export default function ConfigsPage() {
             </div>
 
             <div className="panel">
-              <PanelHeader title="Configuration profiles" description="List first. Open a profile to edit provider selections and policy in a slide-in panel." actions={<button type="button" className="button" onClick={createNew}><Plus size={16} /> New profile</button>} />
+              <PanelHeader title="Configuration profiles" description="List first. Open a profile to edit provider selections and policy in a slide-in panel." actions={<IconAction label="New profile" tone="primary" onClick={createNew}><Plus size={16} /></IconAction>} />
               {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech</th><th>Formatter</th><th>Privacy review</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.id} onDoubleClick={() => edit(profile)}><td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td><td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td><td>{profile.speechProviderType ? <span className="badge">{profile.speechProviderType}</span> : <span className="muted">Local</span>}</td><td>{profile.documentGenerationProviderType ? <span className="badge">{profile.documentGenerationProviderType}</span> : <span className="muted">Local</span>}</td><td><div className="row"><StatusBadge status={profile.privacyControlEnabled ? "active" : "draft"} />{profile.privacyReviewProviderType && <span className="badge">{profile.privacyReviewProviderType}</span>}</div></td><td className="row actions"><button type="button" className="button secondary" onClick={() => edit(profile)}>Edit</button><button type="button" className="button danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /> Delete</button></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech</th><th>Formatter</th><th>Privacy review</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.id} onDoubleClick={() => edit(profile)}><td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td><td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td><td>{profile.speechProviderType ? <span className="badge">{profile.speechProviderType}</span> : <span className="muted">Local</span>}</td><td>{profile.documentGenerationProviderType ? <span className="badge">{profile.documentGenerationProviderType}</span> : <span className="muted">Local</span>}</td><td><div className="row"><StatusBadge status={profile.privacyControlEnabled ? "active" : "draft"} />{profile.privacyReviewProviderType && <span className="badge">{profile.privacyReviewProviderType}</span>}</div></td><td className="row actions"><IconAction label="Edit profile" onClick={() => edit(profile)}><Settings size={14} /></IconAction><IconAction label="Delete profile" tone="danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
               )}
             </div>
           </div>
@@ -311,18 +304,16 @@ export default function ConfigsPage() {
             onClose={() => !saving && setEditorOpen(false)}
             footer={<><button type="button" className="button secondary" onClick={() => setEditorOpen(false)} disabled={saving}>Cancel</button><button type="submit" form="config-editor-form" className="button" disabled={saving}><Save size={16} /> {saving ? "Saving..." : "Save profile"}</button></>}
           >
-            <form id="config-editor-form" onSubmit={save} className="config-form">
-              <section className="config-section">
-                <PanelHeader title="Profile" description="Ownership and plain-language description." />
+            <form id="config-editor-form" onSubmit={save} className="form-stack">
+              <FormSection title="Profile" description="Ownership and plain-language description.">
                 <div className="grid three">
                   <div className="field"><FieldLabel>Name</FieldLabel><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
                   <div className="field"><FieldLabel>Description</FieldLabel><input className="input" value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
                   <div className="field"><FieldLabel help="Partner admins assigned to this solution partner can manage this profile.">Solution partner</FieldLabel><select value={form.partnerId ?? ""} onChange={(e) => setForm({ ...form, partnerId: e.target.value })}><option value="">Internal / no partner</option>{partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select></div>
                 </div>
-              </section>
+              </FormSection>
 
-              <section className="config-section">
-                <PanelHeader title="Speech Provider" description="One selected speech source. This is separate from document generation and privacy review." />
+              <FormSection title="Speech provider" description="One selected speech source. This is separate from document generation and privacy review.">
                 <ProviderHint provider={speechProviders.find((item) => item.value === form.speechProviderType)} />
                 <div className="grid three">
                   <div className="field"><FieldLabel>Selected speech provider</FieldLabel><select value={form.speechProviderType ?? ""} onChange={(e) => applyProviderDefault("speech", e.target.value)}>{speechProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
@@ -330,10 +321,9 @@ export default function ConfigsPage() {
                   <div className="field"><FieldLabel>Model name</FieldLabel><input className="input" value={form.speechModelName ?? ""} onChange={(e) => setForm({ ...form, speechModelName: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.model} /></div>
                 </div>
                 <label className="checkbox-row"><input type="checkbox" checked={form.speechDiarizationEnabled} disabled={form.speechProviderType !== "openai"} onChange={(e) => setForm({ ...form, speechDiarizationEnabled: e.target.checked })} /> OpenAI saved-recording diarization enabled</label>
-              </section>
+              </FormSection>
 
-              <section className="config-section">
-                <PanelHeader title="Document Generation Formatter" description="The formatter creates the final document. It is not the speech provider and not the privacy review provider." />
+              <FormSection title="Document generation formatter" description="The formatter creates the final document. It is not the speech provider and not the privacy review provider.">
                 <ProviderHint provider={formatterProviders.find((item) => item.value === form.documentGenerationProviderType)} />
                 <div className="grid four">
                   <div className="field"><FieldLabel>Selected formatter</FieldLabel><select value={form.documentGenerationProviderType ?? ""} onChange={(e) => applyProviderDefault("formatter", e.target.value)}>{formatterProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
@@ -341,16 +331,18 @@ export default function ConfigsPage() {
                   <div className="field"><FieldLabel>Model name</FieldLabel><input className="input" value={form.documentGenerationModel ?? ""} onChange={(e) => setForm({ ...form, documentGenerationModel: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.model} /></div>
                   <div className="field"><FieldLabel help="Stored for admin policy. Current mobile payload does not centrally inject provider secrets.">Privacy classification</FieldLabel><select value={form.formatterPrivacyEmphasis} onChange={(e) => setForm({ ...form, formatterPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
                 </div>
-              </section>
+              </FormSection>
 
-              <section className="config-section">
-                <PanelHeader title="Privacy Control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review." />
+              <FormSection title="Privacy control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review.">
                 <div className="row checkbox-group">
                   <label className="checkbox-row"><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> Privacy control enabled</label>
                   <label className="checkbox-row"><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> Presidio PII enabled</label>
                 </div>
-                <div className="config-subsection">
-                  <PanelHeader title="Presidio PII Analyzer" description="The app appends /health and /analyze to this base URL." />
+                <div className="form-subsection">
+                  <div className="form-subsection-header">
+                    <h4>Presidio PII analyzer</h4>
+                    <p>The app appends /health and /analyze to this base URL.</p>
+                  </div>
                   <div className="grid three">
                     <div className="field"><FieldLabel>Presidio endpoint URL</FieldLabel><input className="input" value={form.presidioEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, presidioEndpointUrl: e.target.value })} /></div>
                     <div className="field"><FieldLabel>Secret reference</FieldLabel><input className="input" value={form.presidioSecretRef ?? ""} onChange={(e) => setForm({ ...form, presidioSecretRef: e.target.value })} placeholder="secret://ulfy/presidio" /></div>
@@ -360,8 +352,11 @@ export default function ConfigsPage() {
                     {["detectEmail", "detectPhone", "detectPerson", "detectLocation", "detectIdentifier", "fullPersonNamesOnly"].map((key) => <label key={key} className="checkbox-row"><input type="checkbox" checked={Boolean(form[key])} onChange={(e) => setForm({ ...form, [key]: e.target.checked })} /> {labelFor(key)}</label>)}
                   </div>
                 </div>
-                <div className="config-subsection">
-                  <PanelHeader title="Privacy Review / Guardrail" description="Custom review providers are eligible only when explicitly classified as safe." />
+                <div className="form-subsection">
+                  <div className="form-subsection-header">
+                    <h4>Privacy review / guardrail</h4>
+                    <p>Custom review providers are eligible only when explicitly classified as safe.</p>
+                  </div>
                   <ProviderHint provider={privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType)} />
                   {form.privacyReviewProviderType && !["local_heuristic", "ollama", "openai_compatible"].includes(form.privacyReviewProviderType) && <Alert tone="danger">This provider is decoded by the app, but is not a good v1 privacy-review choice. Prefer local_heuristic, ollama, or openai_compatible.</Alert>}
                   <div className="grid four">
@@ -371,10 +366,9 @@ export default function ConfigsPage() {
                     <div className="field"><FieldLabel>Privacy classification</FieldLabel><select value={form.privacyReviewPrivacyEmphasis} onChange={(e) => setForm({ ...form, privacyReviewPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
                   </div>
                 </div>
-              </section>
+              </FormSection>
 
-              <section className="config-section">
-                <PanelHeader title="Repository, Telemetry & Policy" description="Sparse managed config: leave fields blank when the tenant should keep local settings." />
+              <FormSection title="Repository, telemetry and policy" description="Sparse managed config: leave fields blank when the tenant should keep local settings.">
                 <div className="grid three">
                   <div className="field"><FieldLabel>Template repository URL</FieldLabel><input className="input" value={form.templateRepositoryUrl ?? ""} onChange={(e) => setForm({ ...form, templateRepositoryUrl: e.target.value })} /></div>
                   <div className="field"><FieldLabel>Telemetry endpoint URL</FieldLabel><input className="input" value={form.telemetryEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, telemetryEndpointUrl: e.target.value })} /></div>
@@ -391,7 +385,7 @@ export default function ConfigsPage() {
                   <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> User may change privacy review</label>
                 </div>
                 <div className="field"><FieldLabel help="Decoded by the app but not fully enforced yet. Keep this as canonical backend provider values.">Allowed provider restrictions JSON</FieldLabel><textarea value={form.allowedProviderRestrictionsText} onChange={(e) => setForm({ ...form, allowedProviderRestrictionsText: e.target.value })} /></div>
-              </section>
+              </FormSection>
             </form>
           </SidePanel>
         </>

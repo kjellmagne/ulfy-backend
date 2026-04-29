@@ -253,16 +253,20 @@ cp infra/.env.server.example infra/.env.server
 sudo mkdir -p /opt/ulfy-data/postgres
 sudo chown -R "$USER:$USER" /opt/ulfy-data
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml pull
-docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d
+docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d postgres
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma migrate deploy
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma db seed
+docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d api admin
 ```
 
 The Kvasetech/APISIX deployment serves Ulfy publicly at `https://kvasetech.com/backend/`. APISIX strips `/backend` before proxying to both upstream containers, so the API and admin services both run internally at `/`. The admin image still emits public `/backend/...` links and static asset URLs.
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml pull
-docker compose --env-file .env -f docker-compose.yml up -d
+docker compose --env-file .env -f docker-compose.yml up -d postgres
+docker compose --env-file .env -f docker-compose.yml run --rm api pnpm prisma migrate deploy
+docker compose --env-file .env -f docker-compose.yml run --rm api pnpm prisma db seed
+docker compose --env-file .env -f docker-compose.yml up -d api admin
 APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-backend-routes.sh
 ```
 
@@ -280,14 +284,14 @@ GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0
 - `ghcr.io/kjellmagne/ulfy-backend-api:sha-<commit>`
 - `ghcr.io/kjellmagne/ulfy-backend-admin:sha-<commit>`
 
-The admin image uses the GitHub Actions repository variable `NEXT_PUBLIC_API_BASE_URL` at build time. If the variable is not set, it defaults to `http://localhost:4000`.
+The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time and leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, include the complete public API prefix, for example `https://kvasetech.com/backend`.
 
 Required deployment environment variables:
 
 - `DATABASE_URL` for non-compose deployments
 - `JWT_SECRET`
 - `ACTIVATION_TOKEN_SECRET`
-- `NEXT_PUBLIC_API_BASE_URL`
+- `PUBLIC_BASE_PATH` when serving the admin under a gateway prefix such as `/backend`
 - `TEMPLATE_PREVIEW_ENDPOINT_URL`, `TEMPLATE_PREVIEW_API_KEY`, and `TEMPLATE_PREVIEW_MODEL` when AI preview is enabled
 - optional `TEMPLATE_REPOSITORY_API_KEY` for internal repository override access
 

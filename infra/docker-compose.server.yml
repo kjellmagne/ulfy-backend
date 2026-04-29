@@ -40,10 +40,12 @@ services:
       context: ..
       dockerfile: infra/admin.Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+        NEXT_PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-/backend}
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_BASE_URL:?PUBLIC_BASE_URL is required}
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+      NEXT_PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-/backend}
     depends_on:
       - api
     ports:
