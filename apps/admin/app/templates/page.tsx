@@ -81,7 +81,6 @@ function IconLink({ label, href, children, tone = "secondary" }: { label: string
     <a className={`icon-action tone-${tone}`} href={href} aria-label={label} title={label}>
       <span className="sr-only">{label}</span>
       {children}
-      <span className="icon-action-tooltip" role="tooltip">{label}</span>
     </a>
   );
 }

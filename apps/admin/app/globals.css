@@ -430,32 +430,6 @@ button, input, textarea, select { font: inherit; }
   border-color: #dc2626;
   color: #fff;
 }
-.icon-action-tooltip {
-  position: absolute;
-  z-index: 900;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  max-width: 220px;
-  padding: 5px 8px;
-  border-radius: 7px;
-  background: #0f172a;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.25;
-  white-space: nowrap;
-  box-shadow: 0 8px 24px rgba(15,23,42,0.18);
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, 4px);
-  transition: opacity 120ms ease, transform 120ms ease;
-}
-.icon-action:hover .icon-action-tooltip,
-.icon-action:focus-visible .icon-action-tooltip {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
 /* Forms */
 .field {
   display: flex;
@@ -2382,28 +2356,27 @@ textarea {
   color: var(--muted);
   cursor: help;
 }
-.info-tip span {
-  position: absolute;
-  z-index: 10;
-  left: 50%;
-  bottom: calc(100% + 8px);
+.floating-tooltip {
+  position: fixed;
+  z-index: 1600;
   width: max-content;
-  max-width: 240px;
-  transform: translateX(-50%);
+  max-width: min(280px, calc(100vw - 32px));
   padding: 8px 10px;
-  border-radius: 6px;
-  background: #111827;
-  color: white;
-  font-size: 12px;
-  line-height: 1.35;
+  border-radius: 7px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 11px;
   font-weight: 600;
-  opacity: 0;
+  line-height: 1.35;
+  white-space: normal;
+  box-shadow: 0 12px 32px rgba(15,23,42,0.22);
   pointer-events: none;
-  transition: opacity 120ms ease;
 }
-.info-tip:hover span,
-.info-tip:focus span {
-  opacity: 1;
+.floating-tooltip.top {
+  transform: translate(-50%, -100%);
+}
+.floating-tooltip.bottom {
+  transform: translateX(-50%);
 }
 
 /* Template settings controls */

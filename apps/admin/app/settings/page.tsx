@@ -59,6 +59,7 @@ export default function SettingsPage() {
     sections: sections.length,
     required: sections.filter((section) => section.required).length
   }), [categories, sections]);
+  const canManageSettings = isSuperadminRole(me?.role);
 
   function openCategory(category?: Category) {
     setCategoryForm(category ? {
@@ -154,7 +155,7 @@ export default function SettingsPage() {
       />
       {loading ? <LoadingPanel label="Loading settings" /> : (
         <div className="page-stack">
-          {me?.role !== "superadmin" && <Alert tone="info">Only superadmins can create, edit or delete these shared template settings.</Alert>}
+          {!canManageSettings && <Alert tone="info">Only superadmins can create, edit or delete these shared template settings.</Alert>}
           <div className="grid three">
             <StatCard label="Categories" value={stats.categories} icon={<Edit3 size={18} />} sub="template groups" />
             <StatCard label="Sections" value={stats.sections} icon={<Edit3 size={18} />} sub="builder presets" />
@@ -166,7 +167,7 @@ export default function SettingsPage() {
               <PanelHeader
                 title="Template categories"
                 description="Used by template families and the designer category dropdown."
-                actions={<IconAction label="New category" tone="primary" onClick={() => openCategory()} disabled={me?.role !== "superadmin"}><Plus size={15} /></IconAction>}
+                actions={<IconAction label="New category" tone="primary" onClick={() => openCategory()} disabled={!canManageSettings}><Plus size={15} /></IconAction>}
               />
               {!categories.length ? <EmptyState title="No categories" message="Create categories for template families." /> : (
                 <div className="table-wrap">
@@ -177,8 +178,8 @@ export default function SettingsPage() {
                         <td><b>{category.title}</b><br /><span className="muted">{category.description || "No description"}</span></td>
                         <td><span className="code">{category.slug}</span></td>
                         <td className="actions">
-                          <IconAction label="Edit category" onClick={() => openCategory(category)} disabled={me?.role !== "superadmin"}><Edit3 size={14} /></IconAction>
-                          <IconAction label="Delete category" tone="danger" onClick={() => deleteCategory(category)} disabled={me?.role !== "superadmin"}><Trash2 size={14} /></IconAction>
+                          <IconAction label="Edit category" onClick={() => openCategory(category)} disabled={!canManageSettings}><Edit3 size={14} /></IconAction>
+                          <IconAction label="Delete category" tone="danger" onClick={() => deleteCategory(category)} disabled={!canManageSettings}><Trash2 size={14} /></IconAction>
                         </td>
                       </tr>
                     ))}</tbody>
@@ -191,7 +192,7 @@ export default function SettingsPage() {
               <PanelHeader
                 title="Template sections"
                 description="Reusable blocks admins drag or add into templates."
-                actions={<IconAction label="New section preset" tone="primary" onClick={() => openSection()} disabled={me?.role !== "superadmin"}><Plus size={15} /></IconAction>}
+                actions={<IconAction label="New section preset" tone="primary" onClick={() => openSection()} disabled={!canManageSettings}><Plus size={15} /></IconAction>}
               />
               {!sections.length ? <EmptyState title="No section presets" message="Create reusable sections for the designer." /> : (
                 <div className="table-wrap">
@@ -203,8 +204,8 @@ export default function SettingsPage() {
                         <td><span className="badge">{section.format}</span> {section.required && <span className="badge status-active">Required</span>}</td>
                         <td>{section.sortOrder}</td>
                         <td className="actions">
-                          <IconAction label="Edit section preset" onClick={() => openSection(section)} disabled={me?.role !== "superadmin"}><Edit3 size={14} /></IconAction>
-                          <IconAction label="Delete section preset" tone="danger" onClick={() => deleteSection(section)} disabled={me?.role !== "superadmin"}><Trash2 size={14} /></IconAction>
+                          <IconAction label="Edit section preset" onClick={() => openSection(section)} disabled={!canManageSettings}><Edit3 size={14} /></IconAction>
+                          <IconAction label="Delete section preset" tone="danger" onClick={() => deleteSection(section)} disabled={!canManageSettings}><Trash2 size={14} /></IconAction>
                         </td>
                       </tr>
                     ))}</tbody>
@@ -259,4 +260,8 @@ export default function SettingsPage() {
 
 function textToList(value: string) {
   return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+}
+
+function isSuperadminRole(role?: string | null) {
+  return String(role ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "") === "superadmin";
 }

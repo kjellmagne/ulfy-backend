@@ -1,6 +1,7 @@
 "use client";
 
-import { ButtonHTMLAttributes, ReactNode, useEffect, useId } from "react";
+import { ButtonHTMLAttributes, ReactNode, RefObject, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Info, Loader2, X } from "lucide-react";
 
 export function PageHeader({ title, description, meta }: { title: string; description?: string; meta?: ReactNode }) {
@@ -52,11 +53,67 @@ export function FieldLabel({ children, help }: { children: ReactNode; help?: str
 }
 
 export function InfoTip({ text }: { text: string }) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+
   return (
-    <span className="info-tip" tabIndex={0} aria-label={text}>
+    <span
+      ref={anchorRef}
+      className="info-tip"
+      tabIndex={0}
+      aria-label={text}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onClick={() => setOpen((current) => !current)}
+    >
       <Info size={14} />
-      <span role="tooltip">{text}</span>
+      <FloatingTooltip text={text} anchorRef={anchorRef} open={open} />
     </span>
+  );
+}
+
+function FloatingTooltip({ text, anchorRef, open }: { text: string; anchorRef: RefObject<HTMLElement | null>; open: boolean }) {
+  const [position, setPosition] = useState<{ left: number; top: number; placement: "top" | "bottom" } | null>(null);
+  const tooltipId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+
+    function updatePosition() {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const hasRoomAbove = rect.top > 72;
+      setPosition({
+        left: rect.left + rect.width / 2,
+        top: hasRoomAbove ? rect.top - 8 : rect.bottom + 8,
+        placement: hasRoomAbove ? "top" : "bottom"
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [anchorRef, open]);
+
+  if (!open || !position || typeof document === "undefined") return null;
+
+  return createPortal(
+    <span
+      id={tooltipId}
+      className={`floating-tooltip ${position.placement}`}
+      role="tooltip"
+      style={{ left: position.left, top: position.top }}
+    >
+      {text}
+    </span>,
+    document.body
   );
 }
 
@@ -101,17 +158,37 @@ export function IconAction({
   tone?: "primary" | "secondary" | "danger";
   children: ReactNode;
 }) {
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const isDisabled = Boolean(props.disabled);
+
   return (
     <button
       {...props}
+      ref={anchorRef}
       type={type}
       className={["icon-action", `tone-${tone}`, className].filter(Boolean).join(" ")}
       aria-label={label}
-      title={label}
+      onMouseEnter={(event) => {
+        props.onMouseEnter?.(event);
+        if (!isDisabled) setTooltipOpen(true);
+      }}
+      onMouseLeave={(event) => {
+        props.onMouseLeave?.(event);
+        setTooltipOpen(false);
+      }}
+      onFocus={(event) => {
+        props.onFocus?.(event);
+        if (!isDisabled) setTooltipOpen(true);
+      }}
+      onBlur={(event) => {
+        props.onBlur?.(event);
+        setTooltipOpen(false);
+      }}
     >
       <span className="sr-only">{label}</span>
       {children}
-      <span className="icon-action-tooltip" role="tooltip">{label}</span>
+      <FloatingTooltip text={label} anchorRef={anchorRef} open={tooltipOpen && !isDisabled} />
     </button>
   );
 }
