@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
@@ -73,6 +73,17 @@ type SectionPreset = {
 type DragItem = { kind: "preset"; preset: SectionPreset } | { kind: "section"; index: number };
 
 const blankFamily = { id: "", title: "", shortDescription: "", categoryId: "", icon: "doc.text", tagsText: "", isGlobal: false };
+
+function IconLink({ label, href, children, tone = "secondary" }: { label: string; href: string; children: ReactNode; tone?: "primary" | "secondary" | "danger" }) {
+  return (
+    <a className={`icon-action tone-${tone}`} href={href} aria-label={label} title={label}>
+      <span className="sr-only">{label}</span>
+      {children}
+      <span className="icon-action-tooltip" role="tooltip">{label}</span>
+    </a>
+  );
+}
+
 const sectionPresets: SectionPreset[] = [
   {
     title: "Summary",
@@ -641,8 +652,8 @@ export default function TemplatesPage() {
                       <td>{family.variants.length ? family.variants.map((variant) => <span key={variant.id} className="badge">{variant.language}</span>) : <span className="muted">No variants</span>}</td>
                       <td>{family.variants.map((variant) => latest(variant) ? <span key={variant.id} className="badge status-published">{variant.language} {latest(variant)?.version}</span> : <span key={variant.id} className="badge status-draft">{variant.language} draft</span>)}</td>
                       <td className="row actions">
-                        <IconAction label="Open designer" onClick={() => openDesignerRoute(family, family.variants[0])}><FileText size={14} /></IconAction>
-                        <IconAction label="New language variant" onClick={() => openDesignerRoute(family)}><Globe2 size={14} /></IconAction>
+                        <IconLink label="Open designer" href={designerPath(family, family.variants[0])}><FileText size={14} /></IconLink>
+                        <IconLink label="New language variant" href={designerPath(family)}><Globe2 size={14} /></IconLink>
                         <IconAction label="Edit family" onClick={() => openFamilyEditor(family)}><Pencil size={14} /></IconAction>
                         <IconAction label="Archive family" tone="danger" onClick={() => archiveFamily(family)}><Archive size={14} /></IconAction>
                       </td>
