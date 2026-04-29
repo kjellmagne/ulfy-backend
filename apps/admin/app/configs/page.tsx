@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CopyPlus, Plus, Save, Settings, ShieldCheck, Trash2 } from "lucide-react";
+import { CopyPlus, Loader2, Plus, RefreshCw, Save, Settings, ShieldCheck, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
@@ -110,6 +110,8 @@ export default function ConfigsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cloningId, setCloningId] = useState("");
+  const [modelLoading, setModelLoading] = useState("");
+  const [modelOptions, setModelOptions] = useState<Record<string, string[]>>({ speech: [], formatter: [], review: [] });
   const [editorOpen, setEditorOpen] = useState(false);
   const { notify } = useToast();
 
@@ -159,12 +161,14 @@ export default function ConfigsPage() {
       allowedProviderRestrictionsText: JSON.stringify(profile.allowedProviderRestrictions ?? [], null, 2),
       defaultTemplateId: profile.defaultTemplateId ?? ""
     });
+    setModelOptions({ speech: [], formatter: [], review: [] });
     setEditorOpen(true);
   }
 
   function createNew() {
     setSelected("");
     setForm(empty);
+    setModelOptions({ speech: [], formatter: [], review: [] });
     setEditorOpen(true);
   }
 
@@ -179,6 +183,7 @@ export default function ConfigsPage() {
         speechApiKey: provider?.endpoint ? current.speechApiKey : "",
         speechDiarizationEnabled: value === "openai" ? current.speechDiarizationEnabled : false
       }));
+      setModelOptions((current) => ({ ...current, speech: [] }));
       return;
     }
     if (kind === "formatter") {
@@ -191,6 +196,7 @@ export default function ConfigsPage() {
         documentGenerationApiKey: provider?.endpoint ? current.documentGenerationApiKey : "",
         formatterPrivacyEmphasis: value === "apple_intelligence" ? "safe" : current.formatterPrivacyEmphasis
       }));
+      setModelOptions((current) => ({ ...current, formatter: [] }));
       return;
     }
     const provider = privacyReviewProviders.find((item) => item.value === value);
@@ -201,6 +207,49 @@ export default function ConfigsPage() {
       privacyReviewModel: value && value !== "local_heuristic" ? (provider?.modelDefault && !current.privacyReviewModel ? provider.modelDefault : current.privacyReviewModel) : "",
       privacyReviewPrivacyEmphasis: ["local_heuristic", "ollama", "openai_compatible"].includes(value) ? "safe" : current.privacyReviewPrivacyEmphasis
     }));
+    setModelOptions((current) => ({ ...current, review: [] }));
+  }
+
+  async function lookupModels(kind: "speech" | "formatter" | "review") {
+    const config = {
+      speech: {
+        providerDomain: "speech",
+        providerType: form.speechProviderType,
+        endpointUrl: form.speechEndpointUrl,
+        apiKey: form.speechApiKey
+      },
+      formatter: {
+        providerDomain: "document_generation",
+        providerType: form.documentGenerationProviderType,
+        endpointUrl: form.documentGenerationEndpointUrl,
+        apiKey: form.documentGenerationApiKey
+      },
+      review: {
+        providerDomain: "privacy_review",
+        providerType: form.privacyReviewProviderType,
+        endpointUrl: form.privacyReviewEndpointUrl,
+        apiKey: ""
+      }
+    }[kind];
+    if (!config.providerType) {
+      notify({ tone: "info", title: "No provider selected", message: "Choose a managed provider before loading models." });
+      return;
+    }
+    setModelLoading(kind);
+    try {
+      const response = await api("/admin/provider-models", { method: "POST", body: JSON.stringify(config) });
+      const models = (response.models ?? []).map((model: any) => model.id ?? model.name).filter(Boolean);
+      setModelOptions((current) => ({ ...current, [kind]: models }));
+      notify({
+        tone: models.length ? "success" : "info",
+        title: models.length ? "Models loaded" : "No models returned",
+        message: models.length ? `${models.length} model${models.length === 1 ? "" : "s"} available.` : "The provider responded, but did not return model identifiers."
+      });
+    } catch (err: any) {
+      notify({ tone: "danger", title: "Could not load models", message: getErrorMessage(err) });
+    } finally {
+      setModelLoading("");
+    }
   }
 
   async function save(e: React.FormEvent) {
@@ -368,7 +417,7 @@ export default function ConfigsPage() {
                 <div className="grid four">
                   <div className="field"><FieldLabel help={helpText.speechProviderType}>Selected speech provider</FieldLabel><select value={form.speechProviderType ?? ""} onChange={(e) => applyProviderDefault("speech", e.target.value)}>{speechProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
                   <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.speechEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, speechEndpointUrl: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} /></div>
-                  <div className="field"><FieldLabel help={helpText.speechModelName}>Model name</FieldLabel><input className="input" value={form.speechModelName ?? ""} onChange={(e) => setForm({ ...form, speechModelName: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.model} /></div>
+                  <ModelField label="Model name" help={helpText.speechModelName} value={form.speechModelName ?? ""} onChange={(value) => setForm({ ...form, speechModelName: value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.model} loading={modelLoading === "speech"} options={modelOptions.speech} onLookup={() => lookupModels("speech")} />
                   <div className="field"><FieldLabel help={helpText.speechApiKey}>API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.speechApiKey ?? ""} onChange={(e) => setForm({ ...form, speechApiKey: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} placeholder="Optional managed key" /></div>
                 </div>
                 <label className="checkbox-row"><input type="checkbox" checked={form.speechDiarizationEnabled} disabled={form.speechProviderType !== "openai"} onChange={(e) => setForm({ ...form, speechDiarizationEnabled: e.target.checked })} /> OpenAI saved-recording diarization enabled</label>
@@ -379,7 +428,7 @@ export default function ConfigsPage() {
                 <div className="grid four">
                   <div className="field"><FieldLabel help={helpText.documentGenerationProviderType}>Selected formatter</FieldLabel><select value={form.documentGenerationProviderType ?? ""} onChange={(e) => applyProviderDefault("formatter", e.target.value)}>{formatterProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
                   <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.documentGenerationEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, documentGenerationEndpointUrl: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} /></div>
-                  <div className="field"><FieldLabel help={helpText.documentGenerationModel}>Model name</FieldLabel><input className="input" value={form.documentGenerationModel ?? ""} onChange={(e) => setForm({ ...form, documentGenerationModel: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.model} /></div>
+                  <ModelField label="Model name" help={helpText.documentGenerationModel} value={form.documentGenerationModel ?? ""} onChange={(value) => setForm({ ...form, documentGenerationModel: value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.model} loading={modelLoading === "formatter"} options={modelOptions.formatter} onLookup={() => lookupModels("formatter")} />
                   <div className="field"><FieldLabel help={helpText.documentGenerationApiKey}>API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.documentGenerationApiKey ?? ""} onChange={(e) => setForm({ ...form, documentGenerationApiKey: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} placeholder="Optional managed key" /></div>
                   <div className="field"><FieldLabel help="Stored for admin policy warnings and privacy summaries. Use safe only for controlled or explicitly approved providers.">Privacy classification</FieldLabel><select value={form.formatterPrivacyEmphasis} onChange={(e) => setForm({ ...form, formatterPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
                 </div>
@@ -414,7 +463,7 @@ export default function ConfigsPage() {
                   <div className="grid four">
                     <div className="field"><FieldLabel help={helpText.privacyReviewProviderType}>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
                     <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} /></div>
-                    <div className="field"><FieldLabel help={helpText.privacyReviewModel}>Model name</FieldLabel><input className="input" value={form.privacyReviewModel ?? ""} onChange={(e) => setForm({ ...form, privacyReviewModel: e.target.value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} /></div>
+                    <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} loading={modelLoading === "review"} options={modelOptions.review} onLookup={() => lookupModels("review")} />
                     <div className="field"><FieldLabel>Privacy classification</FieldLabel><select value={form.privacyReviewPrivacyEmphasis} onChange={(e) => setForm({ ...form, privacyReviewPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
                   </div>
                 </div>
@@ -451,6 +500,46 @@ export default function ConfigsPage() {
 function ProviderHint({ provider }: { provider?: { privacy?: string; ready?: boolean } }) {
   if (!provider) return null;
   return <div className="config-hint"><span>{provider.privacy}</span>{provider.ready === false && <strong>Coming soon / not production ready</strong>}</div>;
+}
+
+function ModelField({
+  label,
+  help,
+  value,
+  onChange,
+  disabled,
+  loading,
+  options,
+  onLookup
+}: {
+  label: string;
+  help: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  loading?: boolean;
+  options: string[];
+  onLookup: () => void;
+}) {
+  const hasCustomValue = Boolean(value) && !options.includes(value);
+  return (
+    <div className="field">
+      <FieldLabel help={help}>{label}</FieldLabel>
+      <div className="model-input-row">
+        <input className="input" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} />
+        <IconAction label="Load models" onClick={onLookup} disabled={disabled || loading}>
+          {loading ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
+        </IconAction>
+      </div>
+      {options.length > 0 && (
+        <select className="model-select" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>
+          <option value="">Choose loaded model</option>
+          {hasCustomValue && <option value={value}>{value}</option>}
+          {options.map((model) => <option key={model} value={model}>{model}</option>)}
+        </select>
+      )}
+    </div>
+  );
 }
 
 function labelFor(key: string) {

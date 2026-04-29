@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, Min, MinLength } from "class-validator";
 import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import * as bcrypt from "bcryptjs";
@@ -188,6 +188,26 @@ class CloneConfigDto {
   @IsOptional()
   @IsString()
   name?: string;
+}
+
+class ProviderModelLookupDto {
+  @ApiProperty({ example: "document_generation", enum: ["speech", "document_generation", "privacy_review"] })
+  @IsIn(["speech", "document_generation", "privacy_review"])
+  providerDomain!: "speech" | "document_generation" | "privacy_review";
+
+  @ApiProperty({ example: "openai_compatible" })
+  @IsString()
+  providerType!: string;
+
+  @ApiProperty({ required: false, example: "https://llm.example.internal/v1" })
+  @IsOptional()
+  @IsString()
+  endpointUrl?: string;
+
+  @ApiProperty({ required: false, example: "provider-api-key" })
+  @IsOptional()
+  @IsString()
+  apiKey?: string;
 }
 
 class TemplateDto {
@@ -947,6 +967,15 @@ export class AdminController {
     return profile;
   }
 
+  @Post("provider-models")
+  @ApiOperation({ summary: "List provider models", description: "Loads available model identifiers from a speech, document-generation, or privacy-review provider using the endpoint and API key supplied by the admin policy editor." })
+  @ApiBody({ type: ProviderModelLookupDto })
+  @ApiOkResponse({ description: "Provider models.", schema: { example: { success: true, providerType: "openai_compatible", models: [{ id: "my-model", name: "my-model" }] } } })
+  async providerModels(@Body() dto: ProviderModelLookupDto) {
+    const models = await this.lookupProviderModels(dto);
+    return { success: true, providerType: dto.providerType, models };
+  }
+
   @Patch("config-profiles/:id")
   @ApiOperation({ summary: "Update config profile" })
   @ApiParam({ name: "id", description: "ConfigProfile UUID." })
@@ -1456,6 +1485,137 @@ export class AdminController {
     if (value === null) return null;
     const trimmed = value.trim();
     return trimmed ? trimmed : null;
+  }
+
+  private async lookupProviderModels(dto: ProviderModelLookupDto) {
+    const provider = dto.providerType;
+    if (!provider || ["", "local", "apple_online", "apple_intelligence", "local_heuristic"].includes(provider)) {
+      throw new BadRequestException("This provider does not expose a remote model list.");
+    }
+    if (provider === "azure" && dto.providerDomain === "speech") {
+      throw new BadRequestException("Azure Speech container policies do not use model names in the current app.");
+    }
+
+    if (provider === "ollama") return this.lookupOllamaModels(dto.endpointUrl);
+    if (provider === "gemini") return this.lookupGeminiModels(dto.endpointUrl, dto.apiKey);
+    if (provider === "claude") return this.lookupClaudeModels(dto.endpointUrl, dto.apiKey);
+    if (["openai", "openai_compatible", "vllm"].includes(provider)) return this.lookupOpenAiCompatibleModels(dto);
+
+    throw new BadRequestException(`Model lookup is not supported for provider "${provider}".`);
+  }
+
+  private async lookupOpenAiCompatibleModels(dto: ProviderModelLookupDto) {
+    const endpoint = this.modelsUrl(dto.endpointUrl, dto.providerType === "openai" ? "https://api.openai.com/v1" : undefined);
+    const response = await this.fetchJson(endpoint, this.providerHeaders(dto.apiKey));
+    const data = Array.isArray(response?.data) ? response.data : [];
+    let models = data.map((item: any) => item?.id ?? item?.name).filter(Boolean);
+    if (dto.providerDomain === "speech" && dto.providerType === "openai") {
+      const speechModels = models.filter((model: string) => /transcribe|whisper|speech/i.test(model));
+      if (speechModels.length) models = speechModels;
+    }
+    return this.modelOptions(models);
+  }
+
+  private async lookupOllamaModels(endpointUrl?: string) {
+    const endpoint = this.ollamaTagsUrl(endpointUrl);
+    const response = await this.fetchJson(endpoint, this.providerHeaders(undefined));
+    const models = Array.isArray(response?.models) ? response.models.map((item: any) => item?.name ?? item?.model).filter(Boolean) : [];
+    return this.modelOptions(models);
+  }
+
+  private async lookupGeminiModels(endpointUrl?: string, apiKey?: string) {
+    const endpoint = this.geminiModelsUrl(endpointUrl, apiKey);
+    const response = await this.fetchJson(endpoint, this.providerHeaders(apiKey));
+    const models = Array.isArray(response?.models)
+      ? response.models.map((item: any) => String(item?.name ?? "").replace(/^models\//, "")).filter(Boolean)
+      : [];
+    return this.modelOptions(models);
+  }
+
+  private async lookupClaudeModels(endpointUrl?: string, apiKey?: string) {
+    const endpoint = this.modelsUrl(endpointUrl, "https://api.anthropic.com/v1");
+    const response = await this.fetchJson(endpoint, {
+      ...this.providerHeaders(undefined),
+      ...(apiKey?.trim() ? { "x-api-key": apiKey.trim() } : {}),
+      "anthropic-version": "2023-06-01"
+    });
+    const data = Array.isArray(response?.data) ? response.data : [];
+    return this.modelOptions(data.map((item: any) => item?.id ?? item?.display_name).filter(Boolean));
+  }
+
+  private async fetchJson(url: string, headers: Record<string, string>) {
+    let response: Response;
+    try {
+      response = await fetch(url, { method: "GET", headers, signal: AbortSignal.timeout(10000) });
+    } catch (error: any) {
+      throw new BadRequestException(`Could not reach provider model endpoint: ${error?.message ?? "request failed"}`);
+    }
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new BadRequestException(`Provider model endpoint returned ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}`);
+    }
+    return response.json();
+  }
+
+  private providerHeaders(apiKey?: string) {
+    const headers: Record<string, string> = { "Accept": "application/json" };
+    const key = apiKey?.trim();
+    if (key) {
+      headers.Authorization = `Bearer ${key}`;
+      headers["X-API-Key"] = key;
+    }
+    return headers;
+  }
+
+  private modelsUrl(endpointUrl?: string, fallbackBase?: string) {
+    const base = this.providerBaseUrl(endpointUrl, fallbackBase);
+    const path = base.pathname.replace(/\/+$/, "");
+    if (path.endsWith("/models")) return base.toString();
+    base.pathname = `${path}/models`.replace(/\/{2,}/g, "/");
+    base.search = "";
+    return base.toString();
+  }
+
+  private ollamaTagsUrl(endpointUrl?: string) {
+    const base = this.providerBaseUrl(endpointUrl, "http://localhost:11434");
+    base.pathname = "/api/tags";
+    base.search = "";
+    return base.toString();
+  }
+
+  private geminiModelsUrl(endpointUrl?: string, apiKey?: string) {
+    const base = this.providerBaseUrl(endpointUrl, "https://generativelanguage.googleapis.com");
+    const path = base.pathname.replace(/\/+$/, "");
+    base.pathname = path.endsWith("/v1beta") || path.endsWith("/v1") ? `${path}/models` : "/v1beta/models";
+    base.search = "";
+    if (apiKey?.trim()) base.searchParams.set("key", apiKey.trim());
+    return base.toString();
+  }
+
+  private providerBaseUrl(endpointUrl?: string, fallbackBase?: string) {
+    const raw = this.emptyToNull(endpointUrl) ?? fallbackBase;
+    if (!raw) throw new BadRequestException("Endpoint URL is required to list models for this provider.");
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      throw new BadRequestException("Endpoint URL is not valid.");
+    }
+    if (!["http:", "https:"].includes(url.protocol)) throw new BadRequestException("Endpoint URL must use http or https.");
+    const normalizedPath = url.pathname
+      .replace(/\/chat\/completions\/?$/i, "")
+      .replace(/\/responses\/?$/i, "")
+      .replace(/\/audio\/transcriptions\/?$/i, "")
+      .replace(/\/models\/?$/i, "");
+    url.pathname = normalizedPath || "/";
+    url.search = "";
+    return url;
+  }
+
+  private modelOptions(models: string[]) {
+    return [...new Set(models.map((model) => model.trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b))
+      .map((model) => ({ id: model, name: model }));
   }
 
   private cleanPartner(dto: Partial<PartnerDto>) {

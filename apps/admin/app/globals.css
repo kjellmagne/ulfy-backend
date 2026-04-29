@@ -475,6 +475,18 @@ button, input, textarea, select { font: inherit; }
 .input::placeholder, textarea::placeholder {
   color: #94a3b8;
 }
+.model-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 8px;
+  align-items: center;
+}
+.model-select {
+  margin-top: 4px;
+}
+.spin {
+  animation: spin 900ms linear infinite;
+}
 .form-stack {
   display: grid;
   gap: 14px;
