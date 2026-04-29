@@ -163,7 +163,7 @@ export class ConfigDto {
   @ApiProperty({
     required: false,
     description: "Admin-side policy switches, such as whether users may override provider selections.",
-    example: { userMayChangeSpeechProvider: false, userMayChangeFormatter: false, externalFormattersAllowed: false }
+    example: { allowPolicyOverride: false, userMayChangeSpeechProvider: false, userMayChangeFormatter: false, externalFormattersAllowed: false }
   })
   @IsOptional()
   @IsObject()

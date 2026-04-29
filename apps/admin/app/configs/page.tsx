@@ -7,6 +7,27 @@ import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, P
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
+const helpText = {
+  speechProviderType: "Choose where audio is converted to text. On-device and controlled-environment options keep more data under your control. Cloud providers may send audio or transcript content to an external service. Values: local, apple_online, openai, azure, gemini. Locks app UI. Full support.",
+  speechEndpointUrl: "Endpoint URL for the selected speech provider. Use this for self-hosted or controlled-environment speech services such as Azure Speech containers or internal gateway routes. Locks app UI when set.",
+  speechModelName: "Optional model identifier for speech providers that expose multiple models. Leave unset when the service does not use model names. Locks app UI when set.",
+  documentGenerationProviderType: "Choose how Ulfy turns the transcript into a finished note. Self-hosted or internally routed providers keep content under your control. Values: apple_intelligence, openai, ollama, vllm, openai_compatible, gemini, claude. Locks app UI. Full support.",
+  documentGenerationEndpointUrl: "Endpoint URL for the document-generation provider. Use this for internal gateways, self-hosted providers, or OpenAI-compatible services. Locks app UI when set.",
+  documentGenerationModel: "Model identifier used for document generation. Choose the organization-approved model for note formatting. Locks app UI when set.",
+  privacyControlEnabled: "Enables privacy review before transcript content is sent to an external formatter. Values: true or false. Locks app UI. Full support.",
+  privacyReviewProviderType: "Choose which provider reviews transcript text for privacy concerns before document generation. Best supported with local_heuristic, ollama, or openai_compatible. Other values are partial.",
+  privacyReviewEndpointUrl: "Endpoint URL for the privacy-review provider. Use this for internal or self-hosted privacy-review services. Locks app UI when set.",
+  privacyReviewModel: "Model identifier used for the privacy-review step. Locks app UI when set.",
+  piiControlEnabled: "Enables the Presidio-based PII step inside privacy control. This is the first step in the privacy pipeline. Locks app UI. Full support.",
+  presidioEndpointUrl: "Endpoint URL for the Presidio analyzer used for PII detection. Typically an internal or protected service. Locks app UI when set.",
+  presidioSecretRef: "Optional backend-side secret reference for Presidio access. Use when Presidio is protected by a gateway or internal auth layer. Partial support; no practical UI lock beyond managed connection.",
+  templateRepositoryUrl: "Catalog URL for centrally managed templates. Enterprise users use this repository to browse and download entitled templates. Locks app UI. Full support.",
+  defaultTemplateId: "Optional default template for the tenant. Guides users toward the organization's preferred starting template. Partial support; not strongly enforced yet.",
+  developerMode: "Shows internal testing tools and reusable recordings for provider and formatting validation. Locks app UI. Full support.",
+  allowExternalProviders: "Intended to control whether external providers may be used. Partial/future support; no current strong enforcement.",
+  allowPolicyOverride: "When enabled, the user can temporarily ignore centrally managed provider and privacy settings on this device. When disabled, centrally managed settings stay enforced. Locks app UI. Full support."
+};
+
 const speechProviders = [
   { value: "", label: "Not managed", privacy: "Local setting kept", endpoint: false, model: false, diarization: false, ready: true },
   { value: "local", label: "Local", privacy: "Safe", endpoint: false, model: false, diarization: false, ready: true },
@@ -68,6 +89,7 @@ const empty = {
   telemetryEndpointUrl: "",
   developerMode: false,
   allowExternalProviders: false,
+  allowPolicyOverride: false,
   userMayChangeSpeechProvider: false,
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
@@ -124,6 +146,7 @@ export default function ConfigsPage() {
       privacyReviewPrivacyEmphasis: providerProfiles?.privacyReview?.privacyEmphasis ?? "safe",
       developerMode: profile.featureFlags?.developerMode ?? false,
       allowExternalProviders: profile.featureFlags?.allowExternalProviders ?? false,
+      allowPolicyOverride: managedPolicy?.allowPolicyOverride ?? managedPolicy?.allowLocalOverride ?? managedPolicy?.userMayOverridePolicy ?? false,
       userMayChangeSpeechProvider: managedPolicy?.userMayChangeSpeechProvider ?? false,
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
       userMayChangePrivacyReviewProvider: managedPolicy?.userMayChangePrivacyReviewProvider ?? false,
@@ -210,6 +233,7 @@ export default function ConfigsPage() {
         }
       };
       const managedPolicy = {
+        allowPolicyOverride: Boolean(form.allowPolicyOverride),
         userMayChangeSpeechProvider: Boolean(form.userMayChangeSpeechProvider),
         userMayChangeFormatter: Boolean(form.userMayChangeFormatter),
         userMayChangePrivacyReviewProvider: Boolean(form.userMayChangePrivacyReviewProvider),
@@ -316,9 +340,9 @@ export default function ConfigsPage() {
               <FormSection title="Speech provider" description="One selected speech source. This is separate from document generation and privacy review.">
                 <ProviderHint provider={speechProviders.find((item) => item.value === form.speechProviderType)} />
                 <div className="grid three">
-                  <div className="field"><FieldLabel>Selected speech provider</FieldLabel><select value={form.speechProviderType ?? ""} onChange={(e) => applyProviderDefault("speech", e.target.value)}>{speechProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
-                  <div className="field"><FieldLabel>Endpoint URL</FieldLabel><input className="input" value={form.speechEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, speechEndpointUrl: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} /></div>
-                  <div className="field"><FieldLabel>Model name</FieldLabel><input className="input" value={form.speechModelName ?? ""} onChange={(e) => setForm({ ...form, speechModelName: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.model} /></div>
+                  <div className="field"><FieldLabel help={helpText.speechProviderType}>Selected speech provider</FieldLabel><select value={form.speechProviderType ?? ""} onChange={(e) => applyProviderDefault("speech", e.target.value)}>{speechProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
+                  <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.speechEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, speechEndpointUrl: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} /></div>
+                  <div className="field"><FieldLabel help={helpText.speechModelName}>Model name</FieldLabel><input className="input" value={form.speechModelName ?? ""} onChange={(e) => setForm({ ...form, speechModelName: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.model} /></div>
                 </div>
                 <label className="checkbox-row"><input type="checkbox" checked={form.speechDiarizationEnabled} disabled={form.speechProviderType !== "openai"} onChange={(e) => setForm({ ...form, speechDiarizationEnabled: e.target.checked })} /> OpenAI saved-recording diarization enabled</label>
               </FormSection>
@@ -326,17 +350,17 @@ export default function ConfigsPage() {
               <FormSection title="Document generation formatter" description="The formatter creates the final document. It is not the speech provider and not the privacy review provider.">
                 <ProviderHint provider={formatterProviders.find((item) => item.value === form.documentGenerationProviderType)} />
                 <div className="grid four">
-                  <div className="field"><FieldLabel>Selected formatter</FieldLabel><select value={form.documentGenerationProviderType ?? ""} onChange={(e) => applyProviderDefault("formatter", e.target.value)}>{formatterProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
-                  <div className="field"><FieldLabel>Endpoint URL</FieldLabel><input className="input" value={form.documentGenerationEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, documentGenerationEndpointUrl: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} /></div>
-                  <div className="field"><FieldLabel>Model name</FieldLabel><input className="input" value={form.documentGenerationModel ?? ""} onChange={(e) => setForm({ ...form, documentGenerationModel: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.model} /></div>
+                  <div className="field"><FieldLabel help={helpText.documentGenerationProviderType}>Selected formatter</FieldLabel><select value={form.documentGenerationProviderType ?? ""} onChange={(e) => applyProviderDefault("formatter", e.target.value)}>{formatterProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
+                  <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.documentGenerationEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, documentGenerationEndpointUrl: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} /></div>
+                  <div className="field"><FieldLabel help={helpText.documentGenerationModel}>Model name</FieldLabel><input className="input" value={form.documentGenerationModel ?? ""} onChange={(e) => setForm({ ...form, documentGenerationModel: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.model} /></div>
                   <div className="field"><FieldLabel help="Stored for admin policy. Current mobile payload does not centrally inject provider secrets.">Privacy classification</FieldLabel><select value={form.formatterPrivacyEmphasis} onChange={(e) => setForm({ ...form, formatterPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
                 </div>
               </FormSection>
 
               <FormSection title="Privacy control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review.">
                 <div className="row checkbox-group">
-                  <label className="checkbox-row"><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> Privacy control enabled</label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> Presidio PII enabled</label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.privacyControlEnabled}>Privacy control enabled</FieldLabel></label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.piiControlEnabled}>Presidio PII enabled</FieldLabel></label>
                 </div>
                 <div className="form-subsection">
                   <div className="form-subsection-header">
@@ -344,8 +368,8 @@ export default function ConfigsPage() {
                     <p>The app appends /health and /analyze to this base URL.</p>
                   </div>
                   <div className="grid three">
-                    <div className="field"><FieldLabel>Presidio endpoint URL</FieldLabel><input className="input" value={form.presidioEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, presidioEndpointUrl: e.target.value })} /></div>
-                    <div className="field"><FieldLabel>Secret reference</FieldLabel><input className="input" value={form.presidioSecretRef ?? ""} onChange={(e) => setForm({ ...form, presidioSecretRef: e.target.value })} placeholder="secret://ulfy/presidio" /></div>
+                    <div className="field"><FieldLabel help={helpText.presidioEndpointUrl}>Presidio endpoint URL</FieldLabel><input className="input" value={form.presidioEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, presidioEndpointUrl: e.target.value })} /></div>
+                    <div className="field"><FieldLabel help={helpText.presidioSecretRef}>Secret reference</FieldLabel><input className="input" value={form.presidioSecretRef ?? ""} onChange={(e) => setForm({ ...form, presidioSecretRef: e.target.value })} placeholder="secret://ulfy/presidio" /></div>
                     <div className="field"><FieldLabel>Score threshold</FieldLabel><input className="input" type="number" min="0" max="1" step="0.05" value={form.piiScoreThreshold} onChange={(e) => setForm({ ...form, piiScoreThreshold: e.target.value })} /></div>
                   </div>
                   <div className="row checkbox-group">
@@ -360,9 +384,9 @@ export default function ConfigsPage() {
                   <ProviderHint provider={privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType)} />
                   {form.privacyReviewProviderType && !["local_heuristic", "ollama", "openai_compatible"].includes(form.privacyReviewProviderType) && <Alert tone="danger">This provider is decoded by the app, but is not a good v1 privacy-review choice. Prefer local_heuristic, ollama, or openai_compatible.</Alert>}
                   <div className="grid four">
-                    <div className="field"><FieldLabel>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
-                    <div className="field"><FieldLabel>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} /></div>
-                    <div className="field"><FieldLabel>Model name</FieldLabel><input className="input" value={form.privacyReviewModel ?? ""} onChange={(e) => setForm({ ...form, privacyReviewModel: e.target.value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} /></div>
+                    <div className="field"><FieldLabel help={helpText.privacyReviewProviderType}>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
+                    <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} /></div>
+                    <div className="field"><FieldLabel help={helpText.privacyReviewModel}>Model name</FieldLabel><input className="input" value={form.privacyReviewModel ?? ""} onChange={(e) => setForm({ ...form, privacyReviewModel: e.target.value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} /></div>
                     <div className="field"><FieldLabel>Privacy classification</FieldLabel><select value={form.privacyReviewPrivacyEmphasis} onChange={(e) => setForm({ ...form, privacyReviewPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
                   </div>
                 </div>
@@ -370,13 +394,15 @@ export default function ConfigsPage() {
 
               <FormSection title="Repository, telemetry and policy" description="Sparse managed config: leave fields blank when the tenant should keep local settings.">
                 <div className="grid three">
-                  <div className="field"><FieldLabel>Template repository URL</FieldLabel><input className="input" value={form.templateRepositoryUrl ?? ""} onChange={(e) => setForm({ ...form, templateRepositoryUrl: e.target.value })} /></div>
+                  <div className="field"><FieldLabel help={helpText.templateRepositoryUrl}>Template repository URL</FieldLabel><input className="input" value={form.templateRepositoryUrl ?? ""} onChange={(e) => setForm({ ...form, templateRepositoryUrl: e.target.value })} /></div>
                   <div className="field"><FieldLabel>Telemetry endpoint URL</FieldLabel><input className="input" value={form.telemetryEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, telemetryEndpointUrl: e.target.value })} /></div>
-                  <div className="field"><FieldLabel>Default template ID</FieldLabel><input className="input" value={form.defaultTemplateId ?? ""} onChange={(e) => setForm({ ...form, defaultTemplateId: e.target.value })} /></div>
+                  <div className="field"><FieldLabel help={helpText.defaultTemplateId}>Default template ID</FieldLabel><input className="input" value={form.defaultTemplateId ?? ""} onChange={(e) => setForm({ ...form, defaultTemplateId: e.target.value })} /></div>
                 </div>
+                <div className="config-hint"><span>Unchecked override keeps strict mode: managed provider and privacy settings cannot be bypassed on device.</span></div>
                 <div className="row checkbox-group">
-                  <label className="checkbox-row"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /> Developer mode</label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /> Allow external providers</label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /> <FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel></label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /> <FieldLabel help={helpText.developerMode}>Developer mode</FieldLabel></label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /> <FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel></label>
                   <label className="checkbox-row"><input type="checkbox" checked={form.externalFormattersAllowed} onChange={(e) => setForm({ ...form, externalFormattersAllowed: e.target.checked })} /> External formatters allowed by policy</label>
                 </div>
                 <div className="row checkbox-group">

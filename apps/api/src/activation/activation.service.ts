@@ -330,8 +330,18 @@ export class ActivationService {
       telemetryEndpointUrl: profile.telemetryEndpointUrl,
       featureFlags: profile.featureFlags,
       allowedProviderRestrictions: profile.allowedProviderRestrictions,
+      managedPolicy: this.mapManagedPolicy(profile.managedPolicy),
       defaultTemplateId: profile.defaultTemplateId
     });
+  }
+
+  private mapManagedPolicy(policy: unknown) {
+    const source = isRecord(policy) ? policy : {};
+    const overrideValue = firstBoolean(source.allowPolicyOverride, source.allowLocalOverride, source.userMayOverridePolicy);
+    return {
+      ...source,
+      allowPolicyOverride: overrideValue ?? false
+    };
   }
 }
 
@@ -352,4 +362,12 @@ function compactObject(input: Record<string, unknown>) {
     if (typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length === 0) return false;
     return true;
   }));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function firstBoolean(...values: unknown[]) {
+  return values.find((value): value is boolean => typeof value === "boolean");
 }

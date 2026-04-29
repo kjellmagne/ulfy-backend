@@ -253,6 +253,9 @@ export default function TemplatesPage() {
   }, [variantForm.yamlContent]);
   const templateIdentity = templateDoc?.identity ?? {};
   const templateSections = templateDoc?.structure?.sections ?? [];
+  const requiredSectionCount = templateSections.filter((section) => section.required !== false).length;
+  const optionalSectionCount = Math.max(templateSections.length - requiredSectionCount, 0);
+  const latestSelectedVersion = selectedFamily?.variants.find((variant) => variant.id === variantForm.variantId)?.publishedVersions?.[0]?.version ?? "Draft only";
 
   function setNotice(message: string) {
     if (message) notify({ tone: "success", title: message });
@@ -694,141 +697,220 @@ export default function TemplatesPage() {
         onClose={() => setVariantPanel(false)}
         footer={<><button className="button secondary" onClick={() => setVariantPanel(false)}>Close</button><button className="button secondary" onClick={validateYaml}>Validate YAML</button><button className="button" disabled={saving} onClick={saveDraft}><Save size={16} /> Save draft</button><button className="button" disabled={saving || !variantForm.variantId} onClick={publishDraft}><CheckCircle size={16} /> Publish</button></>}
       >
-        <div className="template-designer">
-          <section className="designer-editor form-stack">
-            <FormSection title="Template basics" description="Edit the app-facing identity fields. These values are written directly into YAML.">
-              <div className="grid three">
-                <div className="field"><FieldLabel>Family</FieldLabel><input className="input" value={selectedFamily?.title ?? ""} disabled /></div>
-                <div className="field"><FieldLabel>Template title</FieldLabel><input className="input" value={templateIdentity.title ?? ""} onChange={(e) => updateIdentity("title", e.target.value)} /></div>
-                <div className="field"><FieldLabel>Language</FieldLabel><input className="input" value={variantForm.language} onChange={(e) => updateLanguage(e.target.value)} /></div>
-                <div className="field"><FieldLabel>Short description</FieldLabel><input className="input" value={templateIdentity.short_description ?? ""} onChange={(e) => updateIdentity("short_description", e.target.value)} /></div>
-                <div className="field"><FieldLabel>Category</FieldLabel><input className="input" value={templateIdentity.category ?? ""} onChange={(e) => updateIdentity("category", e.target.value)} /></div>
-                <div className="field"><FieldLabel>Icon</FieldLabel><input className="input" value={templateIdentity.icon ?? ""} onChange={(e) => updateIdentity("icon", e.target.value)} /></div>
-                <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" value={(templateIdentity.tags ?? []).join(", ")} onChange={(e) => updateIdentity("tags", textToList(e.target.value))} placeholder="dictation, personal" /></div>
-                <div className="field"><FieldLabel>Publish bump</FieldLabel><select value={variantForm.bump} onChange={(e) => setVariantForm({ ...variantForm, bump: e.target.value as any })}><option value="patch">Patch</option><option value="minor">Minor</option><option value="major">Major</option></select></div>
-              </div>
-            </FormSection>
-            <FormSection title="Section builder" description="Drag sections from the palette into the template. Reorder cards by dragging the handle. Mark sections as required or optional.">
-              {!templateDoc && <Alert tone="danger">The YAML source cannot be parsed. Fix it in YAML source before using the builder.</Alert>}
-              <div className="builder-workspace">
-                <aside className="section-palette" aria-label="Section palette">
-                  <div className="builder-subhead">
-                    <h4>Section palette</h4>
-                    <p>Drag into the template, or click add.</p>
-                  </div>
-                  <div className="section-preset-list">
-                    {sectionPresets.map((preset) => (
-                      <div
-                        key={preset.title}
-                        className="section-preset"
-                        draggable
-                        onDragStart={(event) => {
-                          event.dataTransfer.effectAllowed = "copy";
-                          setDragItem({ kind: "preset", preset });
-                        }}
-                        onDragEnd={() => setDragItem(null)}
-                      >
-                        <div>
-                          <strong>{preset.title}</strong>
-                          <span>{preset.required ? "Required by default" : "Optional by default"}</span>
-                        </div>
-                        <IconAction label={`Add ${preset.title}`} onClick={() => addSection(preset)}><Plus size={14} /></IconAction>
-                      </div>
-                    ))}
-                  </div>
-                </aside>
-                <div className="section-canvas" onDragOver={(event) => event.preventDefault()} onDrop={dropOnCanvas}>
-                  <div className="builder-subhead">
-                    <h4>Template sections</h4>
-                    <p>{templateSections.length} sections in output order</p>
-                  </div>
-                  {!templateSections.length ? (
-                    <div className="builder-empty">Drop sections here to build the output structure.</div>
-                  ) : (
-                    <div className="section-card-list">
-                      {templateSections.map((section, index) => (
-                        <div
-                          key={`${section.title ?? "section"}-${index}`}
-                          className="section-card"
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={(event) => dropOnSection(event, index)}
-                        >
-                          <div className="section-card-header">
-                            <div
-                              className="section-drag-handle"
-                              draggable
-                              onDragStart={(event) => {
-                                event.dataTransfer.effectAllowed = "move";
-                                setDragItem({ kind: "section", index });
-                              }}
-                              onDragEnd={() => setDragItem(null)}
-                              title="Drag to reorder"
-                            >
-                              <GripVertical size={16} />
-                            </div>
-                            <div className="section-number">{index + 1}</div>
-                            <input className="input section-title-input" value={section.title ?? ""} onChange={(e) => updateSection(index, { title: e.target.value })} placeholder="Section title" />
-                            <span className={`badge ${section.required !== false ? "status-active" : "status-draft"}`}>{section.required !== false ? "Required" : "Optional"}</span>
-                            <IconAction label="Duplicate section" onClick={() => duplicateSection(index)}><CopyPlus size={14} /></IconAction>
-                            <IconAction label="Remove section" tone="danger" onClick={() => removeSection(index)}><Trash2 size={14} /></IconAction>
-                          </div>
-                          <div className="section-card-body">
-                            <div className="field"><FieldLabel>Purpose</FieldLabel><textarea value={section.purpose ?? ""} onChange={(e) => updateSection(index, { purpose: e.target.value })} placeholder="What this section should capture" /></div>
-                            <div className="grid three">
-                              <div className="field"><FieldLabel>Format</FieldLabel><select value={section.format ?? "prose"} onChange={(e) => updateSection(index, { format: e.target.value })}><option value="prose">Prose</option><option value="bullets">Bullets</option><option value="numbered_list">Numbered list</option><option value="table">Table</option><option value="checklist">Checklist</option></select></div>
-                              <label className="checkbox-row section-required-toggle"><input type="checkbox" checked={section.required !== false} onChange={(e) => updateSection(index, { required: e.target.checked })} /> Required section</label>
-                              <div className="field"><FieldLabel>Extraction hints</FieldLabel><textarea value={listToText(section.extraction_hints)} onChange={(e) => updateSection(index, { extraction_hints: textToList(e.target.value) })} placeholder="One hint per line" /></div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </FormSection>
-            <FormSection title="AI assist" description="Generate a suggested draft from a use-case description, then review before publishing.">
-              <div className="field"><FieldLabel help="The assistant proposes draft YAML only. Review before saving or publishing.">Use case</FieldLabel><div className="row"><input className="input" value={variantForm.aiUseCase} onChange={(e) => setVariantForm({ ...variantForm, aiUseCase: e.target.value })} /><IconAction label="Propose draft with AI" onClick={aiAssist} disabled={saving}><Wand2 size={15} /></IconAction></div></div>
-            </FormSection>
-            <FormSection title="YAML source" description="Advanced source view. Changes here immediately update the builder when YAML is valid.">
-              <div className="field"><FieldLabel help="Must use the app schema: identity, context, perspective, structure, content_rules, llm_prompting.">YAML Draft</FieldLabel><textarea className="yaml-editor" value={variantForm.yamlContent} onChange={(e) => setVariantForm({ ...variantForm, yamlContent: e.target.value })} /></div>
-            </FormSection>
-            <FormSection title="Preview fixture" description="Sample transcript used only when an admin manually generates or refreshes preview.">
-              <div className="field"><FieldLabel>Sample Transcript</FieldLabel><textarea value={variantForm.sampleTranscript} onChange={(e) => setVariantForm({ ...variantForm, sampleTranscript: e.target.value })} placeholder="Paste a realistic sample transcript for preview generation." /></div>
-            </FormSection>
+        <div className="template-designer-shell">
+          <section className="designer-summary">
+            <div>
+              <span className="eyebrow">Current draft</span>
+              <h3>{templateIdentity.title || selectedFamily?.title || "Untitled template"}</h3>
+              <p>{templateIdentity.short_description || "No short description yet."}</p>
+            </div>
+            <div className="designer-summary-metrics">
+              <span><strong>{variantForm.language || templateIdentity.language || "-"}</strong>Language</span>
+              <span><strong>{templateSections.length}</strong>Sections</span>
+              <span><strong>{requiredSectionCount}</strong>Required</span>
+              <span><strong>{latestSelectedVersion}</strong>Published</span>
+            </div>
           </section>
 
-          <aside className="designer-preview">
-            <div className="panel-header compact">
-              <div><h2>AI Preview</h2><p>Generated manually from the saved draft and sample transcript.</p></div>
-              <IconAction label="Generate preview" onClick={generatePreview} disabled={saving || !variantForm.draftId}><Bot size={15} /></IconAction>
-            </div>
-            {variantForm.preview?.error && <Alert tone="danger">{variantForm.preview.error}</Alert>}
-            {variantForm.preview?.markdown ? (
-              <>
-                <div className="detail-grid">
-                  <div><span>Provider</span><strong>{variantForm.preview.provider?.type ?? "-"}</strong></div>
-                  <div><span>Model</span><strong>{variantForm.preview.provider?.model ?? "-"}</strong></div>
-                  <div><span>Generated</span><strong>{variantForm.preview.generatedAt ? new Date(variantForm.preview.generatedAt).toLocaleString() : "-"}</strong></div>
-                </div>
-                <pre className="markdown-preview">{variantForm.preview.markdown}</pre>
-              </>
-            ) : (
-              <EmptyState title="No preview yet" message="Save the draft, then generate a preview when you want to inspect the output." />
-            )}
-            {selectedFamily?.variants?.length ? (
-              <div className="panel-subsection">
-                <PanelHeader title="Version history" description="Published snapshots are immutable." />
-                {selectedFamily.variants.map((variant) => (
-                  <div key={variant.id} className="version-row">
-                    <strong>{variant.language}</strong>
-                    <span>{variant.publishedVersions.length ? `${variant.publishedVersions.length} versions` : "No published versions"}</span>
-                    {latest(variant) && <IconAction label="Download YAML" onClick={() => downloadYaml(variant)}><Download size={14} /></IconAction>}
+          <div className="template-designer">
+            <section className="designer-editor">
+              <section className="designer-card">
+                <div className="designer-card-header">
+                  <div>
+                    <span className="eyebrow">1. Identity</span>
+                    <h3>Template basics</h3>
                   </div>
-                ))}
-              </div>
-            ) : null}
-          </aside>
+                  <span className="badge">{variantForm.bump} bump</span>
+                </div>
+                <div className="designer-card-body">
+                  <div className="grid three">
+                    <div className="field"><FieldLabel>Family</FieldLabel><input className="input" value={selectedFamily?.title ?? ""} disabled /></div>
+                    <div className="field"><FieldLabel>Template title</FieldLabel><input className="input" value={templateIdentity.title ?? ""} onChange={(e) => updateIdentity("title", e.target.value)} /></div>
+                    <div className="field"><FieldLabel>Language</FieldLabel><input className="input" value={variantForm.language} onChange={(e) => updateLanguage(e.target.value)} /></div>
+                    <div className="field"><FieldLabel>Short description</FieldLabel><input className="input" value={templateIdentity.short_description ?? ""} onChange={(e) => updateIdentity("short_description", e.target.value)} /></div>
+                    <div className="field"><FieldLabel>Category</FieldLabel><input className="input" value={templateIdentity.category ?? ""} onChange={(e) => updateIdentity("category", e.target.value)} /></div>
+                    <div className="field"><FieldLabel>Icon</FieldLabel><input className="input" value={templateIdentity.icon ?? ""} onChange={(e) => updateIdentity("icon", e.target.value)} /></div>
+                    <div className="field"><FieldLabel>Tags</FieldLabel><input className="input" value={(templateIdentity.tags ?? []).join(", ")} onChange={(e) => updateIdentity("tags", textToList(e.target.value))} placeholder="dictation, personal" /></div>
+                    <div className="field"><FieldLabel>Publish bump</FieldLabel><select value={variantForm.bump} onChange={(e) => setVariantForm({ ...variantForm, bump: e.target.value as any })}><option value="patch">Patch</option><option value="minor">Minor</option><option value="major">Major</option></select></div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="designer-card builder-card">
+                <div className="designer-card-header builder-main-header">
+                  <div>
+                    <span className="eyebrow">2. Builder</span>
+                    <h3>Output structure</h3>
+                    <p>Arrange the document sections in the order the app should generate them.</p>
+                  </div>
+                  <div className="builder-status-strip">
+                    <span><strong>{templateSections.length}</strong>Total</span>
+                    <span><strong>{requiredSectionCount}</strong>Required</span>
+                    <span><strong>{optionalSectionCount}</strong>Optional</span>
+                  </div>
+                </div>
+                <div className="designer-card-body">
+                  {!templateDoc && <Alert tone="danger">The YAML source cannot be parsed. Fix it in YAML source before using the builder.</Alert>}
+                  <div className="builder-workspace">
+                    <aside className="section-palette" aria-label="Section palette">
+                      <div className="builder-subhead">
+                        <h4>Add sections</h4>
+                        <p>Drag a block into the canvas or use the plus button.</p>
+                      </div>
+                      <div className="section-preset-list">
+                        {sectionPresets.map((preset) => (
+                          <div
+                            key={preset.title}
+                            className="section-preset"
+                            draggable
+                            onDragStart={(event) => {
+                              event.dataTransfer.effectAllowed = "copy";
+                              setDragItem({ kind: "preset", preset });
+                            }}
+                            onDragEnd={() => setDragItem(null)}
+                          >
+                            <div>
+                              <strong>{preset.title}</strong>
+                              <span>{preset.format.replace("_", " ")} · {preset.required ? "required" : "optional"}</span>
+                            </div>
+                            <IconAction label={`Add ${preset.title}`} onClick={() => addSection(preset)}><Plus size={14} /></IconAction>
+                          </div>
+                        ))}
+                      </div>
+                    </aside>
+
+                    <div className="section-canvas" onDragOver={(event) => event.preventDefault()} onDrop={dropOnCanvas}>
+                      <div className="canvas-header">
+                        <div>
+                          <h4>Document canvas</h4>
+                          <p>{templateSections.length ? `${templateSections.length} sections in output order` : "No sections yet"}</p>
+                        </div>
+                        <span className="badge status-draft">Draft</span>
+                      </div>
+                      {!templateSections.length ? (
+                        <div className="builder-empty">Drop sections here to build the output structure.</div>
+                      ) : (
+                        <div className="section-card-list">
+                          {templateSections.map((section, index) => (
+                            <div
+                              key={`${section.title ?? "section"}-${index}`}
+                              className="section-card"
+                              onDragOver={(event) => event.preventDefault()}
+                              onDrop={(event) => dropOnSection(event, index)}
+                            >
+                              <div className="section-card-header">
+                                <div
+                                  className="section-drag-handle"
+                                  draggable
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.effectAllowed = "move";
+                                    setDragItem({ kind: "section", index });
+                                  }}
+                                  onDragEnd={() => setDragItem(null)}
+                                  title="Drag to reorder"
+                                >
+                                  <GripVertical size={16} />
+                                </div>
+                                <div className="section-number">{index + 1}</div>
+                                <div className="section-heading-fields">
+                                  <input className="input section-title-input" value={section.title ?? ""} onChange={(e) => updateSection(index, { title: e.target.value })} placeholder="Section title" />
+                                  <div className="section-meta-row">
+                                    <span className={`badge ${section.required !== false ? "status-active" : "status-draft"}`}>{section.required !== false ? "Required" : "Optional"}</span>
+                                    <span>{section.format ?? "prose"}</span>
+                                  </div>
+                                </div>
+                                <div className="section-card-actions">
+                                  <IconAction label="Duplicate section" onClick={() => duplicateSection(index)}><CopyPlus size={14} /></IconAction>
+                                  <IconAction label="Remove section" tone="danger" onClick={() => removeSection(index)}><Trash2 size={14} /></IconAction>
+                                </div>
+                              </div>
+                              <div className="section-card-body">
+                                <div className="field section-purpose-field"><FieldLabel>Purpose</FieldLabel><textarea value={section.purpose ?? ""} onChange={(e) => updateSection(index, { purpose: e.target.value })} placeholder="What this section should capture" /></div>
+                                <div className="section-controls-grid">
+                                  <div className="field"><FieldLabel>Format</FieldLabel><select value={section.format ?? "prose"} onChange={(e) => updateSection(index, { format: e.target.value })}><option value="prose">Prose</option><option value="bullets">Bullets</option><option value="numbered_list">Numbered list</option><option value="table">Table</option><option value="checklist">Checklist</option></select></div>
+                                  <label className="checkbox-row section-required-toggle"><input type="checkbox" checked={section.required !== false} onChange={(e) => updateSection(index, { required: e.target.checked })} /> Required</label>
+                                  <div className="field section-hints-field"><FieldLabel>Extraction hints</FieldLabel><textarea value={listToText(section.extraction_hints)} onChange={(e) => updateSection(index, { extraction_hints: textToList(e.target.value) })} placeholder="One hint per line" /></div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <details className="designer-disclosure">
+                <summary>Advanced YAML source</summary>
+                <div className="designer-disclosure-body">
+                  <div className="field"><FieldLabel help="Must use the app schema: identity, context, perspective, structure, content_rules, llm_prompting.">YAML Draft</FieldLabel><textarea className="yaml-editor" value={variantForm.yamlContent} onChange={(e) => setVariantForm({ ...variantForm, yamlContent: e.target.value })} /></div>
+                </div>
+              </details>
+            </section>
+
+            <aside className="designer-preview">
+              <section className="preview-panel preview-panel-primary">
+                <div className="preview-panel-header">
+                  <div>
+                    <span className="eyebrow">3. Preview</span>
+                    <h3>Generated document</h3>
+                    <p>Uses the saved draft and sample transcript.</p>
+                  </div>
+                  <IconAction label="Generate preview" onClick={generatePreview} disabled={saving || !variantForm.draftId}><Bot size={15} /></IconAction>
+                </div>
+                {variantForm.preview?.error && <Alert tone="danger">{variantForm.preview.error}</Alert>}
+                {variantForm.preview?.markdown ? (
+                  <>
+                    <div className="preview-meta-grid">
+                      <div><span>Provider</span><strong>{variantForm.preview.provider?.type ?? "-"}</strong></div>
+                      <div><span>Model</span><strong>{variantForm.preview.provider?.model ?? "-"}</strong></div>
+                      <div><span>Generated</span><strong>{variantForm.preview.generatedAt ? new Date(variantForm.preview.generatedAt).toLocaleString() : "-"}</strong></div>
+                    </div>
+                    <pre className="markdown-preview">{variantForm.preview.markdown}</pre>
+                  </>
+                ) : (
+                  <EmptyState title="No preview yet" message="Save the draft, then generate a preview." />
+                )}
+              </section>
+
+              <section className="preview-panel">
+                <div className="preview-panel-header">
+                  <div>
+                    <span className="eyebrow">AI assist</span>
+                    <h3>Draft proposal</h3>
+                  </div>
+                  <IconAction label="Propose draft with AI" onClick={aiAssist} disabled={saving}><Wand2 size={15} /></IconAction>
+                </div>
+                <div className="field"><FieldLabel help="The assistant proposes draft YAML only. Review before saving or publishing.">Use case</FieldLabel><textarea value={variantForm.aiUseCase} onChange={(e) => setVariantForm({ ...variantForm, aiUseCase: e.target.value })} placeholder="Describe the template use case." /></div>
+              </section>
+
+              <details className="designer-disclosure" open>
+                <summary>Sample transcript</summary>
+                <div className="designer-disclosure-body">
+                  <div className="field"><FieldLabel>Preview fixture</FieldLabel><textarea value={variantForm.sampleTranscript} onChange={(e) => setVariantForm({ ...variantForm, sampleTranscript: e.target.value })} placeholder="Paste a realistic sample transcript for preview generation." /></div>
+                </div>
+              </details>
+
+              {selectedFamily?.variants?.length ? (
+                <section className="preview-panel">
+                  <div className="preview-panel-header">
+                    <div>
+                      <span className="eyebrow">History</span>
+                      <h3>Published versions</h3>
+                    </div>
+                  </div>
+                  {selectedFamily.variants.map((variant) => (
+                    <div key={variant.id} className="version-row">
+                      <strong>{variant.language}</strong>
+                      <span>{variant.publishedVersions.length ? `${variant.publishedVersions.length} versions` : "No published versions"}</span>
+                      {latest(variant) && <IconAction label="Download YAML" onClick={() => downloadYaml(variant)}><Download size={14} /></IconAction>}
+                    </div>
+                  ))}
+                </section>
+              ) : null}
+            </aside>
+          </div>
         </div>
       </SidePanel>
     </RequireAuth>

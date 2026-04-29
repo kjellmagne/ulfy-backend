@@ -150,6 +150,10 @@ describe("ActivationService", () => {
       maintenanceUntil: "2027-04-29T00:00:00.000Z"
     });
     expect(result.tenant).toMatchObject({ id: "tenant-1", name: "Acme Health", slug: "acme-health" });
-    expect(result.config).toMatchObject({ id: "profile-1", name: "Default Enterprise Profile" });
+    expect(result.config).toMatchObject({
+      id: "profile-1",
+      name: "Default Enterprise Profile",
+      managedPolicy: { allowPolicyOverride: false }
+    });
   });
 });

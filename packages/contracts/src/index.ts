@@ -42,6 +42,12 @@ export const MobileErrorPayload = z.object({
   })
 });
 
+export const ManagedPolicyPayload = z.object({
+  allowPolicyOverride: z.boolean().default(false),
+  allowLocalOverride: z.boolean().optional(),
+  userMayOverridePolicy: z.boolean().optional()
+}).passthrough();
+
 export const ConfigProfilePayload = z.object({
   speechProviderType: z.enum(["local", "apple_online", "openai", "azure", "gemini"]).optional().nullable(),
   speechEndpointUrl: z.string().url().optional().nullable(),
@@ -61,7 +67,7 @@ export const ConfigProfilePayload = z.object({
   featureFlags: z.record(z.boolean()).default({}),
   allowedProviderRestrictions: z.array(z.string()).default([]),
   providerProfiles: z.record(z.unknown()).default({}).optional(),
-  managedPolicy: z.record(z.unknown()).default({}).optional(),
+  managedPolicy: ManagedPolicyPayload.default({ allowPolicyOverride: false }).optional(),
   defaultTemplateId: z.string().uuid().optional().nullable()
 });
 

@@ -317,6 +317,7 @@ function defaultProviderProfiles() {
 
 function defaultManagedPolicy() {
   return {
+    allowPolicyOverride: false,
     userMayChangeSpeechProvider: false,
     userMayChangeFormatter: false,
     userMayChangePrivacyReviewProvider: false,
