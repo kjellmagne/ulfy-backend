@@ -193,6 +193,8 @@ Icon button:
 
 ## Modals
 
+Use modals for short focused tasks such as create/edit forms and confirmations. Do not use centered modals for long read-only detail views.
+
 - Backdrop: fixed full-screen, z-index 500, `rgba(15,23,42,0.35)`, blur 2px.
 - Default width: `min(560px, 95vw)`.
 - Wide width: `min(720px, 95vw)`.
@@ -202,6 +204,23 @@ Icon button:
 - Header padding: 20px 24px 16px.
 - Body padding: 20px 24px with vertical scroll.
 - Footer padding: 14px 24px, `#fafbfc` background.
+
+## Slide-In Detail Panels
+
+Use right-side slide-in panels for row details and long inspection flows, for example license key metadata, tenant/config summaries, and device activation lists.
+
+- Backdrop: fixed full-screen, z-index 500, `rgba(15,23,42,0.28)`, blur 2px.
+- Alignment: panel enters from the right edge.
+- Width: `min(760px, 100vw)`.
+- Height: 100vh.
+- Background: white.
+- Left border: 1px solid `#f1f5f9`.
+- Shadow: `-24px 0 64px rgba(0,0,0,0.18)`.
+- Entry animation: 180ms right-to-left slide.
+- Header padding: 20px 24px 16px.
+- Body padding: 20px 24px 28px with vertical scroll.
+- Footer padding: 14px 24px when present.
+- Mobile: panel takes the full viewport width.
 
 ## Data Visualization
 

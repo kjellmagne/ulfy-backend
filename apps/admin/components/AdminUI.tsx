@@ -131,6 +131,61 @@ export function Modal({
   );
 }
 
+export function SidePanel({
+  open,
+  title,
+  description,
+  children,
+  footer,
+  onClose
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  footer?: ReactNode;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="side-panel-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <aside className="side-panel" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <div className="side-panel-header">
+          <div>
+            <h2 id={titleId}>{title}</h2>
+            {description && <p>{description}</p>}
+          </div>
+          <button type="button" className="icon-button" onClick={onClose} aria-label="Close panel">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="side-panel-body">{children}</div>
+        {footer && <div className="side-panel-footer">{footer}</div>}
+      </aside>
+    </div>
+  );
+}
+
 export function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
   return <div className="card" style={style}>{children}</div>;
 }

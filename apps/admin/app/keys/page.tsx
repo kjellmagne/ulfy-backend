@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Copy, Eye, KeyRound, Plus, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, LoadingPanel, Modal, PageHeader, PanelHeader, SidePanel, StatusBadge } from "../../components/AdminUI";
 import { api } from "../../lib/api";
 
 function defaultMaintenanceDate() {
@@ -186,16 +186,15 @@ export default function KeysPage() {
               <div className="field"><FieldLabel help="Shown to users as maintenance/support coverage.">Maintenance until</FieldLabel><input className="input" type="date" value={enterpriseForm.maintenanceUntil} onChange={(e) => setEnterpriseForm({ ...enterpriseForm, maintenanceUntil: e.target.value })} /></div>
             </form>
           </Modal>
-          <Modal
+          <SidePanel
             open={Boolean(details)}
             title={details?.kind === "single" ? "Single-user license details" : "Enterprise license details"}
             description="Complete stored metadata for this license key. The full activation key cannot be recovered after generation."
             onClose={() => setDetails(null)}
-            wide
           >
             {details?.kind === "single" && <SingleLicenseDetails licenseKey={details.key} />}
             {details?.kind === "enterprise" && <EnterpriseLicenseDetails licenseKey={details.key} onDeleteActivation={deleteEnterpriseActivation} />}
-          </Modal>
+          </SidePanel>
         </>
       )}
     </RequireAuth>
