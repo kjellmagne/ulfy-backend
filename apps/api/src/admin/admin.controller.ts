@@ -1,5 +1,5 @@
 import { Body, ConflictException, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
-import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, Min, MinLength } from "class-validator";
 import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import * as bcrypt from "bcryptjs";
 import { PrismaService } from "../prisma/prisma.service";
@@ -64,7 +64,7 @@ class EnterpriseKeyDto {
   notes?: string;
 }
 
-class ConfigDto {
+export class ConfigDto {
   @ApiProperty({ example: "Default Enterprise Profile" })
   @IsString()
   name!: string;
@@ -76,41 +76,76 @@ class ConfigDto {
 
   @ApiProperty({ required: false, example: "Central configuration for selected enterprise tenant." })
   @IsOptional()
+  @IsString()
   description?: string;
 
   @ApiProperty({ required: false, example: "openai-compatible" })
+  @IsOptional()
+  @IsString()
   speechProviderType?: string;
   @ApiProperty({ required: false, example: "https://speech.example.internal/v1/audio/transcriptions" })
+  @IsOptional()
+  @IsString()
   speechEndpointUrl?: string;
   @ApiProperty({ required: false, example: "whisper-large-v3" })
+  @IsOptional()
+  @IsString()
   speechModelName?: string;
   @ApiProperty({ required: false, example: true })
+  @IsOptional()
+  @IsBoolean()
   privacyControlEnabled?: boolean;
   @ApiProperty({ required: false, example: true })
+  @IsOptional()
+  @IsBoolean()
   piiControlEnabled?: boolean;
   @ApiProperty({ required: false, example: "https://presidio.example.internal" })
+  @IsOptional()
+  @IsString()
   presidioEndpointUrl?: string;
   @ApiProperty({ required: false, example: "secret://ulfy/presidio" })
+  @IsOptional()
+  @IsString()
   presidioSecretRef?: string;
   @ApiProperty({ required: false, example: "openai-compatible" })
+  @IsOptional()
+  @IsString()
   privacyReviewProviderType?: string;
   @ApiProperty({ required: false, example: "https://privacy.example.internal/v1/chat/completions" })
+  @IsOptional()
+  @IsString()
   privacyReviewEndpointUrl?: string;
   @ApiProperty({ required: false, example: "privacy-review-v1" })
+  @IsOptional()
+  @IsString()
   privacyReviewModel?: string;
   @ApiProperty({ required: false, example: "openai-compatible" })
+  @IsOptional()
+  @IsString()
   documentGenerationProviderType?: string;
   @ApiProperty({ required: false, example: "https://docs.example.internal/v1/chat/completions" })
+  @IsOptional()
+  @IsString()
   documentGenerationEndpointUrl?: string;
   @ApiProperty({ required: false, example: "docgen-v1" })
+  @IsOptional()
+  @IsString()
   documentGenerationModel?: string;
   @ApiProperty({ required: false, example: "https://kvasetech.com/backend/api/v1/templates/manifest" })
+  @IsOptional()
+  @IsString()
   templateRepositoryUrl?: string;
   @ApiProperty({ required: false, example: "https://telemetry.example.internal/events" })
+  @IsOptional()
+  @IsString()
   telemetryEndpointUrl?: string;
   @ApiProperty({ required: false, example: { enterpriseTemplates: true, privacyReview: true } })
+  @IsOptional()
+  @IsObject()
   featureFlags?: Record<string, boolean>;
   @ApiProperty({ required: false, example: ["openai-compatible", "internal"] })
+  @IsOptional()
+  @IsArray()
   allowedProviderRestrictions?: string[];
   @ApiProperty({
     required: false,
@@ -122,14 +157,20 @@ class ConfigDto {
       presidio: { scoreThreshold: 0.7, detectEmail: true, detectPerson: true }
     }
   })
+  @IsOptional()
+  @IsObject()
   providerProfiles?: Record<string, unknown>;
   @ApiProperty({
     required: false,
     description: "Admin-side policy switches, such as whether users may override provider selections.",
     example: { userMayChangeSpeechProvider: false, userMayChangeFormatter: false, externalFormattersAllowed: false }
   })
+  @IsOptional()
+  @IsObject()
   managedPolicy?: Record<string, unknown>;
   @ApiProperty({ required: false, nullable: true, example: null })
+  @IsOptional()
+  @IsString()
   defaultTemplateId?: string | null;
   [key: string]: unknown;
 }
