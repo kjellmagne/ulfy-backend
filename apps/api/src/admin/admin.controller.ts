@@ -628,8 +628,8 @@ export class AdminController {
     const current = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
     const existing = this.templatePreviewProviderValue(current?.value);
     const nextProviderType = dto.providerType === undefined ? existing.providerType : this.emptyToNull(dto.providerType) ?? "openai-compatible";
-    const nextEndpointUrl = dto.endpointUrl === undefined ? existing.endpointUrl : this.emptyToNull(dto.endpointUrl);
-    const nextModel = dto.model === undefined ? existing.model : this.emptyToNull(dto.model);
+    const nextEndpointUrl = dto.endpointUrl === undefined ? existing.endpointUrl : this.emptyToNull(dto.endpointUrl) ?? null;
+    const nextModel = dto.model === undefined ? existing.model : this.emptyToNull(dto.model) ?? null;
     const apiKeyScopeChanged = this.previewProviderApiKeyScopeChanged(existing, {
       providerType: nextProviderType,
       endpointUrl: nextEndpointUrl
