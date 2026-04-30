@@ -49,6 +49,40 @@ describe("AdminController provider model lookup", () => {
     expect(result.models).toEqual([{ id: "llama3.1:8b", name: "llama3.1:8b" }, { id: "mistral:latest", name: "mistral:latest" }]);
   });
 
+  it("preserves APISIX route prefixes for Ollama model lookup", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      models: [{ name: "gemma4:26b" }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({} as any, {} as any, {} as any);
+
+    await controller.providerModels({
+      providerDomain: "privacy_review",
+      providerType: "ollama",
+      endpointUrl: "https://kvasetech.com/ollama",
+      apiKey: ""
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://kvasetech.com/ollama/api/tags", expect.any(Object));
+  });
+
+  it("adds /v1/models for vLLM gateway base URLs", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "meta-llama/Meta-Llama-3.1-8B-Instruct" }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({} as any, {} as any, {} as any);
+
+    await controller.providerModels({
+      providerDomain: "document_generation",
+      providerType: "vllm",
+      endpointUrl: "https://kvasetech.com/vllm",
+      apiKey: ""
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://kvasetech.com/vllm/v1/models", expect.any(Object));
+  });
+
   it("rejects providers without remote model lookup", async () => {
     const controller = new AdminController({} as any, {} as any, {} as any);
 

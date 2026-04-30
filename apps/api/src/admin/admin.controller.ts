@@ -1505,7 +1505,9 @@ export class AdminController {
   }
 
   private async lookupOpenAiCompatibleModels(dto: ProviderModelLookupDto) {
-    const endpoint = this.modelsUrl(dto.endpointUrl, dto.providerType === "openai" ? "https://api.openai.com/v1" : undefined);
+    const endpoint = dto.providerType === "vllm"
+      ? this.openAiCompatibleModelsUrl(dto.endpointUrl, "http://localhost:8000/v1")
+      : this.modelsUrl(dto.endpointUrl, dto.providerType === "openai" ? "https://api.openai.com/v1" : undefined);
     const response = await this.fetchJson(endpoint, this.providerHeaders(dto.apiKey));
     const data = Array.isArray(response?.data) ? response.data : [];
     let models = data.map((item: any) => item?.id ?? item?.name).filter(Boolean);
@@ -1552,7 +1554,8 @@ export class AdminController {
     }
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
-      throw new BadRequestException(`Provider model endpoint returned ${response.status}${detail ? `: ${detail.slice(0, 240)}` : ""}`);
+      const readableDetail = this.readableProviderError(detail);
+      throw new BadRequestException(`Provider model endpoint returned ${response.status}${readableDetail ? `: ${readableDetail}` : ""}. Check the provider endpoint URL and APISIX/upstream health.`);
     }
     return response.json();
   }
@@ -1576,9 +1579,26 @@ export class AdminController {
     return base.toString();
   }
 
+  private openAiCompatibleModelsUrl(endpointUrl?: string, fallbackBase?: string) {
+    const base = this.providerBaseUrl(endpointUrl, fallbackBase);
+    const path = base.pathname.replace(/\/+$/, "");
+    if (path.endsWith("/models")) return base.toString();
+    if (path.endsWith("/v1")) {
+      base.pathname = `${path}/models`;
+    } else {
+      base.pathname = `${path}/v1/models`;
+    }
+    base.pathname = base.pathname.replace(/\/{2,}/g, "/");
+    base.search = "";
+    return base.toString();
+  }
+
   private ollamaTagsUrl(endpointUrl?: string) {
     const base = this.providerBaseUrl(endpointUrl, "http://localhost:11434");
-    base.pathname = "/api/tags";
+    const path = base.pathname.replace(/\/+$/, "");
+    if (!path.endsWith("/api/tags")) {
+      base.pathname = `${path}/api/tags`.replace(/\/{2,}/g, "/");
+    }
     base.search = "";
     return base.toString();
   }
@@ -1586,7 +1606,13 @@ export class AdminController {
   private geminiModelsUrl(endpointUrl?: string, apiKey?: string) {
     const base = this.providerBaseUrl(endpointUrl, "https://generativelanguage.googleapis.com");
     const path = base.pathname.replace(/\/+$/, "");
-    base.pathname = path.endsWith("/v1beta") || path.endsWith("/v1") ? `${path}/models` : "/v1beta/models";
+    if (path.endsWith("/models")) {
+      base.pathname = path;
+    } else if (path.endsWith("/v1beta") || path.endsWith("/v1")) {
+      base.pathname = `${path}/models`;
+    } else {
+      base.pathname = `${path}/v1beta/models`.replace(/\/{2,}/g, "/");
+    }
     base.search = "";
     if (apiKey?.trim()) base.searchParams.set("key", apiKey.trim());
     return base.toString();
@@ -1616,6 +1642,16 @@ export class AdminController {
     return [...new Set(models.map((model) => model.trim()).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b))
       .map((model) => ({ id: model, name: model }));
+  }
+
+  private readableProviderError(body: string) {
+    return body
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 180);
   }
 
   private cleanPartner(dto: Partial<PartnerDto>) {
