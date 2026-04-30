@@ -44,7 +44,7 @@ const formatterProviders = [
   { value: "", label: "Not managed", ready: true, endpoint: false, model: false, privacy: "Local setting kept" },
   { value: "apple_intelligence", label: "Apple Intelligence", ready: true, endpoint: false, model: false, privacy: "Safe" },
   { value: "openai", label: "OpenAI", ready: true, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-5-mini" },
-  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama", modelDefault: "llama3.1:8b" },
+  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "openai_compatible", label: "OpenAI-compatible", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "gemini", label: "Gemini", ready: false, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-2.5-flash" },
   { value: "claude", label: "Claude", ready: false, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://api.anthropic.com/v1", modelDefault: "claude-sonnet-4-6" }
@@ -53,7 +53,7 @@ const formatterProviders = [
 const privacyReviewProviders = [
   { value: "", label: "Not managed", ready: true, privacy: "Local setting kept" },
   { value: "local_heuristic", label: "Local heuristic", ready: true, privacy: "Safe" },
-  { value: "ollama", label: "Ollama", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama", modelDefault: "llama3.1:8b" },
+  { value: "ollama", label: "Ollama", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "openai_compatible", label: "OpenAI-compatible", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "openai", label: "OpenAI", ready: false, privacy: "Not recommended for privacy review" },
   { value: "gemini", label: "Gemini", ready: false, privacy: "Coming soon / not recommended" },
@@ -199,7 +199,7 @@ export default function ConfigsPage() {
         ...form,
         speechProviderType: value,
         speechEndpointUrl: provider?.endpoint ? provider.endpointDefault ?? form.speechEndpointUrl : "",
-        speechModelName: provider?.model ? provider.modelDefault ?? form.speechModelName : "",
+        speechModelName: provider?.model ? providerDefaultModel(provider) : "",
         speechApiKey: provider?.endpoint ? form.speechApiKey : "",
         speechDiarizationEnabled: value === "openai" ? form.speechDiarizationEnabled : false
       };
@@ -213,7 +213,7 @@ export default function ConfigsPage() {
         ...form,
         documentGenerationProviderType: value,
         documentGenerationEndpointUrl: provider?.endpoint ? provider.endpointDefault ?? form.documentGenerationEndpointUrl : "",
-        documentGenerationModel: provider?.model ? provider.modelDefault ?? form.documentGenerationModel : "",
+        documentGenerationModel: provider?.model ? providerDefaultModel(provider) : "",
         documentGenerationApiKey: provider?.endpoint ? form.documentGenerationApiKey : "",
         formatterPrivacyEmphasis: value === "apple_intelligence" ? "safe" : form.formatterPrivacyEmphasis
       };
@@ -227,7 +227,7 @@ export default function ConfigsPage() {
       ...form,
       privacyReviewProviderType: value,
       privacyReviewEndpointUrl: canUseRemoteReview ? provider?.endpointDefault ?? form.privacyReviewEndpointUrl : "",
-      privacyReviewModel: canUseRemoteReview ? provider?.modelDefault ?? form.privacyReviewModel : "",
+      privacyReviewModel: canUseRemoteReview ? providerDefaultModel(provider) : "",
       privacyReviewPrivacyEmphasis: ["local_heuristic", "ollama", "openai_compatible"].includes(value) ? "safe" : form.privacyReviewPrivacyEmphasis
     };
     setForm(next);
@@ -659,6 +659,12 @@ function keyFingerprint(value?: string) {
   const trimmed = value?.trim();
   if (!trimmed) return "";
   return `${trimmed.length}:${trimmed.slice(0, 2)}:${trimmed.slice(-4)}`;
+}
+
+function providerDefaultModel(provider?: unknown) {
+  if (!provider || typeof provider !== "object" || !("modelDefault" in provider)) return "";
+  const value = (provider as { modelDefault?: unknown }).modelDefault;
+  return typeof value === "string" ? value : "";
 }
 
 function labelFor(key: string) {

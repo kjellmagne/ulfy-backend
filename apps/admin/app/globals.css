@@ -1309,9 +1309,189 @@ textarea {
 }
 
 @supports selector(:has(*)) {
+  .shell:has(.login-page) {
+    grid-template-columns: 1fr;
+  }
+  .main:has(.login-page) {
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
   .main:has(.template-route) {
     max-width: none;
   }
+}
+
+/* Login */
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: var(--bg);
+}
+.login-layout {
+  width: min(920px, 100%);
+  min-height: 520px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.8fr);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15,23,42,0.16);
+}
+.login-intro {
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 40px;
+  background: #0c1524;
+  color: #e2e8f0;
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.login-logo {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0d9488, #0891b2);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+}
+.login-product {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.login-subtitle {
+  margin-top: 1px;
+  color: #6f8197;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.login-intro-copy {
+  display: grid;
+  gap: 10px;
+}
+.login-kicker {
+  width: fit-content;
+  padding: 4px 9px;
+  border: 1px solid rgba(45,212,191,0.24);
+  border-radius: 999px;
+  background: rgba(13,148,136,0.12);
+  color: #5eead4;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.login-intro h1 {
+  max-width: 420px;
+  margin: 0;
+  color: #fff;
+  font-size: 34px;
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.login-intro p {
+  max-width: 430px;
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.login-assurance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.login-assurance span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid rgba(148,163,184,0.2);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+}
+.login-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 44px;
+  background: #fff;
+}
+.login-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.login-card-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.login-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.login-card p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+.login-form .field {
+  margin: 0;
+}
+.login-error {
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+.login-submit {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 4px;
 }
 
 .template-route {
@@ -2798,6 +2978,27 @@ textarea {
   }
   .main {
     padding: 20px;
+  }
+  .main:has(.login-page) {
+    padding: 0;
+  }
+  .login-page {
+    min-height: 100vh;
+    padding: 18px;
+  }
+  .login-layout {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+  .login-intro {
+    min-height: auto;
+    padding: 28px;
+  }
+  .login-intro h1 {
+    font-size: 28px;
+  }
+  .login-card {
+    padding: 28px;
   }
   .page-header,
   .panel-header {

@@ -144,7 +144,6 @@ Sample enterprise activation payload:
     "piiControlEnabled": true,
     "documentGenerationProviderType": "openai_compatible",
     "documentGenerationEndpointUrl": "https://kvasetech.com/ollama",
-    "documentGenerationModel": "llama3.1:8b",
     "documentGenerationApiKey": "optional-managed-docgen-key",
     "templateRepositoryUrl": "http://localhost:4000/api/v1/templates/manifest",
     "featureFlags": { "enterpriseTemplates": true, "privacyReview": true, "developerMode": false },
@@ -191,7 +190,7 @@ Config profiles keep provider domains separate:
 - Privacy review / guardrail: `local_heuristic`, `ollama`, `openai_compatible` are the recommended v1 choices
 - Presidio PII is configured separately from privacy review
 - Optional managed provider credentials are `speechApiKey` and `documentGenerationApiKey`. Prefer internal gateway endpoints or tenant-scoped keys when these fields are sent to mobile devices.
-- The admin UI defaults Azure Speech to `https://kvasetech.com/stt`, Ollama/OpenAI-compatible formatter endpoints to `https://kvasetech.com/ollama`, and OpenAI formatter to `https://api.openai.com/v1` with `gpt-5-mini`.
+- The admin UI defaults Azure Speech to `https://kvasetech.com/stt`, Ollama/OpenAI-compatible formatter endpoints to `https://kvasetech.com/ollama`, and OpenAI formatter to `https://api.openai.com/v1` with `gpt-5-mini`. Ollama and OpenAI-compatible models are intentionally left blank until selected from the fetched model list or typed manually.
 
 Leave provider fields blank when the backend should not manage that setting for the tenant.
 

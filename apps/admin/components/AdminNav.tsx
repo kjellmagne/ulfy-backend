@@ -22,6 +22,7 @@ const systemLinks = [
 export function AdminNav() {
   const pathname = usePathname();
   const currentPath = normalizePath(pathname ?? "/");
+  if (currentPath === "/login") return null;
 
   return (
     <nav className="nav">

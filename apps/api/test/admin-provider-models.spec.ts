@@ -33,7 +33,7 @@ describe("AdminController provider model lookup", () => {
 
   it("loads Ollama model names from /api/tags", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      models: [{ name: "llama3.1:8b" }, { name: "mistral:latest" }]
+      models: [{ name: "nordic-docgen:latest" }, { name: "mistral:latest" }]
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     const controller = new AdminController({} as any, {} as any, {} as any);
@@ -46,7 +46,7 @@ describe("AdminController provider model lookup", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:11434/api/tags", expect.any(Object));
-    expect(result.models).toEqual([{ id: "llama3.1:8b", name: "llama3.1:8b" }, { id: "mistral:latest", name: "mistral:latest" }]);
+    expect(result.models).toEqual([{ id: "mistral:latest", name: "mistral:latest" }, { id: "nordic-docgen:latest", name: "nordic-docgen:latest" }]);
   });
 
   it("preserves APISIX route prefixes for Ollama model lookup", async () => {
