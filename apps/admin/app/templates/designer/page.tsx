@@ -88,6 +88,7 @@ type PreviewProviderStatus = {
   model?: string | null;
   endpointConfigured?: boolean;
   apiKeyConfigured?: boolean;
+  missingFields?: string[];
 };
 
 type VariantForm = {
@@ -343,8 +344,18 @@ export default function TemplateDesignerRoute() {
   const selectedSection = selectedSectionIndex === null ? null : templateSections[selectedSectionIndex] ?? null;
   const latestVersion = publishedVersion(variant);
   const requiredCount = templateSections.filter((section) => section.required).length;
-  const activePreviewProviderType = variantForm.preview?.providerType ?? (previewProviderStatus?.configured ? previewProviderStatus.providerType : null);
-  const activePreviewProviderModel = variantForm.preview?.providerModel ?? (previewProviderStatus?.configured ? previewProviderStatus.model : null);
+  const activePreviewProviderType = variantForm.preview?.providerType ?? previewProviderStatus?.providerType ?? null;
+  const activePreviewProviderModel = variantForm.preview?.providerModel ?? previewProviderStatus?.model ?? null;
+  const previewProviderLabel = previewProviderStatus
+    ? (activePreviewProviderType ? `${activePreviewProviderType}${activePreviewProviderModel ? ` · ${activePreviewProviderModel}` : ""}` : "Not configured")
+    : "Checking provider";
+  const previewProviderDetail = variantForm.preview?.generatedAt
+    ? formatTime(variantForm.preview.generatedAt)
+    : previewProviderStatus?.configured
+      ? "Ready to generate"
+      : previewProviderStatus?.missingFields?.length
+        ? `Missing ${previewProviderStatus.missingFields.join(", ")}`
+        : "Not generated";
 
   useEffect(() => {
     if (selectedSectionIndex !== null && selectedSectionIndex >= templateSections.length) {
@@ -859,8 +870,8 @@ export default function TemplateDesignerRoute() {
             <div className="preview-footer">
               <div>
                 <span>Preview provider</span>
-                <strong>{activePreviewProviderType ?? "Not configured"}{activePreviewProviderModel ? ` · ${activePreviewProviderModel}` : ""}</strong>
-                <small>{formatTime(variantForm.preview?.generatedAt)}</small>
+                <strong>{previewProviderLabel}</strong>
+                <small>{previewProviderDetail}</small>
               </div>
               <button className="button secondary" type="button" onClick={generatePreview} disabled={!previewProviderStatus?.configured}><Wand2 size={15} /> Generate preview</button>
             </div>

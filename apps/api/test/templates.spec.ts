@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { TemplatesService } from "../src/templates/templates.service";
 
 const validYaml = `identity:
@@ -44,6 +44,10 @@ llm_prompting:
 `;
 
 describe("TemplatesService", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("validates the iOS app YAML schema", () => {
     const service = new TemplatesService({} as any, {} as any);
     const parsed = service.validateYamlContent(validYaml);
@@ -112,5 +116,71 @@ describe("TemplatesService", () => {
     const service = new TemplatesService(prisma as any, { log: vi.fn() } as any);
 
     await expect(service.manifestForEnterpriseActivation("token-token-token-token")).rejects.toThrow();
+  });
+
+  it("normalizes OpenAI preview base URLs to chat completions", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: "# Preview\n\nGenerated note." } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const update = vi.fn().mockImplementation(({ data }) => ({
+      previewMarkdown: data.previewMarkdown ?? null,
+      previewStructured: data.previewStructured ?? null,
+      previewProviderType: data.previewProviderType ?? null,
+      previewProviderModel: data.previewProviderModel ?? null,
+      previewGeneratedAt: data.previewGeneratedAt ?? null,
+      previewError: data.previewError ?? null
+    }));
+    const service = new TemplatesService({
+      systemSetting: {
+        findUnique: vi.fn().mockResolvedValue({
+          value: {
+            providerType: "openai",
+            endpointUrl: "https://api.openai.com/v1",
+            apiKey: "sk-preview",
+            model: "gpt-5-mini"
+          }
+        })
+      },
+      templateDraft: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "draft-1",
+          yamlContent: validYaml,
+          sampleTranscript: "Speaker: short sample.",
+          variant: { family: { title: "Family" } }
+        }),
+        update
+      }
+    } as any, { log: vi.fn() } as any);
+
+    const preview = await service.generatePreview("draft-1", { id: "admin-1", email: "admin@example.com" });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://api.openai.com/v1/chat/completions", expect.objectContaining({
+      method: "POST",
+      headers: expect.objectContaining({ Authorization: "Bearer sk-preview" })
+    }));
+    expect(preview).toMatchObject({
+      markdown: "# Preview\n\nGenerated note.",
+      provider: { type: "openai", model: "gpt-5-mini" },
+      error: null
+    });
+  });
+
+  it("reports missing preview provider fields", async () => {
+    const service = new TemplatesService({
+      systemSetting: {
+        findUnique: vi.fn().mockResolvedValue({
+          value: { providerType: "openai", endpointUrl: "https://api.openai.com/v1", model: null, apiKey: null }
+        })
+      }
+    } as any, { log: vi.fn() } as any);
+
+    await expect(service.previewProviderStatus()).resolves.toMatchObject({
+      configured: false,
+      providerType: "openai",
+      endpointConfigured: true,
+      apiKeyConfigured: false,
+      missingFields: ["apiKey", "model"]
+    });
   });
 });

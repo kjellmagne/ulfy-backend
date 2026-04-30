@@ -360,24 +360,52 @@ export class TemplatesService {
 
   async previewProviderStatus() {
     const { providerType, endpoint, apiKey, model } = await this.previewProviderConfig();
+    const missingFields = [
+      !endpoint ? "endpointUrl" : null,
+      !apiKey ? "apiKey" : null,
+      !model ? "model" : null
+    ].filter(Boolean);
     return {
       configured: Boolean(endpoint && apiKey && model),
       providerType: providerType ?? null,
       model: model ?? null,
       endpointConfigured: Boolean(endpoint),
-      apiKeyConfigured: Boolean(apiKey)
+      apiKeyConfigured: Boolean(apiKey),
+      missingFields
     };
   }
 
   private async previewProviderConfig() {
     const setting = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
     const stored = this.previewProviderSettingValue(setting?.value);
+    const providerType = stored.providerType || process.env.TEMPLATE_PREVIEW_PROVIDER_TYPE || "openai-compatible";
+    const endpoint = stored.endpointUrl || process.env.TEMPLATE_PREVIEW_ENDPOINT_URL || null;
     return {
-      providerType: stored.providerType || process.env.TEMPLATE_PREVIEW_PROVIDER_TYPE || "openai-compatible",
-      endpoint: stored.endpointUrl || process.env.TEMPLATE_PREVIEW_ENDPOINT_URL || null,
+      providerType,
+      endpoint: this.previewChatCompletionsEndpoint(endpoint, providerType),
       apiKey: stored.apiKey || process.env.TEMPLATE_PREVIEW_API_KEY || null,
       model: stored.model || process.env.TEMPLATE_PREVIEW_MODEL || null
     };
+  }
+
+  private previewChatCompletionsEndpoint(endpoint?: string | null, providerType?: string | null) {
+    if (!endpoint?.trim()) return null;
+    const normalizedProvider = providerType?.trim().toLowerCase().replace(/-/g, "_");
+    if (!["openai", "openai_compatible"].includes(normalizedProvider ?? "")) return endpoint.trim();
+
+    try {
+      const url = new URL(endpoint.trim());
+      const path = url.pathname.replace(/\/+$/, "");
+      if (path.endsWith("/chat/completions")) return url.toString();
+      const basePath = path
+        .replace(/\/responses$/i, "")
+        .replace(/\/models$/i, "");
+      url.pathname = `${basePath || ""}/chat/completions`.replace(/\/{2,}/g, "/");
+      url.search = "";
+      return url.toString();
+    } catch {
+      return endpoint.trim();
+    }
   }
 
   private previewProviderSettingValue(value: unknown) {
