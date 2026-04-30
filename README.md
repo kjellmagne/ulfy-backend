@@ -138,13 +138,13 @@ Sample enterprise activation payload:
     "id": "00000000-0000-0000-0000-000000000101",
     "name": "Default Enterprise Profile",
     "speechProviderType": "azure",
-    "speechEndpointUrl": "http://192.168.222.171:5000",
+    "speechEndpointUrl": "https://kvasetech.com/stt",
     "speechApiKey": "optional-managed-speech-key",
     "privacyControlEnabled": true,
     "piiControlEnabled": true,
     "documentGenerationProviderType": "openai_compatible",
-    "documentGenerationEndpointUrl": "http://localhost:8000/v1",
-    "documentGenerationModel": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+    "documentGenerationEndpointUrl": "https://kvasetech.com/ollama",
+    "documentGenerationModel": "llama3.1:8b",
     "documentGenerationApiKey": "optional-managed-docgen-key",
     "templateRepositoryUrl": "http://localhost:4000/api/v1/templates/manifest",
     "featureFlags": { "enterpriseTemplates": true, "privacyReview": true, "developerMode": false },
@@ -187,10 +187,11 @@ Single-user activations are intentionally blocked from the central repository. E
 Config profiles keep provider domains separate:
 
 - Speech: `local`, `apple_online`, `openai`, `azure`, `gemini`
-- Document generation / formatter: `apple_intelligence`, `openai`, `ollama`, `vllm`, `openai_compatible`, `gemini`, `claude`
+- Document generation / formatter: `apple_intelligence`, `openai`, `ollama`, `openai_compatible`, `gemini`, `claude`
 - Privacy review / guardrail: `local_heuristic`, `ollama`, `openai_compatible` are the recommended v1 choices
 - Presidio PII is configured separately from privacy review
 - Optional managed provider credentials are `speechApiKey` and `documentGenerationApiKey`. Prefer internal gateway endpoints or tenant-scoped keys when these fields are sent to mobile devices.
+- The admin UI defaults Azure Speech to `https://kvasetech.com/stt`, Ollama/OpenAI-compatible formatter endpoints to `https://kvasetech.com/ollama`, and OpenAI formatter to `https://api.openai.com/v1` with `gpt-5-mini`.
 
 Leave provider fields blank when the backend should not manage that setting for the tenant.
 
@@ -218,7 +219,7 @@ curl -X POST http://localhost:4000/api/v1/admin/provider-models \
   -d '{
     "providerDomain": "document_generation",
     "providerType": "openai_compatible",
-    "endpointUrl": "https://llm.example.internal/v1",
+    "endpointUrl": "https://kvasetech.com/ollama",
     "apiKey": "provider-or-gateway-key"
   }'
 ```
@@ -237,7 +238,7 @@ Sample model lookup response:
 
 Model lookup support:
 
-- `openai`, `openai_compatible`, and `vllm` use an OpenAI-compatible `/models` endpoint.
+- `openai` and `openai_compatible` use an OpenAI-compatible `/models` endpoint.
 - `ollama` uses `/api/tags`.
 - `gemini` uses the Google model-list endpoint.
 - `claude` uses the Anthropic model-list endpoint.

@@ -13,7 +13,7 @@ const helpText = {
   speechEndpointUrl: "Endpoint URL for the selected speech provider. Use this for self-hosted or controlled-environment speech services such as Azure Speech containers or internal gateway routes. Locks app UI when set.",
   speechModelName: "Optional model identifier for speech providers that expose multiple models. Leave unset when the service does not use model names. Locks app UI when set.",
   speechApiKey: "Optional API key for the selected speech provider. Prefer an internal gateway endpoint or tenant-scoped key when possible. If sent to the app, it should be treated as a managed credential.",
-  documentGenerationProviderType: "Choose how Ulfy turns the transcript into a finished note. Self-hosted or internally routed providers keep content under your control. Values: apple_intelligence, openai, ollama, vllm, openai_compatible, gemini, claude. Locks app UI. Full support.",
+  documentGenerationProviderType: "Choose how Ulfy turns the transcript into a finished note. Self-hosted or internally routed providers keep content under your control. Values: apple_intelligence, openai, ollama, openai_compatible, gemini, claude. Locks app UI. Full support.",
   documentGenerationEndpointUrl: "Endpoint URL for the document-generation provider. Use this for internal gateways, self-hosted providers, or OpenAI-compatible services. Locks app UI when set.",
   documentGenerationModel: "Model identifier used for document generation. Choose the organization-approved model for note formatting. Locks app UI when set.",
   documentGenerationApiKey: "Optional API key for the document-generation provider. Prefer internal gateways or tenant-scoped keys. If sent to the app, it should be treated as a managed credential.",
@@ -36,7 +36,7 @@ const speechProviders = [
   { value: "local", label: "Local", privacy: "Safe", endpoint: false, model: false, diarization: false, ready: true },
   { value: "apple_online", label: "Apple Online", privacy: "Use with caution", endpoint: false, model: false, diarization: false, ready: true },
   { value: "openai", label: "OpenAI Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: true, ready: true, endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-4o-transcribe" },
-  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, endpointDefault: "http://192.168.222.171:5000" },
+  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, endpointDefault: "https://kvasetech.com/stt" },
   { value: "gemini", label: "Gemini Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: false, ready: false, endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-live-2.5-flash-preview" }
 ];
 
@@ -44,9 +44,8 @@ const formatterProviders = [
   { value: "", label: "Not managed", ready: true, endpoint: false, model: false, privacy: "Local setting kept" },
   { value: "apple_intelligence", label: "Apple Intelligence", ready: true, endpoint: false, model: false, privacy: "Safe" },
   { value: "openai", label: "OpenAI", ready: true, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-5-mini" },
-  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "http://localhost:11434", modelDefault: "llama3.1:8b" },
-  { value: "vllm", label: "vLLM", ready: true, endpoint: true, model: true, privacy: "Managed by deployment", endpointDefault: "http://localhost:8000/v1", modelDefault: "meta-llama/Meta-Llama-3.1-8B-Instruct" },
-  { value: "openai_compatible", label: "OpenAI-compatible", ready: true, endpoint: true, model: true, privacy: "Managed by default" },
+  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama", modelDefault: "llama3.1:8b" },
+  { value: "openai_compatible", label: "OpenAI-compatible", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "gemini", label: "Gemini", ready: false, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-2.5-flash" },
   { value: "claude", label: "Claude", ready: false, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://api.anthropic.com/v1", modelDefault: "claude-sonnet-4-6" }
 ];
@@ -54,8 +53,8 @@ const formatterProviders = [
 const privacyReviewProviders = [
   { value: "", label: "Not managed", ready: true, privacy: "Local setting kept" },
   { value: "local_heuristic", label: "Local heuristic", ready: true, privacy: "Safe" },
-  { value: "ollama", label: "Ollama", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "http://localhost:11434", modelDefault: "llama3.1:8b" },
-  { value: "openai_compatible", label: "OpenAI-compatible", ready: true, privacy: "Safe only when explicitly approved" },
+  { value: "ollama", label: "Ollama", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama", modelDefault: "llama3.1:8b" },
+  { value: "openai_compatible", label: "OpenAI-compatible", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "openai", label: "OpenAI", ready: false, privacy: "Not recommended for privacy review" },
   { value: "gemini", label: "Gemini", ready: false, privacy: "Coming soon / not recommended" },
   { value: "claude", label: "Claude", ready: false, privacy: "Coming soon / not recommended" }
@@ -179,81 +178,95 @@ export default function ConfigsPage() {
     setEditorOpen(true);
   }
 
+  function resetModelLookup(kind: ModelKind) {
+    setModelOptions((current) => ({ ...current, [kind]: [] }));
+    setModelLookupKeys((current) => ({ ...current, [kind]: "" }));
+  }
+
+  function refreshModelsForNextForm(kind: ModelKind, nextForm: any, shouldLookup: boolean) {
+    resetModelLookup(kind);
+    if (!shouldLookup) return;
+    const config = modelLookupConfig(kind, nextForm);
+    window.setTimeout(() => {
+      lookupModels(kind, config, { silent: true }).catch(() => undefined);
+    }, 0);
+  }
+
   function applyProviderDefault(kind: "speech" | "formatter" | "review", value: string) {
     if (kind === "speech") {
       const provider = speechProviders.find((item) => item.value === value);
-      setForm((current: any) => ({
-        ...current,
+      const next = {
+        ...form,
         speechProviderType: value,
-        speechEndpointUrl: provider?.endpoint ? (provider?.endpointDefault && !current.speechEndpointUrl ? provider.endpointDefault : current.speechEndpointUrl) : "",
-        speechModelName: provider?.model ? (provider?.modelDefault && !current.speechModelName ? provider.modelDefault : current.speechModelName) : "",
-        speechApiKey: provider?.endpoint ? current.speechApiKey : "",
-        speechDiarizationEnabled: value === "openai" ? current.speechDiarizationEnabled : false
-      }));
-      setModelOptions((current) => ({ ...current, speech: [] }));
-      setModelLookupKeys((current) => ({ ...current, speech: "" }));
+        speechEndpointUrl: provider?.endpoint ? provider.endpointDefault ?? form.speechEndpointUrl : "",
+        speechModelName: provider?.model ? provider.modelDefault ?? form.speechModelName : "",
+        speechApiKey: provider?.endpoint ? form.speechApiKey : "",
+        speechDiarizationEnabled: value === "openai" ? form.speechDiarizationEnabled : false
+      };
+      setForm(next);
+      refreshModelsForNextForm("speech", next, Boolean(provider?.model));
       return;
     }
     if (kind === "formatter") {
       const provider = formatterProviders.find((item) => item.value === value);
-      setForm((current: any) => ({
-        ...current,
+      const next = {
+        ...form,
         documentGenerationProviderType: value,
-        documentGenerationEndpointUrl: provider?.endpoint ? (provider?.endpointDefault && !current.documentGenerationEndpointUrl ? provider.endpointDefault : current.documentGenerationEndpointUrl) : "",
-        documentGenerationModel: provider?.model ? (provider?.modelDefault && !current.documentGenerationModel ? provider.modelDefault : current.documentGenerationModel) : "",
-        documentGenerationApiKey: provider?.endpoint ? current.documentGenerationApiKey : "",
-        formatterPrivacyEmphasis: value === "apple_intelligence" ? "safe" : current.formatterPrivacyEmphasis
-      }));
-      setModelOptions((current) => ({ ...current, formatter: [] }));
-      setModelLookupKeys((current) => ({ ...current, formatter: "" }));
+        documentGenerationEndpointUrl: provider?.endpoint ? provider.endpointDefault ?? form.documentGenerationEndpointUrl : "",
+        documentGenerationModel: provider?.model ? provider.modelDefault ?? form.documentGenerationModel : "",
+        documentGenerationApiKey: provider?.endpoint ? form.documentGenerationApiKey : "",
+        formatterPrivacyEmphasis: value === "apple_intelligence" ? "safe" : form.formatterPrivacyEmphasis
+      };
+      setForm(next);
+      refreshModelsForNextForm("formatter", next, Boolean(provider?.model));
       return;
     }
     const provider = privacyReviewProviders.find((item) => item.value === value);
-    setForm((current: any) => ({
-      ...current,
+    const canUseRemoteReview = Boolean(value && value !== "local_heuristic");
+    const next = {
+      ...form,
       privacyReviewProviderType: value,
-      privacyReviewEndpointUrl: value && value !== "local_heuristic" ? (provider?.endpointDefault && !current.privacyReviewEndpointUrl ? provider.endpointDefault : current.privacyReviewEndpointUrl) : "",
-      privacyReviewModel: value && value !== "local_heuristic" ? (provider?.modelDefault && !current.privacyReviewModel ? provider.modelDefault : current.privacyReviewModel) : "",
-      privacyReviewPrivacyEmphasis: ["local_heuristic", "ollama", "openai_compatible"].includes(value) ? "safe" : current.privacyReviewPrivacyEmphasis
-    }));
-    setModelOptions((current) => ({ ...current, review: [] }));
-    setModelLookupKeys((current) => ({ ...current, review: "" }));
+      privacyReviewEndpointUrl: canUseRemoteReview ? provider?.endpointDefault ?? form.privacyReviewEndpointUrl : "",
+      privacyReviewModel: canUseRemoteReview ? provider?.modelDefault ?? form.privacyReviewModel : "",
+      privacyReviewPrivacyEmphasis: ["local_heuristic", "ollama", "openai_compatible"].includes(value) ? "safe" : form.privacyReviewPrivacyEmphasis
+    };
+    setForm(next);
+    refreshModelsForNextForm("review", next, canUseRemoteReview);
   }
 
-  function modelLookupConfig(kind: ModelKind): ModelLookupConfig {
+  function modelLookupConfig(kind: ModelKind, source = form): ModelLookupConfig {
     return {
       speech: {
         providerDomain: "speech",
-        providerType: form.speechProviderType ?? "",
-        endpointUrl: form.speechEndpointUrl ?? "",
-        apiKey: form.speechApiKey ?? ""
+        providerType: source.speechProviderType ?? "",
+        endpointUrl: source.speechEndpointUrl ?? "",
+        apiKey: source.speechApiKey ?? ""
       },
       formatter: {
         providerDomain: "document_generation",
-        providerType: form.documentGenerationProviderType ?? "",
-        endpointUrl: form.documentGenerationEndpointUrl ?? "",
-        apiKey: form.documentGenerationApiKey ?? ""
+        providerType: source.documentGenerationProviderType ?? "",
+        endpointUrl: source.documentGenerationEndpointUrl ?? "",
+        apiKey: source.documentGenerationApiKey ?? ""
       },
       review: {
         providerDomain: "privacy_review",
-        providerType: form.privacyReviewProviderType ?? "",
-        endpointUrl: form.privacyReviewEndpointUrl ?? "",
+        providerType: source.privacyReviewProviderType ?? "",
+        endpointUrl: source.privacyReviewEndpointUrl ?? "",
         apiKey: ""
       }
     }[kind];
   }
 
-  function modelRequestKey(kind: ModelKind) {
-    const config = modelLookupConfig(kind);
+  function modelRequestKey(kind: ModelKind, source = form) {
+    const config = modelLookupConfig(kind, source);
     return [config.providerDomain, config.providerType, config.endpointUrl, keyFingerprint(config.apiKey)].join("|");
   }
 
-  async function lookupModels(kind: ModelKind) {
-    const config = modelLookupConfig(kind);
-    const requestKey = modelRequestKey(kind);
+  async function lookupModels(kind: ModelKind, config = modelLookupConfig(kind), options: { silent?: boolean } = {}) {
+    const requestKey = [config.providerDomain, config.providerType, config.endpointUrl, keyFingerprint(config.apiKey)].join("|");
     if (modelLoading === kind || modelLookupKeys[kind] === requestKey) return;
     if (!config.providerType) {
-      notify({ tone: "info", title: "No provider selected", message: "Choose a managed provider before loading models." });
+      if (!options.silent) notify({ tone: "info", title: "No provider selected", message: "Choose a managed provider before loading models." });
       return;
     }
     setModelLoading(kind);
@@ -263,7 +276,7 @@ export default function ConfigsPage() {
       setModelOptions((current) => ({ ...current, [kind]: models }));
       setModelLookupKeys((current) => ({ ...current, [kind]: requestKey }));
     } catch (err: any) {
-      notify({ tone: "danger", title: "Could not load models", message: getErrorMessage(err) });
+      if (!options.silent) notify({ tone: "danger", title: "Could not load models", message: getErrorMessage(err) });
     } finally {
       setModelLoading("");
     }
