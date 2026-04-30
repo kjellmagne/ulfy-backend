@@ -358,6 +358,17 @@ export class TemplatesService {
     };
   }
 
+  async previewProviderStatus() {
+    const { providerType, endpoint, apiKey, model } = await this.previewProviderConfig();
+    return {
+      configured: Boolean(endpoint && apiKey && model),
+      providerType: providerType ?? null,
+      model: model ?? null,
+      endpointConfigured: Boolean(endpoint),
+      apiKeyConfigured: Boolean(apiKey)
+    };
+  }
+
   private async previewProviderConfig() {
     const setting = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
     const stored = this.previewProviderSettingValue(setting?.value);

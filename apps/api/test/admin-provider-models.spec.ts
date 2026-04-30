@@ -218,6 +218,30 @@ describe("AdminController provider model lookup", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("returns preview provider runtime status without exposing secrets", async () => {
+    const controller = new AdminController(
+      {} as any,
+      {} as any,
+      {
+        previewProviderStatus: vi.fn().mockResolvedValue({
+          configured: true,
+          providerType: "openai",
+          model: "gpt-5-mini",
+          endpointConfigured: true,
+          apiKeyConfigured: true
+        })
+      } as any
+    );
+
+    await expect(controller.templatePreviewProviderRuntimeStatus()).resolves.toEqual({
+      configured: true,
+      providerType: "openai",
+      model: "gpt-5-mini",
+      endpointConfigured: true,
+      apiKeyConfigured: true
+    });
+  });
+
   it("loads OpenAI provider models from the default endpoint when endpoint URL is omitted", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: [{ id: "gpt-5-mini" }]

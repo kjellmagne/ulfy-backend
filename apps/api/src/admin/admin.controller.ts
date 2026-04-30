@@ -688,6 +688,13 @@ export class AdminController {
     return { models };
   }
 
+  @Get("settings/template-preview-provider/status")
+  @ApiOperation({ summary: "Get AI preview provider runtime status", description: "Returns whether manual template preview generation is currently configured, without exposing secrets." })
+  @ApiOkResponse({ description: "Preview provider runtime status." })
+  async templatePreviewProviderRuntimeStatus() {
+    return this.templates.previewProviderStatus();
+  }
+
   @Get("partners")
   @ApiOperation({ summary: "List solution partners", description: "Superadmins and staff see all partners. Partner admins see only their assigned partner." })
   @ApiOkResponse({ description: "Partner list." })

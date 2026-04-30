@@ -82,6 +82,14 @@ type DraftPreview = {
   error?: string | null;
 };
 
+type PreviewProviderStatus = {
+  configured: boolean;
+  providerType?: string | null;
+  model?: string | null;
+  endpointConfigured?: boolean;
+  apiKeyConfigured?: boolean;
+};
+
 type VariantForm = {
   familyId: string;
   variantId: string;
@@ -258,6 +266,7 @@ export default function TemplateDesignerRoute() {
   const [selectedSectionIndex, setSelectedSectionIndex] = useState<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [previewTab, setPreviewTab] = useState<"document" | "yaml" | "sample">("document");
+  const [previewProviderStatus, setPreviewProviderStatus] = useState<PreviewProviderStatus | null>(null);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -272,12 +281,13 @@ export default function TemplateDesignerRoute() {
     setLoading(true);
     setError("");
     try {
-      const [families, categoryRows, sectionRows, tagRows] = await Promise.all([
+      const [families, categoryRows, sectionRows, tagRows, previewStatus] = await Promise.all([
         api("/admin/template-families"),
         api("/admin/template-categories"),
         api("/admin/template-section-presets"),
-        api("/admin/template-tags")
-      ]) as [Family[], TemplateCategoryOption[], TemplateSectionPresetOption[], TemplateTagOption[]];
+        api("/admin/template-tags"),
+        api("/admin/settings/template-preview-provider/status")
+      ]) as [Family[], TemplateCategoryOption[], TemplateSectionPresetOption[], TemplateTagOption[], PreviewProviderStatus];
       const presetSections = sectionRows.length ? sectionRows.map(presetToTemplateSection) : fallbackSectionPresets;
       const nextFamily = families.find((item) => item.id === familyId) ?? null;
       if (!nextFamily) {
@@ -295,6 +305,7 @@ export default function TemplateDesignerRoute() {
       setCategories(categoryRows);
       setSectionPresetRows(sectionRows);
       setTagOptions(tagRows);
+      setPreviewProviderStatus(previewStatus);
       setFamily(nextFamily);
       setVariant(nextVariant);
       setVariantForm({
@@ -332,6 +343,8 @@ export default function TemplateDesignerRoute() {
   const selectedSection = selectedSectionIndex === null ? null : templateSections[selectedSectionIndex] ?? null;
   const latestVersion = publishedVersion(variant);
   const requiredCount = templateSections.filter((section) => section.required).length;
+  const activePreviewProviderType = variantForm.preview?.providerType ?? (previewProviderStatus?.configured ? previewProviderStatus.providerType : null);
+  const activePreviewProviderModel = variantForm.preview?.providerModel ?? (previewProviderStatus?.configured ? previewProviderStatus.model : null);
 
   useEffect(() => {
     if (selectedSectionIndex !== null && selectedSectionIndex >= templateSections.length) {
@@ -846,10 +859,10 @@ export default function TemplateDesignerRoute() {
             <div className="preview-footer">
               <div>
                 <span>Preview provider</span>
-                <strong>{variantForm.preview?.providerType ?? "Not configured"}{variantForm.preview?.providerModel ? ` · ${variantForm.preview.providerModel}` : ""}</strong>
+                <strong>{activePreviewProviderType ?? "Not configured"}{activePreviewProviderModel ? ` · ${activePreviewProviderModel}` : ""}</strong>
                 <small>{formatTime(variantForm.preview?.generatedAt)}</small>
               </div>
-              <button className="button secondary" type="button" onClick={generatePreview}><Wand2 size={15} /> Generate preview</button>
+              <button className="button secondary" type="button" onClick={generatePreview} disabled={!previewProviderStatus?.configured}><Wand2 size={15} /> Generate preview</button>
             </div>
           </aside>
         </div>
