@@ -26,7 +26,7 @@ type PreviewProviderSetting = {
   apiKeyConfigured: boolean;
   apiKeyPreview?: string | null;
 };
-type TemplateTag = { id: string; slug: string; name: string; color: string; description?: string | null; source?: "catalog" | "usage" };
+type TemplateTag = { id: string; slug: string; name: string; color: string; description?: string | null };
 
 const blankCategory = { id: "", slug: "", title: "", description: "" };
 const blankSection = { id: "", slug: "", title: "", purpose: "", format: "prose", required: false, extractionHintsText: "", sortOrder: 0 };
@@ -135,7 +135,7 @@ export default function SettingsPage() {
 
   function openTag(tag?: TemplateTag) {
     setTagForm(tag ? {
-      id: tag.source === "usage" ? "" : tag.id,
+      id: tag.id,
       name: tag.name,
       color: tag.color || "#64748b",
       description: tag.description ?? ""
@@ -234,10 +234,6 @@ export default function SettingsPage() {
   }
 
   async function deleteTag(tag: TemplateTag) {
-    if (tag.source === "usage") {
-      notify({ title: "Tag is inferred", message: "Create it in the catalog first if you want to manage it globally.", tone: "info" });
-      return;
-    }
     if (!confirm(`Delete tag "${tag.name}" from the shared catalog and current template references?`)) return;
     try {
       await api(`/admin/template-tags/${tag.id}`, { method: "DELETE" });
@@ -389,15 +385,14 @@ export default function SettingsPage() {
               {!tags.length ? <EmptyState title="No tags" message="Create reusable chips for template filtering and visual context." /> : (
                 <div className="table-wrap">
                   <table className="table">
-                    <thead><tr><th>Tag</th><th>Slug</th><th>Source</th><th className="actions">Actions</th></tr></thead>
+                    <thead><tr><th>Tag</th><th>Slug</th><th className="actions">Actions</th></tr></thead>
                     <tbody>{tags.map((tag) => (
                       <tr key={tag.id}>
                         <td><span className="catalog-tag-chip" style={tagStyle(tag.color)} title={tag.description ?? tag.name}>{tag.name}</span><br /><span className="muted">{tag.description || "No description"}</span></td>
                         <td><span className="code">{tag.slug}</span></td>
-                        <td><span className={`badge ${tag.source === "usage" ? "status-draft" : "status-active"}`}>{tag.source === "usage" ? "Inferred" : "Catalog"}</span></td>
                         <td className="actions">
-                          <IconAction label={tag.source === "usage" ? "Create catalog tag" : "Edit tag"} onClick={() => openTag(tag)} disabled={!canManageSettings}>{tag.source === "usage" ? <Plus size={14} /> : <Edit3 size={14} />}</IconAction>
-                          <IconAction label="Delete tag" tone="danger" onClick={() => deleteTag(tag)} disabled={!canManageSettings || tag.source === "usage"}><Trash2 size={14} /></IconAction>
+                          <IconAction label="Edit tag" onClick={() => openTag(tag)} disabled={!canManageSettings}><Edit3 size={14} /></IconAction>
+                          <IconAction label="Delete tag" tone="danger" onClick={() => deleteTag(tag)} disabled={!canManageSettings}><Trash2 size={14} /></IconAction>
                         </td>
                       </tr>
                     ))}</tbody>

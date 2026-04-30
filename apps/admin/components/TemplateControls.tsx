@@ -77,7 +77,6 @@ export type TemplateTagOption = {
   name: string;
   color: string;
   description?: string | null;
-  source?: "catalog" | "usage";
 };
 
 export const sfSymbolOptions = [
@@ -275,7 +274,7 @@ export function TagEditor({
   placeholder = "Add tags"
 }: {
   value: string[];
-  options: Array<TemplateTagOption | string>;
+  options: TemplateTagOption[];
   onChange: (nextTags: string[]) => void;
   onCreateTag?: (name: string) => Promise<TemplateTagOption | null>;
   placeholder?: string;
@@ -363,7 +362,8 @@ export function TagEditor({
     >
       <div className={`tag-combobox${open ? " open" : ""}`} onClick={() => setOpen(true)}>
         {normalizedValue.map((slug) => {
-          const tag = optionBySlug.get(slug) ?? inferredTagOption(slug);
+          const tag = optionBySlug.get(slug);
+          if (!tag) return null;
           return (
           <button key={slug} type="button" className="tag-badge catalog-tag-chip" style={tagStyle(tag.color)} onClick={() => removeTag(slug)} title={tag.description ? `${tag.name}: ${tag.description}` : `Remove ${tag.name}`}>
             <span>{tag.name}</span>
@@ -401,7 +401,7 @@ export function TagEditor({
                 {item.kind === "option" && <span className="tag-color-dot" style={tagStyle(item.tag.color)} />}
                 <span>{item.label}</span>
               </span>
-              <small>{item.kind === "create" ? "New tag" : item.tag.source === "usage" ? "Used" : "Catalog"}</small>
+              <small>{item.kind === "create" ? "New tag" : "Catalog"}</small>
             </button>
           ))}
           {!menuItems.length && <div className="tag-menu-empty">No matches</div>}
@@ -411,7 +411,7 @@ export function TagEditor({
   );
 }
 
-export function TagChipList({ tags, options }: { tags: string[]; options: Array<TemplateTagOption | string> }) {
+export function TagChipList({ tags, options }: { tags: string[]; options: TemplateTagOption[] }) {
   const optionTags = normalizeTagOptions(options);
   const optionBySlug = new Map(optionTags.map((tag) => [tag.slug, tag]));
   const values = uniqueTagSlugs(tags);
@@ -419,7 +419,8 @@ export function TagChipList({ tags, options }: { tags: string[]; options: Array<
   return (
     <div className="template-family-tags">
       {values.map((slug) => {
-        const tag = optionBySlug.get(slug) ?? inferredTagOption(slug);
+        const tag = optionBySlug.get(slug);
+        if (!tag) return null;
         return (
           <span key={slug} className="catalog-tag-chip" style={tagStyle(tag.color)} title={tag.description ? `${tag.name}: ${tag.description}` : tag.name}>
             {tag.name}
@@ -468,11 +469,11 @@ function uniqueTagSlugs(tags: string[]) {
   return result;
 }
 
-function normalizeTagOptions(options: Array<TemplateTagOption | string>) {
+function normalizeTagOptions(options: TemplateTagOption[]) {
   const seen = new Set<string>();
   const tags: TemplateTagOption[] = [];
   for (const option of options) {
-    const tag = typeof option === "string" ? inferredTagOption(option) : {
+    const tag = {
       ...option,
       slug: tagSlug(option.slug || option.name),
       name: normalizeTag(option.name || option.slug),
@@ -483,18 +484,6 @@ function normalizeTagOptions(options: Array<TemplateTagOption | string>) {
     tags.push(tag);
   }
   return tags.sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function inferredTagOption(value: string): TemplateTagOption {
-  const slug = tagSlug(value);
-  return {
-    id: slug,
-    slug,
-    name: normalizeTag(value).replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
-    color: "#64748b",
-    description: null,
-    source: "usage"
-  };
 }
 
 function tagStyle(color: string) {

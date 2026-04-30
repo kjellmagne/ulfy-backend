@@ -1419,37 +1419,10 @@ export class AdminController {
   }
 
   @Get("template-tags")
-  @ApiOperation({ summary: "List template tag catalog", description: "Returns shared colored template tags. Tags already used in templates but not yet cataloged are returned as inferred entries." })
-  @ApiOkResponse({ description: "Template tag catalog.", schema: { example: [{ id: "tag-uuid", slug: "dictation", name: "Dictation", color: "#0d9488", description: "Dictation templates.", source: "catalog" }] } })
-  async templateTags() {
-    const [catalog, families, templates] = await Promise.all([
-      this.prisma.templateTag.findMany({ orderBy: { name: "asc" } }),
-      this.prisma.templateFamily.findMany({ select: { tags: true } }),
-      this.prisma.template.findMany({ select: { tags: true } })
-    ]);
-    const bySlug = new Map<string, any>();
-    for (const tag of catalog) {
-      bySlug.set(tag.slug, { ...tag, source: "catalog" });
-    }
-    for (const row of [...families, ...templates]) {
-      if (Array.isArray(row.tags)) {
-        for (const value of row.tags) {
-          if (typeof value !== "string" || !value.trim()) continue;
-          const slug = this.normalizeTagSlug(value);
-          if (!bySlug.has(slug)) {
-            bySlug.set(slug, {
-              id: slug,
-              slug,
-              name: this.titleFromTagSlug(value),
-              color: "#64748b",
-              description: null,
-              source: "usage"
-            });
-          }
-        }
-      }
-    }
-    return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
+  @ApiOperation({ summary: "List template tag catalog", description: "Returns shared colored template tags from the managed catalog only." })
+  @ApiOkResponse({ description: "Template tag catalog.", schema: { example: [{ id: "tag-uuid", slug: "dictation", name: "Dictation", color: "#0d9488", description: "Dictation templates." }] } })
+  templateTags() {
+    return this.prisma.templateTag.findMany({ orderBy: { name: "asc" } });
   }
 
   @Post("template-tags")
@@ -1462,7 +1435,7 @@ export class AdminController {
     await this.ensureTemplateTagSlugAvailable(slug);
     const tag = await this.prisma.templateTag.create({ data: this.cleanTemplateTag(dto, slug) });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.tag.create", targetType: "TemplateTag", targetId: tag.id });
-    return { ...tag, source: "catalog" };
+    return tag;
   }
 
   @Patch("template-tags/:id")
@@ -1486,7 +1459,7 @@ export class AdminController {
     });
     if (nextSlug !== current.slug) await this.replaceTemplateTagReferences(current.slug, nextSlug);
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.tag.update", targetType: "TemplateTag", targetId: id, metadata: { previousSlug: current.slug, slug: nextSlug } });
-    return { ...tag, source: "catalog" };
+    return tag;
   }
 
   @Delete("template-tags/:id")
@@ -1930,14 +1903,6 @@ export class AdminController {
     if (!color) return "#64748b";
     if (!/^#[0-9a-f]{6}$/i.test(color)) throw new BadRequestException("Tag color must be a hex color such as #0d9488.");
     return color.toLowerCase();
-  }
-
-  private titleFromTagSlug(value: string) {
-    return value
-      .trim()
-      .replace(/[-_]+/g, " ")
-      .replace(/\s+/g, " ")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
   }
 
   private async ensureTemplateTagSlugAvailable(slug: string, currentId?: string) {
