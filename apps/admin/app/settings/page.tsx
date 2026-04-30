@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
-import { Bot, Edit3, KeyRound, Plus, Save, ShieldCheck, Tag, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
+import { Bot, ChevronDown, Edit3, KeyRound, Loader2, Plus, Save, ShieldCheck, Tag, Trash2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
 import { RequireAuth } from "../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
@@ -32,6 +32,9 @@ const blankCategory = { id: "", slug: "", title: "", description: "" };
 const blankSection = { id: "", slug: "", title: "", purpose: "", format: "prose", required: false, extractionHintsText: "", sortOrder: 0 };
 const blankTag = { id: "", name: "", color: "#0d9488", description: "" };
 const blankPreviewProvider = { providerType: "openai-compatible", endpointUrl: "", model: "", apiKey: "" };
+const previewProviderDefaults: Record<string, { endpointUrl?: string; model?: string }> = {
+  openai: { endpointUrl: "https://api.openai.com/v1/chat/completions", model: "gpt-5-mini" }
+};
 
 export default function SettingsPage() {
   const [me, setMe] = useState<any>(null);
@@ -39,6 +42,9 @@ export default function SettingsPage() {
   const [sections, setSections] = useState<SectionPreset[]>([]);
   const [tags, setTags] = useState<TemplateTag[]>([]);
   const [previewProvider, setPreviewProvider] = useState<PreviewProviderSetting | null>(null);
+  const [previewModelOptions, setPreviewModelOptions] = useState<string[]>([]);
+  const [previewModelLookupKey, setPreviewModelLookupKey] = useState("");
+  const [previewModelLoading, setPreviewModelLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categoryPanel, setCategoryPanel] = useState(false);
@@ -72,6 +78,8 @@ export default function SettingsPage() {
         model: previewSetting.model ?? "",
         apiKey: ""
       } : blankPreviewProvider);
+      setPreviewModelOptions([]);
+      setPreviewModelLookupKey("");
     } catch (err) {
       notify({ title: "Settings failed to load", message: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -88,6 +96,18 @@ export default function SettingsPage() {
     required: sections.filter((section) => section.required).length
   }), [categories, sections, tags]);
   const canManageSettings = isSuperadminRole(me?.role);
+
+  useEffect(() => {
+    if (!canManageSettings || loading) return;
+    const endpoint = previewProviderForm.endpointUrl.trim();
+    if (!/^https?:\/\//i.test(endpoint)) return;
+    const timer = window.setTimeout(() => {
+      void loadPreviewModels({ silent: true });
+    }, 650);
+    return () => window.clearTimeout(timer);
+    // The lookup function intentionally reads the freshest form state when the timer fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageSettings, loading, previewProviderForm.providerType, previewProviderForm.endpointUrl, previewProviderForm.apiKey]);
 
   function openCategory(category?: Category) {
     setCategoryForm(category ? {
@@ -121,6 +141,18 @@ export default function SettingsPage() {
       description: tag.description ?? ""
     } : blankTag);
     setTagPanel(true);
+  }
+
+  function changePreviewProviderType(providerType: string) {
+    const defaults = previewProviderDefaults[providerType] ?? {};
+    setPreviewProviderForm((current) => ({
+      ...current,
+      providerType,
+      endpointUrl: defaults.endpointUrl ?? current.endpointUrl,
+      model: defaults.model && !current.model.trim() ? defaults.model : current.model
+    }));
+    setPreviewModelOptions([]);
+    setPreviewModelLookupKey("");
   }
 
   async function saveCategory() {
@@ -233,11 +265,46 @@ export default function SettingsPage() {
         model: setting.model ?? "",
         apiKey: ""
       });
+      setPreviewModelOptions([]);
+      setPreviewModelLookupKey("");
       notify({ title: "AI preview provider saved", tone: "success" });
     } catch (err) {
       notify({ title: "AI preview provider was not saved", message: getErrorMessage(err), tone: "danger" });
     } finally {
       setSaving(false);
+    }
+  }
+
+  function previewModelRequestKey() {
+    return [
+      previewProviderForm.providerType,
+      previewProviderForm.endpointUrl.trim(),
+      keyFingerprint(previewProviderForm.apiKey) || (previewProvider?.apiKeyConfigured ? "saved-key" : "")
+    ].join("|");
+  }
+
+  async function loadPreviewModels(options: { silent?: boolean } = {}) {
+    const requestKey = previewModelRequestKey();
+    if (previewModelLoading || previewModelLookupKey === requestKey) return;
+    if (!previewProviderForm.endpointUrl.trim()) {
+      if (!options.silent) notify({ title: "Endpoint URL missing", message: "Enter a preview provider endpoint before loading models.", tone: "info" });
+      return;
+    }
+    setPreviewModelLoading(true);
+    try {
+      const payload: Record<string, string> = {
+        providerType: previewProviderForm.providerType,
+        endpointUrl: previewProviderForm.endpointUrl
+      };
+      if (previewProviderForm.apiKey.trim()) payload.apiKey = previewProviderForm.apiKey.trim();
+      const response = await api("/admin/settings/template-preview-provider/models", { method: "POST", body: JSON.stringify(payload) });
+      const models = (response.models ?? []).map((model: any) => model.id ?? model.name).filter(Boolean);
+      setPreviewModelOptions(models);
+      setPreviewModelLookupKey(requestKey);
+    } catch (err) {
+      if (!options.silent) notify({ title: "Could not load preview models", message: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setPreviewModelLoading(false);
     }
   }
 
@@ -275,7 +342,7 @@ export default function SettingsPage() {
                 <div className="grid three">
                   <div className="field">
                     <FieldLabel help="Metadata label for the provider. The current preview runner expects an OpenAI-compatible chat-completions endpoint.">Provider type</FieldLabel>
-                    <select value={previewProviderForm.providerType} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, providerType: event.target.value })}>
+                    <select value={previewProviderForm.providerType} onChange={(event) => changePreviewProviderType(event.target.value)}>
                       <option value="openai-compatible">OpenAI-compatible</option>
                       <option value="openai">OpenAI</option>
                     </select>
@@ -285,8 +352,13 @@ export default function SettingsPage() {
                     <input className="input" value={previewProviderForm.endpointUrl} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, endpointUrl: event.target.value })} placeholder="https://api.openai.com/v1/chat/completions" />
                   </div>
                   <div className="field">
-                    <FieldLabel help="Model used for preview generation only. This does not affect tenant runtime policies.">Model</FieldLabel>
-                    <input className="input" value={previewProviderForm.model} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, model: event.target.value })} placeholder="gpt-5-mini" />
+                    <PreviewModelField
+                      value={previewProviderForm.model}
+                      onChange={(model) => setPreviewProviderForm({ ...previewProviderForm, model })}
+                      loading={previewModelLoading}
+                      options={previewModelLookupKey === previewModelRequestKey() ? previewModelOptions : []}
+                      onOpen={() => loadPreviewModels()}
+                    />
                   </div>
                 </div>
                 <div className="grid two">
@@ -467,4 +539,125 @@ function tagStyle(color: string) {
 
 function isSuperadminRole(role?: string | null) {
   return String(role ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "") === "superadmin";
+}
+
+function PreviewModelField({
+  value,
+  onChange,
+  loading,
+  options,
+  onOpen
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  loading: boolean;
+  options: string[];
+  onOpen: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const comboboxRef = useRef<HTMLDivElement>(null);
+  const filteredOptions = useMemo(() => {
+    const query = value.trim().toLowerCase();
+    return query ? options.filter((model) => model.toLowerCase().includes(query)) : options;
+  }, [options, value]);
+
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [value, options.length]);
+
+  function openMenu() {
+    setOpen(true);
+    onOpen();
+  }
+
+  function selectModel(model: string) {
+    onChange(model);
+    setOpen(false);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      openMenu();
+      setActiveIndex((current) => Math.min(current + 1, Math.max(filteredOptions.length - 1, 0)));
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((current) => Math.max(current - 1, 0));
+    }
+    if (event.key === "Enter" && open && filteredOptions[activeIndex]) {
+      event.preventDefault();
+      selectModel(filteredOptions[activeIndex]);
+    }
+    if (event.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <>
+      <FieldLabel help="Model used for preview generation only. Models load automatically from the preview provider; you can still type a custom value.">Model</FieldLabel>
+      <div
+        ref={comboboxRef}
+        className="model-combobox"
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+        }}
+      >
+        <div className="model-combobox-control">
+          <input
+            className="input"
+            value={value}
+            role="combobox"
+            aria-expanded={open}
+            aria-autocomplete="list"
+            autoComplete="off"
+            placeholder="Type or choose a model"
+            onFocus={openMenu}
+            onClick={openMenu}
+            onChange={(event) => {
+              onChange(event.target.value);
+              openMenu();
+            }}
+            onKeyDown={handleKeyDown}
+          />
+          <span className="model-combobox-indicator" aria-hidden="true">
+            {loading ? <Loader2 size={14} className="spin" /> : <ChevronDown size={14} />}
+          </span>
+        </div>
+        {open && (
+          <div className="model-menu" role="listbox">
+            {loading && <div className="model-menu-empty">Loading models...</div>}
+            {!loading && filteredOptions.map((model, index) => (
+              <button
+                key={model}
+                type="button"
+                role="option"
+                aria-selected={model === value}
+                className={`model-option${index === activeIndex ? " active" : ""}`}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  selectModel(model);
+                }}
+              >
+                {model}
+              </button>
+            ))}
+            {!loading && filteredOptions.length === 0 && (
+              <div className="model-menu-empty">
+                {options.length ? "No matching models. Keep typing to use a custom value." : "Models load automatically when available. You can type a custom value."}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function keyFingerprint(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  return `${trimmed.length}:${trimmed.slice(0, 2)}:${trimmed.slice(-4)}`;
 }

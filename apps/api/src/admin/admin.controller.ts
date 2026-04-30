@@ -654,6 +654,26 @@ export class AdminController {
     return this.safeTemplatePreviewProviderSetting(setting.value);
   }
 
+  @Post("settings/template-preview-provider/models")
+  @ApiOperation({ summary: "List AI preview provider models", description: "Superadmin only. Uses the saved preview provider API key when the request omits apiKey." })
+  @ApiBody({ type: TemplatePreviewProviderSettingDto })
+  @ApiOkResponse({ description: "Preview provider model list." })
+  async templatePreviewProviderModels(@Body() dto: TemplatePreviewProviderSettingDto, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const current = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
+    const saved = this.templatePreviewProviderValue(current?.value);
+    const providerType = this.previewProviderLookupType(dto.providerType ?? saved.providerType);
+    const endpointUrl = this.emptyToNull(dto.endpointUrl) ?? saved.endpointUrl ?? "";
+    const apiKey = this.emptyToNull(dto.apiKey) ?? saved.apiKey ?? "";
+    const models = await this.lookupProviderModels({
+      providerDomain: "document_generation",
+      providerType,
+      endpointUrl,
+      apiKey
+    });
+    return { models };
+  }
+
   @Get("partners")
   @ApiOperation({ summary: "List solution partners", description: "Superadmins and staff see all partners. Partner admins see only their assigned partner." })
   @ApiOkResponse({ description: "Partner list." })
@@ -1665,6 +1685,12 @@ export class AdminController {
     return `${value.slice(0, 4)}••••${value.slice(-4)}`;
   }
 
+  private previewProviderLookupType(value?: string | null) {
+    const normalized = value?.trim().toLowerCase().replace(/-/g, "_");
+    if (normalized === "openai") return "openai";
+    return "openai_compatible";
+  }
+
   private async lookupProviderModels(dto: ProviderModelLookupDto) {
     const provider = dto.providerType;
     if (!provider || ["", "local", "apple_online", "apple_intelligence", "local_heuristic"].includes(provider)) {
@@ -1683,9 +1709,12 @@ export class AdminController {
   }
 
   private async lookupOpenAiCompatibleModels(dto: ProviderModelLookupDto) {
-    const endpoint = dto.providerType === "vllm"
-      ? this.openAiCompatibleModelsUrl(dto.endpointUrl, "http://localhost:8000/v1")
-      : this.modelsUrl(dto.endpointUrl, dto.providerType === "openai" ? "https://api.openai.com/v1" : undefined);
+    const fallbackBase = dto.providerType === "openai"
+      ? "https://api.openai.com/v1"
+      : dto.providerType === "vllm"
+        ? "http://localhost:8000/v1"
+        : undefined;
+    const endpoint = this.openAiCompatibleModelsUrl(dto.endpointUrl, fallbackBase);
     const response = await this.fetchJson(endpoint, this.providerHeaders(dto.apiKey));
     const data = Array.isArray(response?.data) ? response.data : [];
     let models = data.map((item: any) => item?.id ?? item?.name).filter(Boolean);
@@ -1758,6 +1787,19 @@ export class AdminController {
   }
 
   private openAiCompatibleModelsUrl(endpointUrl?: string, fallbackBase?: string) {
+    const explicit = this.emptyToNull(endpointUrl);
+    if (explicit) {
+      try {
+        const explicitUrl = new URL(explicit);
+        const explicitPath = explicitUrl.pathname.replace(/\/+$/, "");
+        if (explicitPath.endsWith("/models")) {
+          explicitUrl.search = "";
+          return explicitUrl.toString();
+        }
+      } catch {
+        // Let providerBaseUrl below raise the standard validation error.
+      }
+    }
     const base = this.providerBaseUrl(endpointUrl, fallbackBase);
     const path = base.pathname.replace(/\/+$/, "");
     if (path.endsWith("/models")) return base.toString();

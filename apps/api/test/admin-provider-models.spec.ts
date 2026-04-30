@@ -66,6 +66,90 @@ describe("AdminController provider model lookup", () => {
     expect(fetchMock).toHaveBeenCalledWith("https://kvasetech.com/ollama/api/tags", expect.any(Object));
   });
 
+  it("loads OpenAI-compatible models through APISIX /v1/models", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "qwen3.6:27b-q4_K_M" }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({} as any, {} as any, {} as any);
+
+    await controller.providerModels({
+      providerDomain: "document_generation",
+      providerType: "openai_compatible",
+      endpointUrl: "https://kvasetech.com/ollama",
+      apiKey: "local-ollama-preview"
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://kvasetech.com/ollama/v1/models", expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: "Bearer local-ollama-preview" })
+    }));
+  });
+
+  it("loads AI preview provider models with saved provider credentials", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "preview-model" }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({
+      systemSetting: {
+        findUnique: vi.fn().mockResolvedValue({
+          value: {
+            providerType: "openai-compatible",
+            endpointUrl: "https://kvasetech.com/ollama/v1/chat/completions",
+            apiKey: "saved-preview-key"
+          }
+        })
+      }
+    } as any, {} as any, {} as any);
+
+    const result = await controller.templatePreviewProviderModels({}, { user: { role: "superadmin" } });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://kvasetech.com/ollama/v1/models", expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: "Bearer saved-preview-key" })
+    }));
+    expect(result).toEqual({ models: [{ id: "preview-model", name: "preview-model" }] });
+  });
+
+  it("loads OpenAI preview provider models from the OpenAI models endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "gpt-5-mini" }, { id: "gpt-4.1-mini" }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({
+      systemSetting: { findUnique: vi.fn().mockResolvedValue(null) }
+    } as any, {} as any, {} as any);
+
+    const result = await controller.templatePreviewProviderModels({
+      providerType: "openai",
+      endpointUrl: "https://api.openai.com/v1/chat/completions",
+      apiKey: "sk-preview"
+    }, { user: { role: "superadmin" } });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://api.openai.com/v1/models", expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: "Bearer sk-preview", "X-API-Key": "sk-preview" })
+    }));
+    expect(result.models).toEqual([{ id: "gpt-4.1-mini", name: "gpt-4.1-mini" }, { id: "gpt-5-mini", name: "gpt-5-mini" }]);
+  });
+
+  it("loads OpenAI provider models from the default endpoint when endpoint URL is omitted", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ id: "gpt-5-mini" }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({} as any, {} as any, {} as any);
+
+    await controller.providerModels({
+      providerDomain: "document_generation",
+      providerType: "openai",
+      endpointUrl: "",
+      apiKey: "sk-provider"
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("https://api.openai.com/v1/models", expect.objectContaining({
+      headers: expect.objectContaining({ Authorization: "Bearer sk-provider" })
+    }));
+  });
+
   it("adds /v1/models for vLLM gateway base URLs", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: [{ id: "meta-llama/Meta-Llama-3.1-8B-Instruct" }]
