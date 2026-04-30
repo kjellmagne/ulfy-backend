@@ -134,6 +134,53 @@ describe("AdminController provider model lookup", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("clears the saved preview key when provider scope changes and no replacement key is provided", async () => {
+    const upsert = vi.fn().mockResolvedValue({
+      value: {
+        providerType: "openai",
+        endpointUrl: "https://api.openai.com/v1",
+        model: "gpt-5-mini",
+        apiKey: null
+      }
+    });
+    const controller = new AdminController({
+      systemSetting: {
+        findUnique: vi.fn().mockResolvedValue({
+          value: {
+            providerType: "openai-compatible",
+            endpointUrl: "https://kvasetech.com/ollama/v1/chat/completions",
+            model: "preview-model",
+            apiKey: "saved-preview-key"
+          }
+        }),
+        upsert
+      }
+    } as any, { log: vi.fn() } as any, {} as any);
+
+    const result = await controller.updateTemplatePreviewProviderSetting({
+      providerType: "openai",
+      endpointUrl: "https://api.openai.com/v1",
+      model: "gpt-5-mini"
+    }, { user: { sub: "admin-1", email: "admin@example.com", role: "superadmin" } });
+
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({
+        value: expect.objectContaining({
+          providerType: "openai",
+          endpointUrl: "https://api.openai.com/v1",
+          model: "gpt-5-mini",
+          apiKey: null
+        })
+      })
+    }));
+    expect(result).toEqual(expect.objectContaining({
+      providerType: "openai",
+      endpointUrl: "https://api.openai.com/v1",
+      model: "gpt-5-mini",
+      apiKeyConfigured: false
+    }));
+  });
+
   it("loads OpenAI preview provider models from the OpenAI models endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: [{ id: "gpt-5-mini" }, { id: "gpt-4.1-mini" }]
@@ -153,6 +200,22 @@ describe("AdminController provider model lookup", () => {
       headers: expect.objectContaining({ Authorization: "Bearer sk-preview", "X-API-Key": "sk-preview" })
     }));
     expect(result.models).toEqual([{ id: "gpt-4.1-mini", name: "gpt-4.1-mini" }, { id: "gpt-5-mini", name: "gpt-5-mini" }]);
+  });
+
+  it("requires an API key for OpenAI preview model lookup", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({
+      systemSetting: { findUnique: vi.fn().mockResolvedValue(null) }
+    } as any, {} as any, {} as any);
+
+    await expect(controller.templatePreviewProviderModels({
+      providerType: "openai",
+      endpointUrl: "https://api.openai.com/v1"
+    }, { user: { role: "superadmin" } })).rejects.toThrow(
+      "API key is required for this provider model lookup."
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("loads OpenAI provider models from the default endpoint when endpoint URL is omitted", async () => {

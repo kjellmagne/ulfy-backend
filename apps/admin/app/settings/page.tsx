@@ -361,7 +361,7 @@ export default function SettingsPage() {
                   <div className="field">
                     <FieldLabel help="Write-only secret for the preview provider. Leave blank to keep the saved key; enter a new value to replace it.">API key</FieldLabel>
                     <input className="input" type="password" value={previewProviderForm.apiKey} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, apiKey: event.target.value })} placeholder={previewProvider?.apiKeyPreview ? `Saved: ${previewProvider.apiKeyPreview}` : "Paste preview provider API key"} />
-                    <p className="field-hint">If you change provider type or endpoint before saving, paste the matching API key here before loading models.</p>
+                    <p className="field-hint">If you change provider type or move to a different API host, paste the matching API key here. Leaving it blank will no longer carry an old saved key across provider switches.</p>
                   </div>
                   <div className="settings-provider-safe">
                     <ShieldCheck size={16} />

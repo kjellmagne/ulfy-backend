@@ -627,11 +627,20 @@ export class AdminController {
     this.requireSuperadmin(req);
     const current = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
     const existing = this.templatePreviewProviderValue(current?.value);
+    const nextProviderType = dto.providerType === undefined ? existing.providerType : this.emptyToNull(dto.providerType) ?? "openai-compatible";
+    const nextEndpointUrl = dto.endpointUrl === undefined ? existing.endpointUrl : this.emptyToNull(dto.endpointUrl);
+    const nextModel = dto.model === undefined ? existing.model : this.emptyToNull(dto.model);
+    const apiKeyScopeChanged = this.previewProviderApiKeyScopeChanged(existing, {
+      providerType: nextProviderType,
+      endpointUrl: nextEndpointUrl
+    });
     const next = {
-      providerType: dto.providerType === undefined ? existing.providerType : this.emptyToNull(dto.providerType) ?? "openai-compatible",
-      endpointUrl: dto.endpointUrl === undefined ? existing.endpointUrl : this.emptyToNull(dto.endpointUrl),
-      model: dto.model === undefined ? existing.model : this.emptyToNull(dto.model),
-      apiKey: dto.apiKey === undefined ? existing.apiKey : this.emptyToNull(dto.apiKey)
+      providerType: nextProviderType,
+      endpointUrl: nextEndpointUrl,
+      model: nextModel,
+      apiKey: dto.apiKey === undefined
+        ? (apiKeyScopeChanged ? null : existing.apiKey)
+        : this.emptyToNull(dto.apiKey)
     };
     const setting = await this.prisma.systemSetting.upsert({
       where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY },
@@ -1667,6 +1676,32 @@ export class AdminController {
       && normalizedRequestEndpoint === normalizedSavedEndpoint;
   }
 
+  private previewProviderApiKeyScopeChanged(
+    current: ReturnType<AdminController["templatePreviewProviderValue"]>,
+    next: { providerType: string; endpointUrl: string | null }
+  ) {
+    const currentProviderType = this.previewProviderLookupType(current.providerType);
+    const nextProviderType = this.previewProviderLookupType(next.providerType);
+    if (currentProviderType !== nextProviderType) {
+      return true;
+    }
+
+    const currentEndpointOrigin = this.urlOrigin(current.endpointUrl);
+    const nextEndpointOrigin = this.urlOrigin(next.endpointUrl);
+    return currentEndpointOrigin !== nextEndpointOrigin;
+  }
+
+  private urlOrigin(value?: string | null) {
+    const trimmed = this.emptyToNull(value);
+    if (!trimmed) return null;
+
+    try {
+      return new URL(trimmed).origin;
+    } catch {
+      return trimmed;
+    }
+  }
+
   private templatePreviewProviderValue(value: unknown) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
     return {
@@ -1699,6 +1734,9 @@ export class AdminController {
     }
 
     if (provider === "ollama") return this.lookupOllamaModels(dto.endpointUrl);
+    if (["openai", "gemini", "claude"].includes(provider) && !this.emptyToNull(dto.apiKey)) {
+      throw new BadRequestException("API key is required for this provider model lookup.");
+    }
     if (provider === "gemini") return this.lookupGeminiModels(dto.endpointUrl, dto.apiKey);
     if (provider === "claude") return this.lookupClaudeModels(dto.endpointUrl, dto.apiKey);
     if (["openai", "openai_compatible", "vllm"].includes(provider)) return this.lookupOpenAiCompatibleModels(dto);
