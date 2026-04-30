@@ -6,7 +6,7 @@ import * as yaml from "js-yaml";
 import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
-import { IconPicker, TagEditor, presetToTemplateSection } from "../../components/TemplateControls";
+import { IconPicker, TagEditor, TemplateIcon, presetToTemplateSection } from "../../components/TemplateControls";
 import type { TemplateSectionPresetOption } from "../../components/TemplateControls";
 import { useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
@@ -650,7 +650,7 @@ export default function TemplatesPage() {
                   <section key={family.id} className="template-family-card">
                     <div className="template-family-header">
                       <div className="template-family-title">
-                        <span className="sf-symbol-tile" aria-hidden="true">SF</span>
+                        <span className="sf-symbol-tile" title={`Web preview for ${family.icon}`}><TemplateIcon symbol={family.icon} /></span>
                         <div>
                           <div className="template-family-kicker">Template family</div>
                           <h3>{family.title}</h3>

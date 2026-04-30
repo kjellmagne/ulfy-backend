@@ -1,7 +1,55 @@
 "use client";
 
 import { KeyboardEvent, useMemo, useState } from "react";
-import { Plus, Search, X } from "lucide-react";
+import {
+  AudioWaveform,
+  BadgeCheck,
+  Brain,
+  Briefcase,
+  Building2,
+  Calendar,
+  ChartBar,
+  ChartLine,
+  CircleCheck,
+  Clipboard,
+  ClipboardList,
+  Clock,
+  Cross,
+  Download,
+  FileCheck2,
+  FilePenLine,
+  FilePlus2,
+  FileText,
+  Flag,
+  Folder,
+  HeartPulse,
+  ListChecks,
+  LockKeyhole,
+  MessageSquare,
+  MessagesSquare,
+  Mic,
+  NotebookText,
+  Phone,
+  Plus,
+  Quote,
+  RefreshCw,
+  RotateCw,
+  Search,
+  Settings,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  SquarePen,
+  Stethoscope,
+  Tag,
+  User,
+  Users,
+  Video,
+  Volume2,
+  WandSparkles,
+  X,
+  type LucideIcon
+} from "lucide-react";
 import { FieldLabel } from "./AdminUI";
 
 export type TemplateCategoryOption = {
@@ -85,6 +133,73 @@ export const sfSymbolOptions = [
   "magnifyingglass"
 ];
 
+const sfToLucideIcon: Record<string, LucideIcon> = {
+  "doc.text": FileText,
+  "doc.text.fill": FileText,
+  "text.badge.checkmark": FileCheck2,
+  "text.badge.plus": FilePlus2,
+  "text.quote": Quote,
+  "note.text": NotebookText,
+  "list.bullet.clipboard": ClipboardList,
+  "clipboard": Clipboard,
+  "clipboard.fill": Clipboard,
+  "checklist": ListChecks,
+  "checkmark.circle": CircleCheck,
+  "checkmark.seal": BadgeCheck,
+  "person": User,
+  "person.fill": User,
+  "person.text.rectangle": User,
+  "person.2": Users,
+  "person.2.fill": Users,
+  "person.3": Users,
+  "person.3.fill": Users,
+  "person.3.sequence.fill": Users,
+  "building.2": Building2,
+  "building.2.fill": Building2,
+  "briefcase": Briefcase,
+  "briefcase.fill": Briefcase,
+  "stethoscope": Stethoscope,
+  "heart.text.square": HeartPulse,
+  "cross.case": Cross,
+  "waveform": AudioWaveform,
+  "waveform.and.mic": Mic,
+  "mic": Mic,
+  "mic.fill": Mic,
+  "speaker.wave.2": Volume2,
+  "bubble.left.and.bubble.right": MessagesSquare,
+  "message": MessageSquare,
+  "phone": Phone,
+  "video": Video,
+  "calendar": Calendar,
+  "clock": Clock,
+  "arrow.triangle.2.circlepath": RefreshCw,
+  "arrow.clockwise": RotateCw,
+  "tray.and.arrow.down": Download,
+  "folder": Folder,
+  "folder.fill": Folder,
+  "tag": Tag,
+  "tag.fill": Tag,
+  "flag": Flag,
+  "shield": Shield,
+  "shield.checkered": ShieldCheck,
+  "lock.shield": LockKeyhole,
+  "gearshape": Settings,
+  "wand.and.stars": WandSparkles,
+  "sparkles": Sparkles,
+  "brain.head.profile": Brain,
+  "chart.bar": ChartBar,
+  "chart.line.uptrend.xyaxis": ChartLine,
+  "doc.richtext": FileText,
+  "rectangle.and.pencil.and.ellipsis": FilePenLine,
+  "square.and.pencil": SquarePen,
+  "magnifyingglass": Search
+};
+
+export function TemplateIcon({ symbol, size = 18 }: { symbol?: string | null; size?: number }) {
+  const Icon = sfToLucideIcon[symbol || ""] ?? FileText;
+  return <Icon size={size} strokeWidth={2.1} aria-hidden="true" />;
+}
+
 export function IconPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [query, setQuery] = useState("");
   const filteredSymbols = useMemo(() => {
@@ -96,7 +211,9 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (valu
   return (
     <div className="icon-picker">
       <div className="icon-picker-current">
-        <span className="sf-symbol-tile" aria-hidden="true">SF</span>
+        <span className="sf-symbol-tile" title={`Web preview for ${value || "doc.text"}`}>
+          <TemplateIcon symbol={value || "doc.text"} />
+        </span>
         <div>
           <FieldLabel>SF Symbol</FieldLabel>
           <input className="input" value={value} onChange={(event) => onChange(event.target.value)} placeholder="doc.text" />
@@ -115,7 +232,7 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (valu
             onClick={() => onChange(symbol)}
             title={symbol}
           >
-            <span className="sf-symbol-tile" aria-hidden="true">SF</span>
+            <span className="sf-symbol-tile" aria-hidden="true"><TemplateIcon symbol={symbol} size={16} /></span>
             <span>{symbol}</span>
           </button>
         ))}

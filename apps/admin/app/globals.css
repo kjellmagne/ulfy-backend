@@ -2825,14 +2825,15 @@ textarea {
   height: 38px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #f8fafc;
-  color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  flex: 0 0 auto;
+}
+.sf-symbol-tile svg {
+  display: block;
 }
 .icon-search {
   display: grid;
