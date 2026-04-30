@@ -6,8 +6,8 @@ import * as yaml from "js-yaml";
 import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
-import { IconPicker, TagEditor, TemplateIcon, presetToTemplateSection } from "../../components/TemplateControls";
-import type { TemplateSectionPresetOption } from "../../components/TemplateControls";
+import { IconPicker, TagChipList, TagEditor, TemplateIcon, presetToTemplateSection } from "../../components/TemplateControls";
+import type { TemplateSectionPresetOption, TemplateTagOption } from "../../components/TemplateControls";
 import { useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 import { appPath } from "../../lib/base-path";
@@ -237,7 +237,7 @@ export default function TemplatesPage() {
   const [families, setFamilies] = useState<Family[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sectionPresetRows, setSectionPresetRows] = useState<TemplateSectionPresetOption[]>([]);
-  const [tagOptions, setTagOptions] = useState<string[]>([]);
+  const [tagOptions, setTagOptions] = useState<TemplateTagOption[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -495,6 +495,18 @@ export default function TemplatesPage() {
     }
   }
 
+  async function createTemplateTag(name: string) {
+    try {
+      const tag = await api("/admin/template-tags", { method: "POST", body: JSON.stringify({ name }) });
+      setTagOptions((current) => [...current.filter((item) => item.slug !== tag.slug), tag].sort((a, b) => a.name.localeCompare(b.name)));
+      notify({ tone: "success", title: "Tag created", message: `${tag.name} was added to the shared catalog.` });
+      return tag;
+    } catch (err: any) {
+      setError(err.message);
+      return null;
+    }
+  }
+
   async function saveDraft() {
     if (!validateYaml()) return null;
     setSaving(true); setError(""); setNotice("");
@@ -661,11 +673,7 @@ export default function TemplatesPage() {
                             <span className="badge">{family.isGlobal ? "Global catalog" : `${family.entitlements.length} tenant${family.entitlements.length === 1 ? "" : "s"}`}</span>
                             <span className="badge">{family.variants.length} variant{family.variants.length === 1 ? "" : "s"}</span>
                           </div>
-                          {family.tags.length ? (
-                            <div className="template-family-tags">
-                              {family.tags.map((tag) => <span key={tag}>{tag}</span>)}
-                            </div>
-                          ) : null}
+                          <TagChipList tags={family.tags} options={tagOptions} />
                         </div>
                       </div>
                       <div className="template-family-actions">
@@ -743,7 +751,7 @@ export default function TemplatesPage() {
             </div>
             <div className="field">
               <FieldLabel>Tags</FieldLabel>
-              <TagEditor value={familyForm.tags} options={tagOptions} onChange={(tags) => setFamilyForm({ ...familyForm, tags })} />
+              <TagEditor value={familyForm.tags} options={tagOptions} onChange={(tags) => setFamilyForm({ ...familyForm, tags })} onCreateTag={createTemplateTag} />
             </div>
             <label className="checkbox-row"><input type="checkbox" checked={familyForm.isGlobal} onChange={(e) => setFamilyForm({ ...familyForm, isGlobal: e.target.checked })} /> Global template family for all enterprise tenants</label>
           </FormSection>
@@ -809,7 +817,7 @@ export default function TemplatesPage() {
                     <div className="field"><FieldLabel>Short description</FieldLabel><input className="input" value={templateIdentity.short_description ?? ""} onChange={(e) => updateIdentity("short_description", e.target.value)} /></div>
                     <div className="field"><FieldLabel>Category</FieldLabel><select value={templateIdentity.category ?? ""} onChange={(e) => updateIdentity("category", e.target.value)}><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.slug}>{category.title}</option>)}</select></div>
                     <div className="field wide"><FieldLabel>Icon</FieldLabel><IconPicker value={templateIdentity.icon ?? "doc.text"} onChange={(icon) => updateIdentity("icon", icon)} /></div>
-                    <div className="field wide"><FieldLabel>Tags</FieldLabel><TagEditor value={templateIdentity.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} /></div>
+                    <div className="field wide"><FieldLabel>Tags</FieldLabel><TagEditor value={templateIdentity.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} onCreateTag={createTemplateTag} /></div>
                     <div className="field"><FieldLabel>Publish bump</FieldLabel><select value={variantForm.bump} onChange={(e) => setVariantForm({ ...variantForm, bump: e.target.value as any })}><option value="patch">Patch</option><option value="minor">Minor</option><option value="major">Major</option></select></div>
                   </div>
                 </div>

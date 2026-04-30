@@ -1,7 +1,8 @@
-import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, Min, MinLength } from "class-validator";
 import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import * as bcrypt from "bcryptjs";
+import * as yaml from "js-yaml";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdminGuard } from "../auth/admin.guard";
 import { createActivationKey, sha256 } from "../common/crypto";
@@ -422,6 +423,22 @@ class TemplateSectionPresetDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+}
+
+class TemplateTagDto {
+  @ApiProperty({ example: "Dictation" })
+  @IsString()
+  name!: string;
+
+  @ApiProperty({ required: false, example: "#0d9488" })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiProperty({ required: false, example: "Templates used for personal or professional dictation notes." })
+  @IsOptional()
+  @IsString()
+  description?: string;
 }
 
 class TenantDto {
@@ -1100,7 +1117,7 @@ export class AdminController {
         shortDescription: dto.shortDescription,
         categoryId: dto.categoryId || undefined,
         icon: dto.icon || "doc.text",
-        tags: dto.tags ?? [],
+        tags: this.normalizeTagList(dto.tags ?? []),
         isGlobal: dto.isGlobal ?? false
       },
       include: this.templateFamilyInclude()
@@ -1123,7 +1140,7 @@ export class AdminController {
         shortDescription: dto.shortDescription,
         categoryId: dto.categoryId || undefined,
         icon: dto.icon,
-        tags: dto.tags as any,
+        tags: dto.tags === undefined ? undefined : this.normalizeTagList(dto.tags),
         isGlobal: dto.isGlobal
       },
       include: this.templateFamilyInclude()
@@ -1163,7 +1180,7 @@ export class AdminController {
     });
     await this.prisma.templateFamily.update({
       where: { id },
-      data: { title: metadata.title, shortDescription: metadata.shortDescription, icon: metadata.icon, tags: metadata.tags }
+      data: { title: metadata.title, shortDescription: metadata.shortDescription, icon: metadata.icon, tags: this.normalizeTagList(metadata.tags) }
     });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.variant.create", targetType: "TemplateVariant", targetId: variant.id });
     return variant;
@@ -1192,7 +1209,7 @@ export class AdminController {
       }
     });
     await this.prisma.templateVariant.update({ where: { id }, data: { language: metadata.language, templateIdentityId: metadata.id } });
-    await this.prisma.templateFamily.update({ where: { id: variant.familyId }, data: { title: metadata.title, shortDescription: metadata.shortDescription, icon: metadata.icon, tags: metadata.tags } });
+    await this.prisma.templateFamily.update({ where: { id: variant.familyId }, data: { title: metadata.title, shortDescription: metadata.shortDescription, icon: metadata.icon, tags: this.normalizeTagList(metadata.tags) } });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.draft.update", targetType: "TemplateDraft", targetId: draft.id });
     return draft;
   }
@@ -1382,22 +1399,88 @@ export class AdminController {
   }
 
   @Get("template-tags")
-  @ApiOperation({ summary: "List known template tags", description: "Aggregates tags used by legacy templates and repository template families." })
-  @ApiOkResponse({ description: "Known template tags.", schema: { example: ["dictation", "personal", "meeting"] } })
+  @ApiOperation({ summary: "List template tag catalog", description: "Returns shared colored template tags. Tags already used in templates but not yet cataloged are returned as inferred entries." })
+  @ApiOkResponse({ description: "Template tag catalog.", schema: { example: [{ id: "tag-uuid", slug: "dictation", name: "Dictation", color: "#0d9488", description: "Dictation templates.", source: "catalog" }] } })
   async templateTags() {
-    const [families, templates] = await Promise.all([
+    const [catalog, families, templates] = await Promise.all([
+      this.prisma.templateTag.findMany({ orderBy: { name: "asc" } }),
       this.prisma.templateFamily.findMany({ select: { tags: true } }),
       this.prisma.template.findMany({ select: { tags: true } })
     ]);
-    const tags = new Set<string>();
+    const bySlug = new Map<string, any>();
+    for (const tag of catalog) {
+      bySlug.set(tag.slug, { ...tag, source: "catalog" });
+    }
     for (const row of [...families, ...templates]) {
       if (Array.isArray(row.tags)) {
-        for (const tag of row.tags) {
-          if (typeof tag === "string" && tag.trim()) tags.add(tag.trim());
+        for (const value of row.tags) {
+          if (typeof value !== "string" || !value.trim()) continue;
+          const slug = this.normalizeTagSlug(value);
+          if (!bySlug.has(slug)) {
+            bySlug.set(slug, {
+              id: slug,
+              slug,
+              name: this.titleFromTagSlug(value),
+              color: "#64748b",
+              description: null,
+              source: "usage"
+            });
+          }
         }
       }
     }
-    return [...tags].sort((a, b) => a.localeCompare(b));
+    return [...bySlug.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  @Post("template-tags")
+  @ApiOperation({ summary: "Create template tag", description: "Superadmin only. Creates a reusable colored tag in the shared template tag catalog." })
+  @ApiBody({ type: TemplateTagDto })
+  @ApiOkResponse({ description: "Template tag created." })
+  async createTemplateTag(@Body() dto: TemplateTagDto, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const slug = this.normalizeTagSlug(dto.name);
+    await this.ensureTemplateTagSlugAvailable(slug);
+    const tag = await this.prisma.templateTag.create({ data: this.cleanTemplateTag(dto, slug) });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.tag.create", targetType: "TemplateTag", targetId: tag.id });
+    return { ...tag, source: "catalog" };
+  }
+
+  @Patch("template-tags/:id")
+  @ApiOperation({ summary: "Update template tag", description: "Superadmin only. Renaming a tag updates current template family and draft references." })
+  @ApiParam({ name: "id", description: "TemplateTag UUID." })
+  @ApiBody({ type: TemplateTagDto })
+  @ApiOkResponse({ description: "Template tag updated." })
+  async updateTemplateTag(@Param("id") id: string, @Body() dto: Partial<TemplateTagDto>, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const current = await this.prisma.templateTag.findUnique({ where: { id } });
+    if (!current) throw new NotFoundException("Template tag not found");
+    const nextSlug = dto.name !== undefined ? this.normalizeTagSlug(dto.name) : current.slug;
+    if (nextSlug !== current.slug) await this.ensureTemplateTagSlugAvailable(nextSlug, id);
+    const tag = await this.prisma.templateTag.update({
+      where: { id },
+      data: this.cleanTemplateTag({
+        name: dto.name ?? current.name,
+        color: dto.color ?? current.color,
+        description: dto.description === undefined ? current.description ?? undefined : dto.description
+      }, nextSlug)
+    });
+    if (nextSlug !== current.slug) await this.replaceTemplateTagReferences(current.slug, nextSlug);
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.tag.update", targetType: "TemplateTag", targetId: id, metadata: { previousSlug: current.slug, slug: nextSlug } });
+    return { ...tag, source: "catalog" };
+  }
+
+  @Delete("template-tags/:id")
+  @ApiOperation({ summary: "Delete template tag", description: "Superadmin only. Removes the tag from the shared catalog and current template family/draft references." })
+  @ApiParam({ name: "id", description: "TemplateTag UUID." })
+  @ApiOkResponse({ description: "Template tag deleted.", schema: { example: { success: true } } })
+  async deleteTemplateTag(@Param("id") id: string, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const tag = await this.prisma.templateTag.findUnique({ where: { id } });
+    if (!tag) throw new NotFoundException("Template tag not found");
+    await this.removeTemplateTagReferences(tag.slug);
+    await this.prisma.templateTag.delete({ where: { id } });
+    await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.tag.delete", targetType: "TemplateTag", targetId: id, metadata: { slug: tag.slug } });
+    return { success: true };
   }
 
   @Post("templates")
@@ -1417,7 +1500,7 @@ export class AdminController {
         categoryId: dto.categoryId || undefined,
         language: dto.language,
         icon: dto.icon,
-        tags: dto.tags,
+        tags: this.normalizeTagList(dto.tags),
         tenantId: dto.tenantId || undefined,
         versions: { create: { version: dto.version, yamlContent: dto.yamlContent, createdByAdminId: req.user.sub } }
       },
@@ -1443,7 +1526,7 @@ export class AdminController {
         categoryId: dto.categoryId || undefined,
         language: dto.language,
         icon: dto.icon,
-        tags: dto.tags as any,
+        tags: dto.tags === undefined ? undefined : this.normalizeTagList(dto.tags),
         tenantId: dto.tenantId || undefined
       }
     });
@@ -1785,6 +1868,106 @@ export class AdminController {
     if (dto.extractionHints !== undefined) data.extractionHints = dto.extractionHints;
     if (dto.sortOrder !== undefined) data.sortOrder = dto.sortOrder;
     return data;
+  }
+
+  private cleanTemplateTag(dto: TemplateTagDto, slug: string) {
+    return {
+      slug,
+      name: dto.name.trim(),
+      color: this.normalizeTagColor(dto.color),
+      description: this.emptyToNull(dto.description)
+    };
+  }
+
+  private normalizeTagSlug(value: string) {
+    return this.normalizeSlug(value);
+  }
+
+  private normalizeTagColor(value?: string | null) {
+    const color = value?.trim();
+    if (!color) return "#64748b";
+    if (!/^#[0-9a-f]{6}$/i.test(color)) throw new BadRequestException("Tag color must be a hex color such as #0d9488.");
+    return color.toLowerCase();
+  }
+
+  private titleFromTagSlug(value: string) {
+    return value
+      .trim()
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  private async ensureTemplateTagSlugAvailable(slug: string, currentId?: string) {
+    const existing = await this.prisma.templateTag.findUnique({ where: { slug } });
+    if (existing && existing.id !== currentId) throw new ConflictException("A tag with this name already exists.");
+  }
+
+  private normalizeTagList(tags: unknown, replace?: { from: string; to: string | null }) {
+    if (!Array.isArray(tags)) return [];
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const item of tags) {
+      if (typeof item !== "string" || !item.trim()) continue;
+      let tag = this.normalizeTagSlug(item);
+      if (replace && tag === replace.from) {
+        if (!replace.to) continue;
+        tag = replace.to;
+      }
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      result.push(tag);
+    }
+    return result;
+  }
+
+  private async replaceTemplateTagReferences(fromSlug: string, toSlug: string) {
+    await this.updateTemplateTagReferences({ from: fromSlug, to: toSlug });
+  }
+
+  private async removeTemplateTagReferences(slug: string) {
+    await this.updateTemplateTagReferences({ from: slug, to: null });
+  }
+
+  private async updateTemplateTagReferences(replace: { from: string; to: string | null }) {
+    const [families, templates, drafts] = await Promise.all([
+      this.prisma.templateFamily.findMany({ select: { id: true, tags: true } }),
+      this.prisma.template.findMany({ select: { id: true, tags: true } }),
+      this.prisma.templateDraft.findMany({ select: { id: true, yamlContent: true } })
+    ]);
+
+    for (const family of families) {
+      const tags = this.normalizeTagList(family.tags, replace);
+      await this.prisma.templateFamily.update({ where: { id: family.id }, data: { tags } });
+    }
+    for (const template of templates) {
+      const tags = this.normalizeTagList(template.tags, replace);
+      await this.prisma.template.update({ where: { id: template.id }, data: { tags } });
+    }
+    for (const draft of drafts) {
+      const yamlContent = this.rewriteTemplateDraftTags(draft.yamlContent, replace);
+      if (yamlContent !== draft.yamlContent) {
+        await this.prisma.templateDraft.update({ where: { id: draft.id }, data: { yamlContent, previewError: null } });
+      }
+    }
+  }
+
+  private rewriteTemplateDraftTags(yamlContent: string, replace: { from: string; to: string | null }) {
+    let parsed: any;
+    try {
+      parsed = yaml.load(yamlContent);
+    } catch {
+      return yamlContent;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return yamlContent;
+    const current = parsed.identity?.tags;
+    if (!Array.isArray(current)) return yamlContent;
+    const nextTags = this.normalizeTagList(current, replace);
+    const currentKey = JSON.stringify(this.normalizeTagList(current));
+    const nextKey = JSON.stringify(nextTags);
+    if (currentKey === nextKey) return yamlContent;
+    parsed.identity = { ...(parsed.identity ?? {}), tags: nextTags };
+    return yaml.dump(parsed, { lineWidth: 100, noRefs: true, sortKeys: false });
   }
 
   private async cleanAdminUser(dto: AdminUserCreateDto | AdminUserUpdateDto, creating: boolean) {

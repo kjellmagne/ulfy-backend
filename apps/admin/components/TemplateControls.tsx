@@ -1,6 +1,7 @@
 "use client";
 
-import { KeyboardEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import {
   AudioWaveform,
   BadgeCheck,
@@ -68,6 +69,15 @@ export type TemplateSectionPresetOption = {
   extractionHints?: string[];
   extraction_hints?: string[];
   sortOrder?: number;
+};
+
+export type TemplateTagOption = {
+  id: string;
+  slug: string;
+  name: string;
+  color: string;
+  description?: string | null;
+  source?: "catalog" | "usage";
 };
 
 export const sfSymbolOptions = [
@@ -261,37 +271,53 @@ export function TagEditor({
   value,
   options,
   onChange,
+  onCreateTag,
   placeholder = "Add tags"
 }: {
   value: string[];
-  options: string[];
+  options: Array<TemplateTagOption | string>;
   onChange: (nextTags: string[]) => void;
+  onCreateTag?: (name: string) => Promise<TemplateTagOption | null>;
   placeholder?: string;
 }) {
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
-  const normalizedValue = uniqueTags(value);
-  const optionTags = uniqueTags(options);
-  const query = normalizeTag(draft).toLowerCase();
-  const selectedLookup = new Set(normalizedValue.map((tag) => tag.toLowerCase()));
-  const availableOptions = optionTags.filter((tag) => !selectedLookup.has(tag.toLowerCase()));
-  const matchingOptions = query ? availableOptions.filter((tag) => tag.toLowerCase().includes(query)) : availableOptions;
-  const exactOption = optionTags.find((tag) => tag.toLowerCase() === query);
-  const canCreate = Boolean(query && !selectedLookup.has(query) && !exactOption);
+  const optionTags = normalizeTagOptions(options);
+  const normalizedValue = uniqueTagSlugs(value);
+  const query = normalizeTag(draft);
+  const querySlug = tagSlug(query);
+  const selectedLookup = new Set(normalizedValue);
+  const optionBySlug = new Map(optionTags.map((tag) => [tag.slug, tag]));
+  const availableOptions = optionTags.filter((tag) => !selectedLookup.has(tag.slug));
+  const matchingOptions = query
+    ? availableOptions.filter((tag) => tag.name.toLowerCase().includes(query.toLowerCase()) || tag.slug.includes(querySlug))
+    : availableOptions;
+  const exactOption = optionTags.find((tag) => tag.slug === querySlug || tag.name.toLowerCase() === query.toLowerCase());
+  const canCreate = Boolean(query && querySlug && !selectedLookup.has(querySlug) && !exactOption);
   const menuItems = [
-    ...(canCreate ? [{ kind: "create" as const, value: normalizeTag(draft), label: `Create "${normalizeTag(draft)}"` }] : []),
-    ...matchingOptions.slice(0, 10).map((tag) => ({ kind: "option" as const, value: tag, label: tag }))
+    ...(canCreate ? [{ kind: "create" as const, value: query, label: `Create "${query}"` }] : []),
+    ...matchingOptions.slice(0, 10).map((tag) => ({ kind: "option" as const, value: tag.slug, label: tag.name, tag }))
   ];
 
-  function addTag(tag: string) {
-    const normalized = canonicalTag(tag, optionTags);
-    if (!normalized || normalizedValue.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
+  async function addTag(tag: string, createIfMissing = false) {
+    let option = optionBySlug.get(tagSlug(tag)) ?? optionTags.find((item) => item.name.toLowerCase() === normalizeTag(tag).toLowerCase());
+    if (!option && createIfMissing && onCreateTag) {
+      const created = await onCreateTag(normalizeTag(tag));
+      if (!created) {
+        setDraft("");
+        setOpen(false);
+        return;
+      }
+      option = created;
+    }
+    const slug = option?.slug ?? tagSlug(tag);
+    if (!slug || normalizedValue.includes(slug)) {
       setDraft("");
       setOpen(false);
       return;
     }
-    onChange([...normalizedValue, normalized]);
+    onChange([...normalizedValue, slug]);
     setDraft("");
     setOpen(false);
   }
@@ -324,7 +350,7 @@ export function TagEditor({
     if (event.key === "Enter" || event.key === ",") {
       event.preventDefault();
       const selectedItem = open ? menuItems[activeIndex] : undefined;
-      addTag(selectedItem?.value ?? draft);
+      void addTag(selectedItem?.value ?? draft, selectedItem?.kind === "create" || !selectedItem);
     }
   }
 
@@ -336,12 +362,15 @@ export function TagEditor({
       }}
     >
       <div className={`tag-combobox${open ? " open" : ""}`} onClick={() => setOpen(true)}>
-        {normalizedValue.map((tag) => (
-          <button key={tag} type="button" className="tag-badge" onClick={() => removeTag(tag)} title={`Remove ${tag}`}>
-            {tag}
-            <X size={12} />
+        {normalizedValue.map((slug) => {
+          const tag = optionBySlug.get(slug) ?? inferredTagOption(slug);
+          return (
+          <button key={slug} type="button" className="tag-badge catalog-tag-chip" style={tagStyle(tag.color)} onClick={() => removeTag(slug)} title={tag.description ? `${tag.name}: ${tag.description}` : `Remove ${tag.name}`}>
+            <span>{tag.name}</span>
+            <X className="tag-remove-icon" size={12} />
           </button>
-        ))}
+          );
+        })}
         <input
           value={draft}
           onChange={(event) => {
@@ -365,16 +394,38 @@ export function TagEditor({
               className={index === activeIndex ? "active" : undefined}
               onMouseDown={(event) => {
                 event.preventDefault();
-                addTag(item.value);
+                void addTag(item.value, item.kind === "create");
               }}
             >
-              <span>{item.label}</span>
-              {item.kind === "create" && <small>New tag</small>}
+              <span className="tag-menu-label">
+                {item.kind === "option" && <span className="tag-color-dot" style={tagStyle(item.tag.color)} />}
+                <span>{item.label}</span>
+              </span>
+              <small>{item.kind === "create" ? "New tag" : item.tag.source === "usage" ? "Used" : "Catalog"}</small>
             </button>
           ))}
           {!menuItems.length && <div className="tag-menu-empty">No matches</div>}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+export function TagChipList({ tags, options }: { tags: string[]; options: Array<TemplateTagOption | string> }) {
+  const optionTags = normalizeTagOptions(options);
+  const optionBySlug = new Map(optionTags.map((tag) => [tag.slug, tag]));
+  const values = uniqueTagSlugs(tags);
+  if (!values.length) return null;
+  return (
+    <div className="template-family-tags">
+      {values.map((slug) => {
+        const tag = optionBySlug.get(slug) ?? inferredTagOption(slug);
+        return (
+          <span key={slug} className="catalog-tag-chip" style={tagStyle(tag.color)} title={tag.description ? `${tag.name}: ${tag.description}` : tag.name}>
+            {tag.name}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -401,21 +452,51 @@ function normalizeTag(tag: string) {
   return tag.trim().replace(/\s+/g, " ");
 }
 
-function canonicalTag(tag: string, options: string[]) {
-  const normalized = normalizeTag(tag);
-  if (!normalized) return "";
-  return options.find((option) => option.toLowerCase() === normalized.toLowerCase()) ?? normalized;
+function tagSlug(tag: string) {
+  return normalizeTag(tag).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function uniqueTags(tags: string[]) {
+function uniqueTagSlugs(tags: string[]) {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const tag of tags) {
-    const normalized = normalizeTag(tag);
-    const key = normalized.toLowerCase();
-    if (!normalized || seen.has(key)) continue;
-    seen.add(key);
-    result.push(normalized);
+    const slug = tagSlug(tag);
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    result.push(slug);
   }
   return result;
+}
+
+function normalizeTagOptions(options: Array<TemplateTagOption | string>) {
+  const seen = new Set<string>();
+  const tags: TemplateTagOption[] = [];
+  for (const option of options) {
+    const tag = typeof option === "string" ? inferredTagOption(option) : {
+      ...option,
+      slug: tagSlug(option.slug || option.name),
+      name: normalizeTag(option.name || option.slug),
+      color: option.color || "#64748b"
+    };
+    if (!tag.slug || seen.has(tag.slug)) continue;
+    seen.add(tag.slug);
+    tags.push(tag);
+  }
+  return tags.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function inferredTagOption(value: string): TemplateTagOption {
+  const slug = tagSlug(value);
+  return {
+    id: slug,
+    slug,
+    name: normalizeTag(value).replace(/[-_]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    color: "#64748b",
+    description: null,
+    source: "usage"
+  };
+}
+
+function tagStyle(color: string) {
+  return { "--tag-color": color } as CSSProperties;
 }

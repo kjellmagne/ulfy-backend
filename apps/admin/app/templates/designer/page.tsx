@@ -6,7 +6,7 @@ import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, IconAction, LoadingPanel, StatusBadge } from "../../../components/AdminUI";
 import { IconPicker, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
-import type { TemplateCategoryOption, TemplateSectionPresetOption } from "../../../components/TemplateControls";
+import type { TemplateCategoryOption, TemplateSectionPresetOption, TemplateTagOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../../components/ToastProvider";
 import { api } from "../../../lib/api";
@@ -248,7 +248,7 @@ export default function TemplateDesignerRoute() {
   const [variant, setVariant] = useState<Variant | null>(null);
   const [categories, setCategories] = useState<TemplateCategoryOption[]>([]);
   const [sectionPresetRows, setSectionPresetRows] = useState<TemplateSectionPresetOption[]>([]);
-  const [tagOptions, setTagOptions] = useState<string[]>([]);
+  const [tagOptions, setTagOptions] = useState<TemplateTagOption[]>([]);
   const [variantForm, setVariantForm] = useState<VariantForm>(blankVariantForm);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -277,7 +277,7 @@ export default function TemplateDesignerRoute() {
         api("/admin/template-categories"),
         api("/admin/template-section-presets"),
         api("/admin/template-tags")
-      ]) as [Family[], TemplateCategoryOption[], TemplateSectionPresetOption[], string[]];
+      ]) as [Family[], TemplateCategoryOption[], TemplateSectionPresetOption[], TemplateTagOption[]];
       const presetSections = sectionRows.length ? sectionRows.map(presetToTemplateSection) : fallbackSectionPresets;
       const nextFamily = families.find((item) => item.id === familyId) ?? null;
       if (!nextFamily) {
@@ -386,6 +386,18 @@ export default function TemplateDesignerRoute() {
   function updateLanguage(value: string) {
     updateVariantForm((current) => ({ ...current, language: value }));
     updateIdentity("language", value);
+  }
+
+  async function createTemplateTag(name: string) {
+    try {
+      const tag = await api("/admin/template-tags", { method: "POST", body: JSON.stringify({ name }) });
+      setTagOptions((current) => [...current.filter((item) => item.slug !== tag.slug), tag].sort((a, b) => a.name.localeCompare(b.name)));
+      notify({ title: "Tag created", message: `${tag.name} was added to the shared catalog.`, tone: "success" });
+      return tag;
+    } catch (err) {
+      notify({ title: "Tag was not created", message: getErrorMessage(err), tone: "danger" });
+      return null;
+    }
   }
 
   function updateSection(index: number, patch: Partial<TemplateSection>) {
@@ -787,7 +799,7 @@ export default function TemplateDesignerRoute() {
                   </div>
                   <div className="field wide">
                     <FieldLabel>Tags</FieldLabel>
-                    <TagEditor value={templateIdentity?.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} />
+                    <TagEditor value={templateIdentity?.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} onCreateTag={createTemplateTag} />
                   </div>
                 </div>
               </section>

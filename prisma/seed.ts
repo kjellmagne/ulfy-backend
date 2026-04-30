@@ -3,6 +3,7 @@ import * as bcrypt from "bcryptjs";
 import { createHash, randomBytes } from "crypto";
 
 const prisma = new PrismaClient();
+const tagColors = ["#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#15803d", "#475569"];
 
 function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -244,6 +245,23 @@ async function seedTemplateSectionPresets() {
 }
 
 async function seedTemplateRepository(tenantId: string) {
+  const seedTagNames = [...new Set(seedTemplates.flatMap((template) => template.tags))];
+  for (const [index, tag] of seedTagNames.entries()) {
+    await prisma.templateTag.upsert({
+      where: { slug: tag },
+      update: {
+        name: titleFromTagSlug(tag),
+        color: tagColors[index % tagColors.length]
+      },
+      create: {
+        slug: tag,
+        name: titleFromTagSlug(tag),
+        color: tagColors[index % tagColors.length],
+        description: `${titleFromTagSlug(tag)} templates.`
+      }
+    });
+  }
+
   for (const template of seedTemplates) {
     const yamlContent = templateYaml(template);
     const category = await prisma.templateCategory.upsert({
@@ -347,6 +365,14 @@ async function seedTemplateRepository(tenantId: string) {
     }
   });
   await prisma.template.update({ where: { id: legacyTemplate.id }, data: { publishedVersionId: legacyVersion.id } });
+}
+
+function titleFromTagSlug(value: string) {
+  return value
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function defaultProviderProfiles() {

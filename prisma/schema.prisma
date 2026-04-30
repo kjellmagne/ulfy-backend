@@ -240,6 +240,16 @@ model TemplateSectionPreset {
   updatedAt       DateTime @updatedAt
 }
 
+model TemplateTag {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  name        String
+  color       String   @default("#64748b")
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Template {
   id               String            @id @default(uuid())
   title            String

@@ -3112,6 +3112,38 @@ textarea {
   font-weight: 700;
   cursor: pointer;
 }
+.catalog-tag-chip {
+  --tag-color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--tag-color) 34%, white);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tag-color) 12%, white);
+  color: color-mix(in srgb, var(--tag-color) 74%, #0f172a);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+.tag-badge.catalog-tag-chip {
+  min-height: 26px;
+  cursor: pointer;
+}
+.tag-remove-icon {
+  opacity: 0;
+  width: 0;
+  margin-left: -4px;
+  transition: opacity 130ms ease, width 130ms ease, margin 130ms ease;
+}
+.tag-badge:hover .tag-remove-icon,
+.tag-badge:focus-visible .tag-remove-icon {
+  opacity: 1;
+  width: 12px;
+  margin-left: 0;
+}
 .tag-badge:hover {
   border-color: var(--line-strong);
   background: #fff;
@@ -3173,11 +3205,67 @@ textarea {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+.tag-menu-label {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+.tag-color-dot {
+  --tag-color: #64748b;
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--tag-color);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tag-color) 18%, white);
+}
 .tag-menu-empty {
   padding: 10px 9px;
   color: #94a3b8;
   font-size: 12px;
   font-weight: 600;
+}
+.tag-color-field {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+}
+.tag-color-field input[type="color"] {
+  width: 44px;
+  height: 38px;
+  padding: 3px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
+.tag-color-presets,
+.tag-preview-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tag-color-presets button {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.tag-color-presets button.active {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.tag-preview-row {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 /* Responsive */

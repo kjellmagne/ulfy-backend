@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Bot, Edit3, KeyRound, Plus, Save, ShieldCheck, Trash2 } from "lucide-react";
+import type { CSSProperties } from "react";
+import { Bot, Edit3, KeyRound, Plus, Save, ShieldCheck, Tag, Trash2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
 import { RequireAuth } from "../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
@@ -25,22 +26,27 @@ type PreviewProviderSetting = {
   apiKeyConfigured: boolean;
   apiKeyPreview?: string | null;
 };
+type TemplateTag = { id: string; slug: string; name: string; color: string; description?: string | null; source?: "catalog" | "usage" };
 
 const blankCategory = { id: "", slug: "", title: "", description: "" };
 const blankSection = { id: "", slug: "", title: "", purpose: "", format: "prose", required: false, extractionHintsText: "", sortOrder: 0 };
+const blankTag = { id: "", name: "", color: "#0d9488", description: "" };
 const blankPreviewProvider = { providerType: "openai-compatible", endpointUrl: "", model: "", apiKey: "" };
 
 export default function SettingsPage() {
   const [me, setMe] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sections, setSections] = useState<SectionPreset[]>([]);
+  const [tags, setTags] = useState<TemplateTag[]>([]);
   const [previewProvider, setPreviewProvider] = useState<PreviewProviderSetting | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categoryPanel, setCategoryPanel] = useState(false);
   const [sectionPanel, setSectionPanel] = useState(false);
+  const [tagPanel, setTagPanel] = useState(false);
   const [categoryForm, setCategoryForm] = useState(blankCategory);
   const [sectionForm, setSectionForm] = useState(blankSection);
+  const [tagForm, setTagForm] = useState(blankTag);
   const [previewProviderForm, setPreviewProviderForm] = useState(blankPreviewProvider);
   const { notify } = useToast();
 
@@ -49,14 +55,16 @@ export default function SettingsPage() {
     try {
       const current = await api("/admin/me");
       const canReadPreviewProvider = isSuperadminRole(current?.role);
-      const [categoryRows, sectionRows, previewSetting] = await Promise.all([
+      const [categoryRows, sectionRows, tagRows, previewSetting] = await Promise.all([
         api("/admin/template-categories"),
         api("/admin/template-section-presets"),
+        api("/admin/template-tags"),
         canReadPreviewProvider ? api("/admin/settings/template-preview-provider") : Promise.resolve(null)
       ]);
       setMe(current);
       setCategories(categoryRows);
       setSections(sectionRows);
+      setTags(tagRows);
       setPreviewProvider(previewSetting);
       setPreviewProviderForm(previewSetting ? {
         providerType: previewSetting.providerType ?? "openai-compatible",
@@ -76,8 +84,9 @@ export default function SettingsPage() {
   const stats = useMemo(() => ({
     categories: categories.length,
     sections: sections.length,
+    tags: tags.length,
     required: sections.filter((section) => section.required).length
-  }), [categories, sections]);
+  }), [categories, sections, tags]);
   const canManageSettings = isSuperadminRole(me?.role);
 
   function openCategory(category?: Category) {
@@ -102,6 +111,16 @@ export default function SettingsPage() {
       sortOrder: section.sortOrder ?? 0
     } : blankSection);
     setSectionPanel(true);
+  }
+
+  function openTag(tag?: TemplateTag) {
+    setTagForm(tag ? {
+      id: tag.source === "usage" ? "" : tag.id,
+      name: tag.name,
+      color: tag.color || "#64748b",
+      description: tag.description ?? ""
+    } : blankTag);
+    setTagPanel(true);
   }
 
   async function saveCategory() {
@@ -166,6 +185,37 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveTag() {
+    setSaving(true);
+    try {
+      const payload = { name: tagForm.name, color: tagForm.color, description: tagForm.description || undefined };
+      const path = tagForm.id ? `/admin/template-tags/${tagForm.id}` : "/admin/template-tags";
+      await api(path, { method: tagForm.id ? "PATCH" : "POST", body: JSON.stringify(payload) });
+      notify({ title: "Tag saved", tone: "success" });
+      setTagPanel(false);
+      await load();
+    } catch (err) {
+      notify({ title: "Tag was not saved", message: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteTag(tag: TemplateTag) {
+    if (tag.source === "usage") {
+      notify({ title: "Tag is inferred", message: "Create it in the catalog first if you want to manage it globally.", tone: "info" });
+      return;
+    }
+    if (!confirm(`Delete tag "${tag.name}" from the shared catalog and current template references?`)) return;
+    try {
+      await api(`/admin/template-tags/${tag.id}`, { method: "DELETE" });
+      notify({ title: "Tag deleted", tone: "success" });
+      await load();
+    } catch (err) {
+      notify({ title: "Tag was not deleted", message: getErrorMessage(err), tone: "danger" });
+    }
+  }
+
   async function savePreviewProvider() {
     setSaving(true);
     try {
@@ -200,9 +250,10 @@ export default function SettingsPage() {
       {loading ? <LoadingPanel label="Loading settings" /> : (
         <div className="page-stack">
           {!canManageSettings && <Alert tone="info">Only superadmins can create, edit or delete shared settings. AI preview provider configuration is hidden from non-superadmins.</Alert>}
-          <div className="grid three">
+          <div className="grid four">
             <StatCard label="Categories" value={stats.categories} icon={<Edit3 size={18} />} sub="template groups" />
             <StatCard label="Sections" value={stats.sections} icon={<Edit3 size={18} />} sub="builder presets" />
+            <StatCard label="Tags" value={stats.tags} icon={<Tag size={18} />} sub="colored chips" />
             <StatCard label="Required" value={stats.required} icon={<Edit3 size={18} />} sub="default required sections" />
           </div>
 
@@ -259,6 +310,32 @@ export default function SettingsPage() {
           <div className="settings-grid">
             <section className="panel">
               <PanelHeader
+                title="Template tags"
+                description="Shared colored chips used by template families and YAML identity metadata."
+                actions={<IconAction label="New tag" tone="primary" onClick={() => openTag()} disabled={!canManageSettings}><Plus size={15} /></IconAction>}
+              />
+              {!tags.length ? <EmptyState title="No tags" message="Create reusable chips for template filtering and visual context." /> : (
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead><tr><th>Tag</th><th>Slug</th><th>Source</th><th className="actions">Actions</th></tr></thead>
+                    <tbody>{tags.map((tag) => (
+                      <tr key={tag.id}>
+                        <td><span className="catalog-tag-chip" style={tagStyle(tag.color)} title={tag.description ?? tag.name}>{tag.name}</span><br /><span className="muted">{tag.description || "No description"}</span></td>
+                        <td><span className="code">{tag.slug}</span></td>
+                        <td><span className={`badge ${tag.source === "usage" ? "status-draft" : "status-active"}`}>{tag.source === "usage" ? "Inferred" : "Catalog"}</span></td>
+                        <td className="actions">
+                          <IconAction label={tag.source === "usage" ? "Create catalog tag" : "Edit tag"} onClick={() => openTag(tag)} disabled={!canManageSettings}>{tag.source === "usage" ? <Plus size={14} /> : <Edit3 size={14} />}</IconAction>
+                          <IconAction label="Delete tag" tone="danger" onClick={() => deleteTag(tag)} disabled={!canManageSettings || tag.source === "usage"}><Trash2 size={14} /></IconAction>
+                        </td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className="panel">
+              <PanelHeader
                 title="Template categories"
                 description="Used by template families and the designer category dropdown."
                 actions={<IconAction label="New category" tone="primary" onClick={() => openCategory()} disabled={!canManageSettings}><Plus size={15} /></IconAction>}
@@ -312,6 +389,34 @@ export default function SettingsPage() {
       )}
 
       <SidePanel
+        open={tagPanel}
+        title={tagForm.id ? "Edit Tag" : "New Tag"}
+        description="Tags are shared colored chips. Templates store the tag slug, while the admin resolves name, color and description from this catalog."
+        onClose={() => setTagPanel(false)}
+        footer={<><button className="button secondary" onClick={() => setTagPanel(false)}>Cancel</button><button className="button" onClick={saveTag} disabled={saving}><Save size={15} /> Save</button></>}
+      >
+        <FormSection title="Tag details" description="Duplicate names are not allowed. Descriptions appear as hover context on compact chips.">
+          <div className="grid two">
+            <div className="field"><FieldLabel>Name</FieldLabel><input className="input" value={tagForm.name} onChange={(event) => setTagForm({ ...tagForm, name: event.target.value })} placeholder="Dictation" /></div>
+            <div className="field">
+              <FieldLabel>Color</FieldLabel>
+              <div className="tag-color-field">
+                <input type="color" value={tagForm.color} onChange={(event) => setTagForm({ ...tagForm, color: event.target.value })} aria-label="Tag color" />
+                <input className="input" value={tagForm.color} onChange={(event) => setTagForm({ ...tagForm, color: event.target.value })} placeholder="#0d9488" />
+              </div>
+            </div>
+          </div>
+          <div className="tag-color-presets" aria-label="Tag color presets">
+            {["#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#15803d", "#475569"].map((color) => (
+              <button key={color} type="button" className={tagForm.color.toLowerCase() === color ? "active" : undefined} style={{ background: color }} onClick={() => setTagForm({ ...tagForm, color })} aria-label={`Use ${color}`} />
+            ))}
+          </div>
+          <div className="field"><FieldLabel>Description</FieldLabel><textarea value={tagForm.description} onChange={(event) => setTagForm({ ...tagForm, description: event.target.value })} placeholder="Short context shown when hovering over the chip" /></div>
+          {tagForm.name && <div className="tag-preview-row"><span>Preview</span><span className="catalog-tag-chip" style={tagStyle(tagForm.color)}>{tagForm.name}</span></div>}
+        </FormSection>
+      </SidePanel>
+
+      <SidePanel
         open={categoryPanel}
         title={categoryForm.id ? "Edit Category" : "New Category"}
         description="Categories become dropdown choices in template family and designer metadata."
@@ -354,6 +459,10 @@ export default function SettingsPage() {
 
 function textToList(value: string) {
   return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+}
+
+function tagStyle(color: string) {
+  return { "--tag-color": color } as CSSProperties;
 }
 
 function isSuperadminRole(role?: string | null) {
