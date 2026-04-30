@@ -8,6 +8,7 @@ import { mobileError } from "../activation/activation.service";
 import { tokenHash } from "../common/crypto";
 
 const SemverSchema = z.string().regex(/^\d+\.\d+\.\d+$/, "identity.version must use semver x.y.z, such as 1.0.0.");
+const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
 
 export const AppTemplateYamlSchema = z.object({
   identity: z.object({
@@ -282,13 +283,10 @@ export class TemplatesService {
     const draft = await this.prisma.templateDraft.findUnique({ where: { id: draftId }, include: { variant: { include: { family: true } } } });
     if (!draft) throw new NotFoundException("Template draft not found");
     const parsed = this.validateYamlContent(draft.yamlContent);
-    const providerType = process.env.TEMPLATE_PREVIEW_PROVIDER_TYPE ?? "openai-compatible";
-    const endpoint = process.env.TEMPLATE_PREVIEW_ENDPOINT_URL;
-    const apiKey = process.env.TEMPLATE_PREVIEW_API_KEY;
-    const model = process.env.TEMPLATE_PREVIEW_MODEL;
+    const { providerType, endpoint, apiKey, model } = await this.previewProviderConfig();
 
     if (!endpoint || !apiKey || !model) {
-      const message = "Preview provider is not configured. Set TEMPLATE_PREVIEW_ENDPOINT_URL, TEMPLATE_PREVIEW_API_KEY and TEMPLATE_PREVIEW_MODEL.";
+      const message = "Preview provider is not configured. Configure Settings > AI preview provider or set TEMPLATE_PREVIEW_ENDPOINT_URL, TEMPLATE_PREVIEW_API_KEY and TEMPLATE_PREVIEW_MODEL.";
       await this.prisma.templateDraft.update({ where: { id: draftId }, data: { previewError: message } });
       throw new BadRequestException(message);
     }
@@ -357,6 +355,27 @@ export class TemplatesService {
       provider: draft.previewProviderType ? { type: draft.previewProviderType, model: draft.previewProviderModel } : null,
       generatedAt: draft.previewGeneratedAt?.toISOString() ?? null,
       error: draft.previewError ?? null
+    };
+  }
+
+  private async previewProviderConfig() {
+    const setting = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
+    const stored = this.previewProviderSettingValue(setting?.value);
+    return {
+      providerType: stored.providerType || process.env.TEMPLATE_PREVIEW_PROVIDER_TYPE || "openai-compatible",
+      endpoint: stored.endpointUrl || process.env.TEMPLATE_PREVIEW_ENDPOINT_URL || null,
+      apiKey: stored.apiKey || process.env.TEMPLATE_PREVIEW_API_KEY || null,
+      model: stored.model || process.env.TEMPLATE_PREVIEW_MODEL || null
+    };
+  }
+
+  private previewProviderSettingValue(value: unknown) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    return {
+      providerType: typeof source.providerType === "string" && source.providerType.trim() ? source.providerType.trim() : null,
+      endpointUrl: typeof source.endpointUrl === "string" && source.endpointUrl.trim() ? source.endpointUrl.trim() : null,
+      apiKey: typeof source.apiKey === "string" && source.apiKey.trim() ? source.apiKey.trim() : null,
+      model: typeof source.model === "string" && source.model.trim() ? source.model.trim() : null
     };
   }
 

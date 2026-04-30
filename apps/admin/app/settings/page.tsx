@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Plus, Save, Trash2 } from "lucide-react";
+import { Bot, Edit3, KeyRound, Plus, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
 import { RequireAuth } from "../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
@@ -18,33 +18,52 @@ type SectionPreset = {
   extractionHints: string[];
   sortOrder: number;
 };
+type PreviewProviderSetting = {
+  providerType: string;
+  endpointUrl?: string | null;
+  model?: string | null;
+  apiKeyConfigured: boolean;
+  apiKeyPreview?: string | null;
+};
 
 const blankCategory = { id: "", slug: "", title: "", description: "" };
 const blankSection = { id: "", slug: "", title: "", purpose: "", format: "prose", required: false, extractionHintsText: "", sortOrder: 0 };
+const blankPreviewProvider = { providerType: "openai-compatible", endpointUrl: "", model: "", apiKey: "" };
 
 export default function SettingsPage() {
   const [me, setMe] = useState<any>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [sections, setSections] = useState<SectionPreset[]>([]);
+  const [previewProvider, setPreviewProvider] = useState<PreviewProviderSetting | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categoryPanel, setCategoryPanel] = useState(false);
   const [sectionPanel, setSectionPanel] = useState(false);
   const [categoryForm, setCategoryForm] = useState(blankCategory);
   const [sectionForm, setSectionForm] = useState(blankSection);
+  const [previewProviderForm, setPreviewProviderForm] = useState(blankPreviewProvider);
   const { notify } = useToast();
 
   async function load() {
     setLoading(true);
     try {
-      const [current, categoryRows, sectionRows] = await Promise.all([
-        api("/admin/me"),
+      const current = await api("/admin/me");
+      const canReadPreviewProvider = isSuperadminRole(current?.role);
+      const [categoryRows, sectionRows, previewSetting] = await Promise.all([
         api("/admin/template-categories"),
-        api("/admin/template-section-presets")
+        api("/admin/template-section-presets"),
+        canReadPreviewProvider ? api("/admin/settings/template-preview-provider") : Promise.resolve(null)
       ]);
       setMe(current);
       setCategories(categoryRows);
       setSections(sectionRows);
+      setPreviewProvider(previewSetting);
+      setPreviewProviderForm(previewSetting ? {
+        providerType: previewSetting.providerType ?? "openai-compatible",
+        endpointUrl: previewSetting.endpointUrl ?? "",
+        model: previewSetting.model ?? "",
+        apiKey: ""
+      } : blankPreviewProvider);
     } catch (err) {
       notify({ title: "Settings failed to load", message: getErrorMessage(err), tone: "danger" });
     } finally {
@@ -147,6 +166,31 @@ export default function SettingsPage() {
     }
   }
 
+  async function savePreviewProvider() {
+    setSaving(true);
+    try {
+      const payload: Record<string, string> = {
+        providerType: previewProviderForm.providerType,
+        endpointUrl: previewProviderForm.endpointUrl,
+        model: previewProviderForm.model
+      };
+      if (previewProviderForm.apiKey.trim()) payload.apiKey = previewProviderForm.apiKey.trim();
+      const setting = await api("/admin/settings/template-preview-provider", { method: "PATCH", body: JSON.stringify(payload) });
+      setPreviewProvider(setting);
+      setPreviewProviderForm({
+        providerType: setting.providerType ?? "openai-compatible",
+        endpointUrl: setting.endpointUrl ?? "",
+        model: setting.model ?? "",
+        apiKey: ""
+      });
+      notify({ title: "AI preview provider saved", tone: "success" });
+    } catch (err) {
+      notify({ title: "AI preview provider was not saved", message: getErrorMessage(err), tone: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <RequireAuth>
       <PageHeader
@@ -155,12 +199,62 @@ export default function SettingsPage() {
       />
       {loading ? <LoadingPanel label="Loading settings" /> : (
         <div className="page-stack">
-          {!canManageSettings && <Alert tone="info">Only superadmins can create, edit or delete these shared template settings.</Alert>}
+          {!canManageSettings && <Alert tone="info">Only superadmins can create, edit or delete shared settings. AI preview provider configuration is hidden from non-superadmins.</Alert>}
           <div className="grid three">
             <StatCard label="Categories" value={stats.categories} icon={<Edit3 size={18} />} sub="template groups" />
             <StatCard label="Sections" value={stats.sections} icon={<Edit3 size={18} />} sub="builder presets" />
             <StatCard label="Required" value={stats.required} icon={<Edit3 size={18} />} sub="default required sections" />
           </div>
+
+          {canManageSettings && (
+            <section className="panel">
+              <PanelHeader
+                title="AI preview provider"
+                description="Superadmin-only provider used when admins manually generate template previews from a draft and sample transcript."
+                actions={<span className={`badge ${previewProvider?.apiKeyConfigured ? "status-active" : "status-draft"}`}>{previewProvider?.apiKeyConfigured ? "API key saved" : "No API key"}</span>}
+              />
+              <div className="settings-provider-panel">
+                <div className="settings-provider-summary">
+                  <div className="settings-provider-icon"><Bot size={20} /></div>
+                  <div>
+                    <strong>Manual preview generation</strong>
+                    <span>The template designer calls this one central provider only when Preview/Refresh is pressed. The raw API key is never shown after saving.</span>
+                  </div>
+                </div>
+                <div className="grid three">
+                  <div className="field">
+                    <FieldLabel help="Metadata label for the provider. The current preview runner expects an OpenAI-compatible chat-completions endpoint.">Provider type</FieldLabel>
+                    <select value={previewProviderForm.providerType} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, providerType: event.target.value })}>
+                      <option value="openai-compatible">OpenAI-compatible</option>
+                      <option value="openai">OpenAI</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <FieldLabel help="Full chat-completions URL used by the backend preview runner. For OpenAI this is normally https://api.openai.com/v1/chat/completions.">Endpoint URL</FieldLabel>
+                    <input className="input" value={previewProviderForm.endpointUrl} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, endpointUrl: event.target.value })} placeholder="https://api.openai.com/v1/chat/completions" />
+                  </div>
+                  <div className="field">
+                    <FieldLabel help="Model used for preview generation only. This does not affect tenant runtime policies.">Model</FieldLabel>
+                    <input className="input" value={previewProviderForm.model} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, model: event.target.value })} placeholder="gpt-5-mini" />
+                  </div>
+                </div>
+                <div className="grid two">
+                  <div className="field">
+                    <FieldLabel help="Write-only secret for the preview provider. Leave blank to keep the saved key; enter a new value to replace it.">API key</FieldLabel>
+                    <input className="input" type="password" value={previewProviderForm.apiKey} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, apiKey: event.target.value })} placeholder={previewProvider?.apiKeyPreview ? `Saved: ${previewProvider.apiKeyPreview}` : "Paste preview provider API key"} />
+                  </div>
+                  <div className="settings-provider-safe">
+                    <ShieldCheck size={16} />
+                    <span>Visible and editable by superadmins only.</span>
+                    {previewProvider?.apiKeyConfigured && <span><KeyRound size={14} /> Saved key is masked.</span>}
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button className="button" type="button" onClick={savePreviewProvider} disabled={saving}><Save size={15} /> Save preview provider</button>
+                </div>
+              </div>
+            </section>
+          )}
 
           <div className="settings-grid">
             <section className="panel">

@@ -30,7 +30,6 @@ import {
   Mic,
   NotebookText,
   Phone,
-  Plus,
   Quote,
   RefreshCw,
   RotateCw,
@@ -50,7 +49,7 @@ import {
   X,
   type LucideIcon
 } from "lucide-react";
-import { FieldLabel } from "./AdminUI";
+import { Modal } from "./AdminUI";
 
 export type TemplateCategoryOption = {
   id: string;
@@ -202,6 +201,7 @@ export function TemplateIcon({ symbol, size = 18 }: { symbol?: string | null; si
 
 export function IconPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
   const filteredSymbols = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return sfSymbolOptions;
@@ -210,33 +210,49 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (valu
 
   return (
     <div className="icon-picker">
-      <div className="icon-picker-current">
+      <button type="button" className="icon-picker-trigger" onClick={() => setOpen(true)}>
         <span className="sf-symbol-tile" title={`Web preview for ${value || "doc.text"}`}>
           <TemplateIcon symbol={value || "doc.text"} />
         </span>
-        <div>
-          <FieldLabel>SF Symbol</FieldLabel>
-          <input className="input" value={value} onChange={(event) => onChange(event.target.value)} placeholder="doc.text" />
+        <span className="icon-picker-trigger-copy">
+          <strong>Template icon</strong>
+          <span>Click to choose</span>
+        </span>
+      </button>
+
+      <Modal
+        open={open}
+        title="Choose template icon"
+        description="Pick the visual icon used in the admin. The stored template value remains compatible with the iOS app."
+        onClose={() => setOpen(false)}
+        wide
+      >
+        <div className="icon-picker-dialog">
+          <label className="icon-search">
+            <Search size={14} />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search icons" autoFocus />
+          </label>
+          <div className="icon-picker-grid icon-picker-grid-icons" role="listbox" aria-label="Template icons">
+            {filteredSymbols.map((symbol) => (
+              <button
+                key={symbol}
+                type="button"
+                className={symbol === value ? "selected" : undefined}
+                onClick={() => {
+                  onChange(symbol);
+                  setOpen(false);
+                }}
+                title={symbol}
+                aria-label={`Use ${symbol}`}
+                aria-selected={symbol === value}
+              >
+                <TemplateIcon symbol={symbol} size={21} />
+              </button>
+            ))}
+          </div>
+          {!filteredSymbols.length && <div className="model-menu-empty">No matching icons.</div>}
         </div>
-      </div>
-      <label className="icon-search">
-        <Search size={14} />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search SF Symbols" />
-      </label>
-      <div className="icon-picker-grid" role="listbox" aria-label="SF Symbols">
-        {filteredSymbols.map((symbol) => (
-          <button
-            key={symbol}
-            type="button"
-            className={symbol === value ? "selected" : undefined}
-            onClick={() => onChange(symbol)}
-            title={symbol}
-          >
-            <span className="sf-symbol-tile" aria-hidden="true"><TemplateIcon symbol={symbol} size={16} /></span>
-            <span>{symbol}</span>
-          </button>
-        ))}
-      </div>
+      </Modal>
     </div>
   );
 }
@@ -245,7 +261,7 @@ export function TagEditor({
   value,
   options,
   onChange,
-  placeholder = "Add or create tag"
+  placeholder = "Add tags"
 }: {
   value: string[];
   options: string[];
@@ -253,17 +269,31 @@ export function TagEditor({
   placeholder?: string;
 }) {
   const [draft, setDraft] = useState("");
-  const normalizedValue = value.map((tag) => tag.trim()).filter(Boolean);
-  const suggestions = options.filter((tag) => !normalizedValue.includes(tag));
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const normalizedValue = uniqueTags(value);
+  const optionTags = uniqueTags(options);
+  const query = normalizeTag(draft).toLowerCase();
+  const selectedLookup = new Set(normalizedValue.map((tag) => tag.toLowerCase()));
+  const availableOptions = optionTags.filter((tag) => !selectedLookup.has(tag.toLowerCase()));
+  const matchingOptions = query ? availableOptions.filter((tag) => tag.toLowerCase().includes(query)) : availableOptions;
+  const exactOption = optionTags.find((tag) => tag.toLowerCase() === query);
+  const canCreate = Boolean(query && !selectedLookup.has(query) && !exactOption);
+  const menuItems = [
+    ...(canCreate ? [{ kind: "create" as const, value: normalizeTag(draft), label: `Create "${normalizeTag(draft)}"` }] : []),
+    ...matchingOptions.slice(0, 10).map((tag) => ({ kind: "option" as const, value: tag, label: tag }))
+  ];
 
   function addTag(tag: string) {
-    const normalized = tag.trim();
-    if (!normalized || normalizedValue.includes(normalized)) {
+    const normalized = canonicalTag(tag, optionTags);
+    if (!normalized || normalizedValue.some((item) => item.toLowerCase() === normalized.toLowerCase())) {
       setDraft("");
+      setOpen(false);
       return;
     }
     onChange([...normalizedValue, normalized]);
     setDraft("");
+    setOpen(false);
   }
 
   function removeTag(tag: string) {
@@ -271,33 +301,78 @@ export function TagEditor({
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== "Enter" && event.key !== ",") return;
-    event.preventDefault();
-    addTag(draft);
+    if (event.key === "Backspace" && !draft && normalizedValue.length) {
+      event.preventDefault();
+      removeTag(normalizedValue[normalizedValue.length - 1]);
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => Math.min(current + 1, Math.max(menuItems.length - 1, 0)));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((current) => Math.max(current - 1, 0));
+      return;
+    }
+    if (event.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (event.key === "Enter" || event.key === ",") {
+      event.preventDefault();
+      const selectedItem = open ? menuItems[activeIndex] : undefined;
+      addTag(selectedItem?.value ?? draft);
+    }
   }
 
   return (
-    <div className="tag-editor">
-      <div className="tag-badges">
+    <div
+      className="tag-editor"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
+      <div className={`tag-combobox${open ? " open" : ""}`} onClick={() => setOpen(true)}>
         {normalizedValue.map((tag) => (
           <button key={tag} type="button" className="tag-badge" onClick={() => removeTag(tag)} title={`Remove ${tag}`}>
             {tag}
             <X size={12} />
           </button>
         ))}
-        {!normalizedValue.length && <span className="muted">No tags yet.</span>}
+        <input
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setOpen(true);
+            setActiveIndex(0);
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={normalizedValue.length ? "" : placeholder}
+        />
       </div>
-      <div className="tag-input-row">
-        <input className="input" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={handleKeyDown} placeholder={placeholder} />
-        <button type="button" className="icon-action" onClick={() => addTag(draft)} title="Add tag" aria-label="Add tag">
-          <Plus size={14} />
-        </button>
-      </div>
-      {suggestions.length ? (
-        <div className="tag-suggestions">
-          {suggestions.slice(0, 12).map((tag) => (
-            <button key={tag} type="button" onClick={() => addTag(tag)}>{tag}</button>
+      {open && (menuItems.length || draft.trim()) ? (
+        <div className="tag-menu" role="listbox" aria-label="Tag suggestions">
+          {menuItems.map((item, index) => (
+            <button
+              key={`${item.kind}-${item.value}`}
+              type="button"
+              role="option"
+              aria-selected={index === activeIndex}
+              className={index === activeIndex ? "active" : undefined}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                addTag(item.value);
+              }}
+            >
+              <span>{item.label}</span>
+              {item.kind === "create" && <small>New tag</small>}
+            </button>
           ))}
+          {!menuItems.length && <div className="tag-menu-empty">No matches</div>}
         </div>
       ) : null}
     </div>
@@ -320,4 +395,27 @@ export function presetToTemplateSection(preset: TemplateSectionPresetOption) {
     required: preset.required,
     extraction_hints: preset.extraction_hints ?? preset.extractionHints ?? []
   };
+}
+
+function normalizeTag(tag: string) {
+  return tag.trim().replace(/\s+/g, " ");
+}
+
+function canonicalTag(tag: string, options: string[]) {
+  const normalized = normalizeTag(tag);
+  if (!normalized) return "";
+  return options.find((option) => option.toLowerCase() === normalized.toLowerCase()) ?? normalized;
+}
+
+function uniqueTags(tags: string[]) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const tag of tags) {
+    const normalized = normalizeTag(tag);
+    const key = normalized.toLowerCase();
+    if (!normalized || seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+  return result;
 }

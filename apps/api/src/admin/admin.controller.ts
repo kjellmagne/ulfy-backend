@@ -8,6 +8,8 @@ import { createActivationKey, sha256 } from "../common/crypto";
 import { AuditService } from "../common/audit.service";
 import { TemplatesService } from "../templates/templates.service";
 
+const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
+
 class SingleKeyDto {
   @ApiProperty({ example: "Ola Nordmann" })
   @IsString()
@@ -205,6 +207,28 @@ class ProviderModelLookupDto {
   endpointUrl?: string;
 
   @ApiProperty({ required: false, example: "provider-api-key" })
+  @IsOptional()
+  @IsString()
+  apiKey?: string;
+}
+
+class TemplatePreviewProviderSettingDto {
+  @ApiProperty({ required: false, example: "openai-compatible", description: "Metadata label for the preview provider. The current preview runner expects an OpenAI-compatible chat-completions endpoint." })
+  @IsOptional()
+  @IsString()
+  providerType?: string;
+
+  @ApiProperty({ required: false, example: "https://api.openai.com/v1/chat/completions" })
+  @IsOptional()
+  @IsString()
+  endpointUrl?: string;
+
+  @ApiProperty({ required: false, example: "gpt-5-mini" })
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @ApiProperty({ required: false, example: "sk-preview-provider-key", description: "Write-only. Omit to keep the existing saved key; send an empty string to clear it." })
   @IsOptional()
   @IsString()
   apiKey?: string;
@@ -567,6 +591,50 @@ export class AdminController {
   async me(@Req() req: any) {
     const user = await this.prisma.adminUser.findUnique({ where: { id: req.user.sub }, include: { partner: true } });
     return user ? { id: user.id, email: user.email, fullName: user.fullName, role: user.role, partnerId: user.partnerId, partner: user.partner } : req.user;
+  }
+
+  @Get("settings/template-preview-provider")
+  @ApiOperation({ summary: "Get AI preview provider setting", description: "Superadmin only. Returns masked provider configuration for manual template preview generation." })
+  @ApiOkResponse({ description: "Template preview provider setting." })
+  async templatePreviewProviderSetting(@Req() req: any) {
+    this.requireSuperadmin(req);
+    const setting = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
+    return this.safeTemplatePreviewProviderSetting(setting?.value);
+  }
+
+  @Patch("settings/template-preview-provider")
+  @ApiOperation({ summary: "Update AI preview provider setting", description: "Superadmin only. API key is write-only and is never returned unmasked." })
+  @ApiBody({ type: TemplatePreviewProviderSettingDto })
+  @ApiOkResponse({ description: "Template preview provider setting updated." })
+  async updateTemplatePreviewProviderSetting(@Body() dto: TemplatePreviewProviderSettingDto, @Req() req: any) {
+    this.requireSuperadmin(req);
+    const current = await this.prisma.systemSetting.findUnique({ where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY } });
+    const existing = this.templatePreviewProviderValue(current?.value);
+    const next = {
+      providerType: dto.providerType === undefined ? existing.providerType : this.emptyToNull(dto.providerType) ?? "openai-compatible",
+      endpointUrl: dto.endpointUrl === undefined ? existing.endpointUrl : this.emptyToNull(dto.endpointUrl),
+      model: dto.model === undefined ? existing.model : this.emptyToNull(dto.model),
+      apiKey: dto.apiKey === undefined ? existing.apiKey : this.emptyToNull(dto.apiKey)
+    };
+    const setting = await this.prisma.systemSetting.upsert({
+      where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY },
+      update: { value: next },
+      create: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY, value: next }
+    });
+    await this.audit.log({
+      actorAdminId: req.user.sub,
+      actorEmail: req.user.email,
+      action: "settings.template_preview_provider.update",
+      targetType: "SystemSetting",
+      targetId: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY,
+      metadata: {
+        providerType: next.providerType,
+        endpointUrlConfigured: Boolean(next.endpointUrl),
+        model: next.model,
+        apiKeyConfigured: Boolean(next.apiKey)
+      }
+    });
+    return this.safeTemplatePreviewProviderSetting(setting.value);
   }
 
   @Get("partners")
@@ -1485,6 +1553,33 @@ export class AdminController {
     if (value === null) return null;
     const trimmed = value.trim();
     return trimmed ? trimmed : null;
+  }
+
+  private safeTemplatePreviewProviderSetting(value: unknown) {
+    const setting = this.templatePreviewProviderValue(value);
+    return {
+      providerType: setting.providerType,
+      endpointUrl: setting.endpointUrl,
+      model: setting.model,
+      apiKeyConfigured: Boolean(setting.apiKey),
+      apiKeyPreview: this.maskSecret(setting.apiKey)
+    };
+  }
+
+  private templatePreviewProviderValue(value: unknown) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    return {
+      providerType: typeof source.providerType === "string" && source.providerType.trim() ? source.providerType.trim() : "openai-compatible",
+      endpointUrl: typeof source.endpointUrl === "string" && source.endpointUrl.trim() ? source.endpointUrl.trim() : null,
+      model: typeof source.model === "string" && source.model.trim() ? source.model.trim() : null,
+      apiKey: typeof source.apiKey === "string" && source.apiKey.trim() ? source.apiKey.trim() : null
+    };
+  }
+
+  private maskSecret(value?: string | null) {
+    if (!value) return null;
+    if (value.length <= 8) return "••••";
+    return `${value.slice(0, 4)}••••${value.slice(-4)}`;
   }
 
   private async lookupProviderModels(dto: ProviderModelLookupDto) {

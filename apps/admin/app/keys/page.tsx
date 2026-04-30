@@ -13,6 +13,8 @@ function defaultMaintenanceDate() {
   return date.toISOString().slice(0, 10);
 }
 
+type KeyTab = "single" | "enterprise";
+
 export default function KeysPage() {
   const [single, setSingle] = useState<any[]>([]);
   const [enterprise, setEnterprise] = useState<any[]>([]);
@@ -27,6 +29,7 @@ export default function KeysPage() {
   const [singleModalOpen, setSingleModalOpen] = useState(false);
   const [enterpriseModalOpen, setEnterpriseModalOpen] = useState(false);
   const [details, setDetails] = useState<{ kind: "single" | "enterprise"; key: any } | null>(null);
+  const [activeTab, setActiveTab] = useState<KeyTab>("single");
   const { notify } = useToast();
 
   async function load() {
@@ -46,6 +49,7 @@ export default function KeysPage() {
     try {
       const res = await api("/admin/single-keys", { method: "POST", body: JSON.stringify({ ...form, partnerId: form.partnerId || undefined }) });
       setGenerated({ key: res.activationKey, kind: "single-user", label: form.purchaserEmail });
+      setActiveTab("single");
       notify({ tone: "success", title: "Single-user key generated", message: "Store the activation key now. It will not be shown again." });
       setForm({ purchaserFullName: "", purchaserEmail: "", maintenanceUntil: defaultMaintenanceDate(), partnerId: "", notes: "" });
       setSingleModalOpen(false);
@@ -62,6 +66,7 @@ export default function KeysPage() {
     try {
       const res = await api("/admin/enterprise-keys", { method: "POST", body: JSON.stringify(enterpriseForm) });
       setGenerated({ key: res.activationKey, kind: "enterprise", label: res.tenant?.name ?? "Enterprise tenant" });
+      setActiveTab("enterprise");
       notify({ tone: "success", title: "Enterprise key generated", message: "Store the activation key now. It will not be shown again." });
       setEnterpriseModalOpen(false);
       await load();
@@ -128,8 +133,11 @@ export default function KeysPage() {
         description="Generate, inspect, revoke/reactivate, and delete activation keys. Full keys are shown once after generation."
         meta={(
           <>
-            <IconAction label="Generate single-user key" tone="primary" onClick={() => setSingleModalOpen(true)}><KeyRound size={16} /></IconAction>
-            <IconAction label="Generate enterprise key" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><Plus size={16} /></IconAction>
+            {activeTab === "single" ? (
+              <IconAction label="Generate single-user key" tone="primary" onClick={() => setSingleModalOpen(true)}><KeyRound size={16} /></IconAction>
+            ) : (
+              <IconAction label="Generate enterprise key" tone="primary" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><Plus size={16} /></IconAction>
+            )}
           </>
         )}
       />
@@ -146,18 +154,56 @@ export default function KeysPage() {
       {loading ? <LoadingPanel label="Loading license keys" /> : (
         <>
           <div className="page-stack">
+            <div className="license-tabs" role="tablist" aria-label="License key type">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "single"}
+                className={activeTab === "single" ? "active" : undefined}
+                onClick={() => setActiveTab("single")}
+              >
+                <KeyRound size={16} />
+                <span>Single-user keys</span>
+                <span className="tab-count">{single.length}</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "enterprise"}
+                className={activeTab === "enterprise" ? "active" : undefined}
+                onClick={() => setActiveTab("enterprise")}
+              >
+                <ShieldCheck size={16} />
+                <span>Enterprise keys</span>
+                <span className="tab-count">{enterprise.length}</span>
+              </button>
+            </div>
+
+            {activeTab === "single" && (
             <div className="panel">
-              <PanelHeader title="Single-user keys" description="Double-click a row to view all associated details. Full activation keys are hashed and cannot be recovered later." />
+              <PanelHeader
+                title="Single-user keys"
+                description="Double-click a row to view all associated details. Full activation keys are hashed and cannot be recovered later."
+                actions={<IconAction label="Generate single-user key" tone="primary" onClick={() => setSingleModalOpen(true)}><KeyRound size={15} /></IconAction>}
+              />
               {!single.length ? <EmptyState title="No single-user keys" message="Generate a key above to make it available for activation." /> : (
                 <div className="table-wrap"><table className="table"><thead><tr><th>Purchaser</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Device</th><th className="actions">Actions</th></tr></thead><tbody>{single.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "single", key: k })}><td><b>{k.purchaserFullName}</b><br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.deviceIdentifier ?? "-"}</td><td className="row actions"><IconAction label="View license details" onClick={() => setDetails({ kind: "single", key: k })}><Eye size={14} /></IconAction><IconAction label={k.status === "revoked" ? "Reactivate license" : "Revoke license"} onClick={() => toggleSingleKey(k)}>{k.status === "revoked" ? <ShieldCheck size={14} /> : <ShieldX size={14} />}</IconAction><IconAction label="Delete key" tone="danger" onClick={() => deleteSingleKey(k)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
               )}
             </div>
+            )}
+
+            {activeTab === "enterprise" && (
             <div className="panel">
-              <PanelHeader title="Enterprise keys" description="Double-click a row to inspect tenant, config, and device activation details." />
+              <PanelHeader
+                title="Enterprise keys"
+                description="Double-click a row to inspect tenant, config, and device activation details."
+                actions={<IconAction label="Generate enterprise key" tone="primary" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><Plus size={15} /></IconAction>}
+              />
               {!enterprise.length ? <EmptyState title="No enterprise keys" message="Create a tenant and config profile, then generate an enterprise key." /> : (
                 <div className="table-wrap"><table className="table"><thead><tr><th>Tenant</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Devices</th><th>Config</th><th className="actions">Actions</th></tr></thead><tbody>{enterprise.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "enterprise", key: k })}><td><b>{k.tenant?.name}</b></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.activations?.length ?? 0}/{k.maxDevices ?? "unlimited"}</td><td>{k.configProfile?.name}</td><td className="row actions"><IconAction label="View license details" onClick={() => setDetails({ kind: "enterprise", key: k })}><Eye size={14} /></IconAction><IconAction label="Delete key" tone="danger" onClick={() => deleteEnterpriseKey(k)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
               )}
             </div>
+            )}
           </div>
           <SidePanel
             open={singleModalOpen}

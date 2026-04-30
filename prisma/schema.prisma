@@ -211,6 +211,13 @@ model ActivationAuditLog {
   createdAt      DateTime @default(now())
 }
 
+model SystemSetting {
+  key       String   @id
+  value     Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model TemplateCategory {
   id          String     @id @default(uuid())
   slug        String     @unique

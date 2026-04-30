@@ -658,7 +658,6 @@ export default function TemplatesPage() {
                           <div className="template-family-meta">
                             <StatusBadge status={family.state} />
                             <span className="badge">{family.category?.title ?? "Uncategorized"}</span>
-                            <span className="badge">{family.icon}</span>
                             <span className="badge">{family.isGlobal ? "Global catalog" : `${family.entitlements.length} tenant${family.entitlements.length === 1 ? "" : "s"}`}</span>
                             <span className="badge">{family.variants.length} variant{family.variants.length === 1 ? "" : "s"}</span>
                           </div>

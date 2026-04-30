@@ -381,7 +381,7 @@ Required deployment environment variables:
 - `JWT_SECRET`
 - `ACTIVATION_TOKEN_SECRET`
 - `PUBLIC_BASE_PATH` when serving the admin under a gateway prefix such as `/backend`
-- `TEMPLATE_PREVIEW_ENDPOINT_URL`, `TEMPLATE_PREVIEW_API_KEY`, and `TEMPLATE_PREVIEW_MODEL` when AI preview is enabled
+- AI preview provider is normally configured in the admin portal under `Settings` by a superadmin. `TEMPLATE_PREVIEW_ENDPOINT_URL`, `TEMPLATE_PREVIEW_API_KEY`, and `TEMPLATE_PREVIEW_MODEL` remain optional deployment fallbacks.
 - optional `TEMPLATE_REPOSITORY_API_KEY` for internal repository override access
 
 ## v1 Simplifications
@@ -390,4 +390,4 @@ Required deployment environment variables:
 - Config profiles are manually managed JSON-backed records, without an advanced policy engine.
 - Activation tokens are long-lived JWTs whose hashes are stored for lookup and revocation.
 - The mobile app still owns local template forking/update behavior; the backend provides the authoritative published repository, tenant filtering, history, and preview tooling.
-- AI preview uses one centrally configured OpenAI-compatible preview provider/model and fails cleanly when those environment variables are not configured.
+- AI preview uses one centrally configured OpenAI-compatible preview provider/model. It is managed by superadmins in Settings, with environment variables kept as deployment fallbacks.
