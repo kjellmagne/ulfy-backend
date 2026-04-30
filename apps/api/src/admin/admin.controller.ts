@@ -664,7 +664,12 @@ export class AdminController {
     const saved = this.templatePreviewProviderValue(current?.value);
     const providerType = this.previewProviderLookupType(dto.providerType ?? saved.providerType);
     const endpointUrl = this.emptyToNull(dto.endpointUrl) ?? saved.endpointUrl ?? "";
-    const apiKey = this.emptyToNull(dto.apiKey) ?? saved.apiKey ?? "";
+    const requestApiKey = this.emptyToNull(dto.apiKey);
+    const canReuseSavedApiKey = this.previewProviderRequestMatchesSavedSetting(dto, saved);
+    if (requestApiKey === undefined && saved.apiKey && !canReuseSavedApiKey) {
+      throw new BadRequestException("Enter an API key to test unsaved preview provider changes, or save the preview provider first.");
+    }
+    const apiKey = requestApiKey ?? (canReuseSavedApiKey ? saved.apiKey ?? "" : "");
     const models = await this.lookupProviderModels({
       providerDomain: "document_generation",
       providerType,
@@ -1640,6 +1645,26 @@ export class AdminController {
       apiKeyConfigured: Boolean(setting.apiKey),
       apiKeyPreview: this.maskSecret(setting.apiKey)
     };
+  }
+
+  private previewProviderRequestMatchesSavedSetting(
+    dto: TemplatePreviewProviderSettingDto,
+    saved: ReturnType<AdminController["templatePreviewProviderValue"]>
+  ) {
+    const requestProviderType = this.emptyToNull(dto.providerType);
+    const requestEndpointUrl = this.emptyToNull(dto.endpointUrl);
+
+    if (requestProviderType === undefined && requestEndpointUrl === undefined) {
+      return true;
+    }
+
+    const normalizedRequestProviderType = this.previewProviderLookupType(requestProviderType ?? saved.providerType);
+    const normalizedSavedProviderType = this.previewProviderLookupType(saved.providerType);
+    const normalizedRequestEndpoint = requestEndpointUrl ?? saved.endpointUrl ?? "";
+    const normalizedSavedEndpoint = saved.endpointUrl ?? "";
+
+    return normalizedRequestProviderType === normalizedSavedProviderType
+      && normalizedRequestEndpoint === normalizedSavedEndpoint;
   }
 
   private templatePreviewProviderValue(value: unknown) {

@@ -110,6 +110,30 @@ describe("AdminController provider model lookup", () => {
     expect(result).toEqual({ models: [{ id: "preview-model", name: "preview-model" }] });
   });
 
+  it("does not reuse the saved preview key for unsaved provider changes", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AdminController({
+      systemSetting: {
+        findUnique: vi.fn().mockResolvedValue({
+          value: {
+            providerType: "openai-compatible",
+            endpointUrl: "https://kvasetech.com/ollama/v1/chat/completions",
+            apiKey: "saved-preview-key"
+          }
+        })
+      }
+    } as any, {} as any, {} as any);
+
+    await expect(controller.templatePreviewProviderModels({
+      providerType: "openai",
+      endpointUrl: "https://api.openai.com/v1/chat/completions"
+    }, { user: { role: "superadmin" } })).rejects.toThrow(
+      "Enter an API key to test unsaved preview provider changes, or save the preview provider first."
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("loads OpenAI preview provider models from the OpenAI models endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       data: [{ id: "gpt-5-mini" }, { id: "gpt-4.1-mini" }]
