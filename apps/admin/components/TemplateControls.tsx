@@ -79,6 +79,27 @@ export type TemplateTagOption = {
   description?: string | null;
 };
 
+export const languageOptions = [
+  { code: "nb-NO", name: "Norwegian Bokmal" },
+  { code: "nn-NO", name: "Norwegian Nynorsk" },
+  { code: "en-US", name: "English (United States)" },
+  { code: "en-GB", name: "English (United Kingdom)" },
+  { code: "sv-SE", name: "Swedish" },
+  { code: "da-DK", name: "Danish" },
+  { code: "fi-FI", name: "Finnish" },
+  { code: "de-DE", name: "German" },
+  { code: "fr-FR", name: "French" },
+  { code: "es-ES", name: "Spanish" },
+  { code: "it-IT", name: "Italian" },
+  { code: "nl-NL", name: "Dutch" },
+  { code: "pt-PT", name: "Portuguese" },
+  { code: "pt-BR", name: "Portuguese (Brazil)" },
+  { code: "pl-PL", name: "Polish" },
+  { code: "lt-LT", name: "Lithuanian" },
+  { code: "uk-UA", name: "Ukrainian" },
+  { code: "ja-JP", name: "Japanese" }
+];
+
 export const sfSymbolOptions = [
   "doc.text",
   "doc.text.fill",
@@ -208,6 +229,98 @@ export function TemplateIcon({ symbol, size = 18 }: { symbol?: string | null; si
   return <Icon size={size} strokeWidth={2.1} aria-hidden="true" />;
 }
 
+function languageLabel(code: string) {
+  const language = languageOptions.find((option) => option.code === code);
+  return language ? `${language.name} (${language.code})` : code || "";
+}
+
+export function LanguageCombobox({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const selectedLabel = languageLabel(value);
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredLanguages = useMemo(() => {
+    if (!normalizedQuery) return languageOptions;
+    return languageOptions.filter((language) =>
+      language.name.toLowerCase().includes(normalizedQuery) ||
+      language.code.toLowerCase().includes(normalizedQuery)
+    );
+  }, [normalizedQuery]);
+
+  function selectLanguage(code: string) {
+    onChange(code);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+      return;
+    }
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    const exactMatch = languageOptions.find((language) =>
+      language.code.toLowerCase() === normalizedQuery ||
+      language.name.toLowerCase() === normalizedQuery
+    );
+    const nextLanguage = exactMatch ?? filteredLanguages[0];
+    if (nextLanguage) selectLanguage(nextLanguage.code);
+  }
+
+  return (
+    <div
+      className="language-combobox"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setOpen(false);
+          setQuery("");
+        }
+      }}
+    >
+      <label className={`language-combobox-input${open ? " open" : ""}`}>
+        <Search size={14} />
+        <input
+          value={open ? query : selectedLabel}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => {
+            setOpen(true);
+            setQuery("");
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Search language"
+        />
+        <span>{value || "-"}</span>
+      </label>
+      {open && (
+        <div className="language-menu" role="listbox" aria-label="Template languages">
+          {filteredLanguages.map((language) => (
+            <button
+              key={language.code}
+              type="button"
+              role="option"
+              aria-selected={language.code === value}
+              className={language.code === value ? "selected" : undefined}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                selectLanguage(language.code);
+              }}
+            >
+              <strong>{language.name}</strong>
+              <span>{language.code}</span>
+            </button>
+          ))}
+          {!filteredLanguages.length && <div className="language-menu-empty">No matching languages.</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function IconPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -219,13 +332,9 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (valu
 
   return (
     <div className="icon-picker">
-      <button type="button" className="icon-picker-trigger" onClick={() => setOpen(true)}>
+      <button type="button" className="icon-picker-trigger" onClick={() => setOpen(true)} aria-label="Choose template icon" title="Choose template icon">
         <span className="sf-symbol-tile" title={`Web preview for ${value || "doc.text"}`}>
           <TemplateIcon symbol={value || "doc.text"} />
-        </span>
-        <span className="icon-picker-trigger-copy">
-          <strong>Template icon</strong>
-          <span>Click to choose</span>
         </span>
       </button>
 

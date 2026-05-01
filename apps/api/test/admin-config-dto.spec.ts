@@ -28,7 +28,7 @@ describe("ConfigDto", () => {
       featureFlags: { developerMode: true, allowExternalProviders: false },
       allowedProviderRestrictions: ["openai_compatible"],
       providerProfiles: { presidio: { scoreThreshold: 0.75, detectEmail: true } },
-      managedPolicy: { allowPolicyOverride: false, userMayChangeSpeechProvider: false, externalFormattersAllowed: true },
+      managedPolicy: { allowPolicyOverride: false, hideSettings: true, userMayChangeSpeechProvider: false, externalFormattersAllowed: true },
       defaultTemplateId: null,
       shouldBeStripped: "not allowed"
     };
@@ -55,7 +55,7 @@ describe("ConfigDto", () => {
       featureFlags: { developerMode: true, allowExternalProviders: false },
       allowedProviderRestrictions: ["openai_compatible"],
       providerProfiles: { presidio: { scoreThreshold: 0.75, detectEmail: true } },
-      managedPolicy: { allowPolicyOverride: false, userMayChangeSpeechProvider: false, externalFormattersAllowed: true },
+      managedPolicy: { allowPolicyOverride: false, hideSettings: true, userMayChangeSpeechProvider: false, externalFormattersAllowed: true },
       defaultTemplateId: null
     });
     expect(result).not.toHaveProperty("shouldBeStripped");

@@ -45,7 +45,10 @@ export const MobileErrorPayload = z.object({
 export const ManagedPolicyPayload = z.object({
   allowPolicyOverride: z.boolean().default(false),
   allowLocalOverride: z.boolean().optional(),
-  userMayOverridePolicy: z.boolean().optional()
+  userMayOverridePolicy: z.boolean().optional(),
+  hideSettings: z.boolean().default(false),
+  hideAppSettings: z.boolean().optional(),
+  hideSettingsUI: z.boolean().optional()
 }).passthrough();
 
 export const ConfigProfilePayload = z.object({

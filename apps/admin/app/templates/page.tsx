@@ -6,7 +6,7 @@ import * as yaml from "js-yaml";
 import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, InfoTip, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
-import { IconPicker, TagChipList, TagEditor, TemplateIcon, presetToTemplateSection } from "../../components/TemplateControls";
+import { IconPicker, LanguageCombobox, TagChipList, TagEditor, TemplateIcon, presetToTemplateSection } from "../../components/TemplateControls";
 import type { TemplateSectionPresetOption, TemplateTagOption } from "../../components/TemplateControls";
 import { useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
@@ -818,7 +818,7 @@ export default function TemplatesPage() {
                   <div className="grid three">
                     <div className="field"><FieldLabel>Family</FieldLabel><input className="input" value={selectedFamily?.title ?? ""} disabled /></div>
                     <div className="field"><FieldLabel>Template title</FieldLabel><input className="input" value={templateIdentity.title ?? ""} onChange={(e) => updateIdentity("title", e.target.value)} /></div>
-                    <div className="field"><FieldLabel>Language</FieldLabel><input className="input" value={variantForm.language} onChange={(e) => updateLanguage(e.target.value)} /></div>
+                    <div className="field"><FieldLabel>Language</FieldLabel><LanguageCombobox value={variantForm.language} onChange={updateLanguage} /></div>
                     <div className="field"><FieldLabel>Short description</FieldLabel><input className="input" value={templateIdentity.short_description ?? ""} onChange={(e) => updateIdentity("short_description", e.target.value)} /></div>
                     <div className="field"><FieldLabel>Category</FieldLabel><select value={templateIdentity.category ?? ""} onChange={(e) => updateIdentity("category", e.target.value)}><option value="">Uncategorized</option>{categories.map((category) => <option key={category.id} value={category.slug}>{category.title}</option>)}</select></div>
                     <div className="field wide"><FieldLabel>Icon</FieldLabel><IconPicker value={templateIdentity.icon ?? "doc.text"} onChange={(icon) => updateIdentity("icon", icon)} /></div>

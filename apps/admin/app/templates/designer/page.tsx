@@ -5,7 +5,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel } from "../../../components/AdminUI";
-import { IconPicker, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
+import { IconPicker, LanguageCombobox, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
 import type { TemplateCategoryOption, TemplateSectionPresetOption, TemplateTagOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../../components/ToastProvider";
@@ -853,7 +853,7 @@ export default function TemplateDesignerRoute() {
                   </div>
                   <div className="field">
                     <FieldLabel>Language</FieldLabel>
-                    <input className="input" value={variantForm.language} onChange={(event) => updateLanguage(event.target.value)} />
+                    <LanguageCombobox value={variantForm.language} onChange={updateLanguage} />
                   </div>
                   <div className="field">
                     <FieldLabel>Category</FieldLabel>

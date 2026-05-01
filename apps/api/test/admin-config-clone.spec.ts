@@ -28,7 +28,7 @@ describe("AdminController config cloning", () => {
       featureFlags: { developerMode: false },
       allowedProviderRestrictions: ["openai_compatible"],
       providerProfiles: { formatter: { privacyEmphasis: "managed" } },
-      managedPolicy: { allowPolicyOverride: false },
+      managedPolicy: { allowPolicyOverride: false, hideSettings: true },
       defaultTemplateId: null,
       createdAt: new Date("2026-04-29T10:00:00.000Z"),
       updatedAt: new Date("2026-04-29T10:00:00.000Z")
@@ -51,7 +51,7 @@ describe("AdminController config cloning", () => {
         name: "Copy of Strict enterprise policy",
         speechApiKey: "speech-key",
         documentGenerationApiKey: "docgen-key",
-        managedPolicy: { allowPolicyOverride: false }
+        managedPolicy: { allowPolicyOverride: false, hideSettings: true }
       }),
       include: { partner: true }
     });

@@ -136,7 +136,8 @@ describe("ActivationService", () => {
           documentGenerationProviderType: "openai_compatible",
           documentGenerationApiKey: "docgen-key",
           featureFlags: { enterpriseTemplates: true },
-          allowedProviderRestrictions: []
+          allowedProviderRestrictions: [],
+          managedPolicy: { allowPolicyOverride: false, hideSettings: true }
         }
       }
     });
@@ -159,7 +160,7 @@ describe("ActivationService", () => {
       name: "Default Enterprise Profile",
       speechApiKey: "speech-key",
       documentGenerationApiKey: "docgen-key",
-      managedPolicy: { allowPolicyOverride: false }
+      managedPolicy: { allowPolicyOverride: false, hideSettings: true }
     });
   });
 });

@@ -28,7 +28,8 @@ const helpText = {
   defaultTemplateId: "Optional default template for the tenant. Guides users toward the organization's preferred starting template. Partial support; not strongly enforced yet.",
   developerMode: "Shows internal testing tools and reusable recordings for provider and formatting validation. Locks app UI. Full support.",
   allowExternalProviders: "Intended to control whether external providers may be used. Partial/future support; no current strong enforcement.",
-  allowPolicyOverride: "When enabled, the user can temporarily ignore centrally managed provider and privacy settings on this device. When disabled, centrally managed settings stay enforced. Locks app UI. Full support."
+  allowPolicyOverride: "When enabled, the user can temporarily ignore centrally managed provider and privacy settings on this device. When disabled, centrally managed settings stay enforced. Locks app UI. Full support.",
+  hideSettings: "When enabled, the iOS app should hide most local settings for managed enterprise users and leave only operational screens such as license status, about, support, and diagnostics. Full support once implemented in the app."
 };
 
 const speechProviders = [
@@ -94,6 +95,7 @@ const empty = {
   developerMode: false,
   allowExternalProviders: false,
   allowPolicyOverride: false,
+  hideSettings: false,
   userMayChangeSpeechProvider: false,
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
@@ -158,6 +160,7 @@ export default function ConfigsPage() {
       developerMode: profile.featureFlags?.developerMode ?? false,
       allowExternalProviders: profile.featureFlags?.allowExternalProviders ?? false,
       allowPolicyOverride: managedPolicy?.allowPolicyOverride ?? managedPolicy?.allowLocalOverride ?? managedPolicy?.userMayOverridePolicy ?? false,
+      hideSettings: managedPolicy?.hideSettings ?? managedPolicy?.hideAppSettings ?? managedPolicy?.hideSettingsUI ?? false,
       userMayChangeSpeechProvider: managedPolicy?.userMayChangeSpeechProvider ?? false,
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
       userMayChangePrivacyReviewProvider: managedPolicy?.userMayChangePrivacyReviewProvider ?? false,
@@ -320,6 +323,7 @@ export default function ConfigsPage() {
       };
       const managedPolicy = {
         allowPolicyOverride: Boolean(form.allowPolicyOverride),
+        hideSettings: Boolean(form.hideSettings),
         userMayChangeSpeechProvider: Boolean(form.userMayChangeSpeechProvider),
         userMayChangeFormatter: Boolean(form.userMayChangeFormatter),
         userMayChangePrivacyReviewProvider: Boolean(form.userMayChangePrivacyReviewProvider),
@@ -519,6 +523,7 @@ export default function ConfigsPage() {
                       <p>Keep override off for strict enterprise control. Only enable local changes deliberately.</p>
                     </div>
                     <div className="policy-toggle-grid">
+                      <label className="policy-toggle"><input type="checkbox" checked={form.hideSettings} onChange={(e) => setForm({ ...form, hideSettings: e.target.checked })} /><span><FieldLabel help={helpText.hideSettings}>Hide most app settings</FieldLabel><small>Keeps managed enterprise users focused on status, support, and daily use.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /><span><strong>User may change speech</strong><small>Allows local speech-provider changes when policy override is available.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /><span><strong>User may change formatter</strong><small>Allows local document-generation provider changes.</small></span></label>

@@ -340,9 +340,11 @@ export class ActivationService {
   private mapManagedPolicy(policy: unknown) {
     const source = isRecord(policy) ? policy : {};
     const overrideValue = firstBoolean(source.allowPolicyOverride, source.allowLocalOverride, source.userMayOverridePolicy);
+    const hideSettingsValue = firstBoolean(source.hideSettings, source.hideAppSettings, source.hideSettingsUI);
     return {
       ...source,
-      allowPolicyOverride: overrideValue ?? false
+      allowPolicyOverride: overrideValue ?? false,
+      hideSettings: hideSettingsValue ?? false
     };
   }
 }
