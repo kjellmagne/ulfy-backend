@@ -45,7 +45,7 @@ describe("AdminController config cloning", () => {
 
     const result = await controller.cloneConfig("profile-1", {}, { user: { sub: "admin-1", email: "admin@example.com", role: "superadmin" } });
 
-    expect(result).toEqual(created);
+    expect(result).toEqual({ ...created, speechApiKey: "********", documentGenerationApiKey: "********" });
     expect(prisma.configProfile.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: "Copy of Strict enterprise policy",

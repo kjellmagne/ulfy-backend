@@ -10,6 +10,7 @@ import { AuditService } from "../common/audit.service";
 import { TemplatesService } from "../templates/templates.service";
 
 const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
+const ADMIN_SECRET_MASK = "********";
 
 class SingleKeyDto {
   @ApiProperty({ example: "Ola Nordmann" })
@@ -1050,7 +1051,9 @@ export class AdminController {
   @ApiOkResponse({ description: "Config profile list." })
   configProfiles(@Req() req: any) {
     const partnerId = this.scopedPartnerId(req);
-    return this.prisma.configProfile.findMany({ where: partnerId ? { partnerId } : {}, orderBy: { updatedAt: "desc" }, include: { partner: true } });
+    return this.prisma.configProfile
+      .findMany({ where: partnerId ? { partnerId } : {}, orderBy: { updatedAt: "desc" }, include: { partner: true } })
+      .then((profiles) => profiles.map((profile) => this.maskAdminConfigSecrets(profile)));
   }
 
   @Post("config-profiles")
@@ -1062,7 +1065,7 @@ export class AdminController {
     if (partnerId) dto.partnerId = partnerId;
     const profile = await this.prisma.configProfile.create({ data: this.cleanConfig(dto) as any });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "config.create", targetType: "ConfigProfile", targetId: profile.id });
-    return profile;
+    return this.maskAdminConfigSecrets(profile);
   }
 
   @Post("config-profiles/:id/clone")
@@ -1097,7 +1100,7 @@ export class AdminController {
       targetId: profile.id,
       metadata: { sourceConfigProfileId: id }
     });
-    return profile;
+    return this.maskAdminConfigSecrets(profile);
   }
 
   @Post("provider-models")
@@ -1120,7 +1123,7 @@ export class AdminController {
     if (partnerId) dto.partnerId = partnerId;
     const profile = await this.prisma.configProfile.update({ where: { id }, data: this.cleanConfig(dto) as any });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "config.update", targetType: "ConfigProfile", targetId: id });
-    return profile;
+    return this.maskAdminConfigSecrets(profile);
   }
 
   @Delete("config-profiles/:id")
@@ -1629,7 +1632,7 @@ export class AdminController {
       speechProviderType: this.emptyToNull(dto.speechProviderType),
       speechEndpointUrl: this.emptyToNull(dto.speechEndpointUrl),
       speechModelName: this.emptyToNull(dto.speechModelName),
-      speechApiKey: this.emptyToNull(dto.speechApiKey),
+      speechApiKey: this.emptySecretToNull(dto.speechApiKey),
       privacyControlEnabled: dto.privacyControlEnabled ?? false,
       piiControlEnabled: dto.piiControlEnabled ?? false,
       presidioEndpointUrl: this.emptyToNull(dto.presidioEndpointUrl),
@@ -1640,7 +1643,7 @@ export class AdminController {
       documentGenerationProviderType: this.emptyToNull(dto.documentGenerationProviderType),
       documentGenerationEndpointUrl: this.emptyToNull(dto.documentGenerationEndpointUrl),
       documentGenerationModel: this.emptyToNull(dto.documentGenerationModel),
-      documentGenerationApiKey: this.emptyToNull(dto.documentGenerationApiKey),
+      documentGenerationApiKey: this.emptySecretToNull(dto.documentGenerationApiKey),
       templateRepositoryUrl: this.emptyToNull(dto.templateRepositoryUrl),
       telemetryEndpointUrl: this.emptyToNull(dto.telemetryEndpointUrl),
       featureFlags: dto.featureFlags ?? {},
@@ -1657,6 +1660,19 @@ export class AdminController {
     if (value === null) return null;
     const trimmed = value.trim();
     return trimmed ? trimmed : null;
+  }
+
+  private emptySecretToNull(value?: string | null) {
+    if (value === ADMIN_SECRET_MASK) return undefined;
+    return this.emptyToNull(value);
+  }
+
+  private maskAdminConfigSecrets<T extends { speechApiKey?: string | null; documentGenerationApiKey?: string | null }>(profile: T) {
+    return {
+      ...profile,
+      speechApiKey: profile.speechApiKey ? ADMIN_SECRET_MASK : null,
+      documentGenerationApiKey: profile.documentGenerationApiKey ? ADMIN_SECRET_MASK : null
+    };
   }
 
   private safeTemplatePreviewProviderSetting(value: unknown) {

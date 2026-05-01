@@ -9,11 +9,11 @@ import { getErrorMessage, useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
 const helpText = {
-  speechProviderType: "Choose where audio is converted to text. On-device and controlled-environment options keep more data under your control. Cloud providers may send audio or transcript content to an external service. Values: local, apple_online, openai, azure, gemini. Locks app UI. Full support.",
+  speechProviderType: "Choose where audio is converted to text. On-device and controlled-environment options keep more data under your control. Cloud providers may send audio or transcript content to an external service. Values: local, apple_online, openai, azure. Locks app UI. Full support.",
   speechEndpointUrl: "Endpoint URL for the selected speech provider. Use this for self-hosted or controlled-environment speech services such as Azure Speech containers or internal gateway routes. Locks app UI when set.",
   speechModelName: "Optional model identifier for speech providers that expose multiple models. Leave unset when the service does not use model names. Locks app UI when set.",
   speechApiKey: "Optional API key for the selected speech provider. Prefer an internal gateway endpoint or tenant-scoped key when possible. If sent to the app, it should be treated as a managed credential.",
-  documentGenerationProviderType: "Choose how Ulfy turns the transcript into a finished note. Self-hosted or internally routed providers keep content under your control. Values: apple_intelligence, openai, ollama, openai_compatible, gemini, claude. Locks app UI. Full support.",
+  documentGenerationProviderType: "Choose how Ulfy turns the transcript into a finished note. Self-hosted or internally routed providers keep content under your control. Values: apple_intelligence, ollama, openai_compatible. Use OpenAI-compatible for OpenAI, vLLM, and internal OpenAI-compatible gateways. Locks app UI. Full support.",
   documentGenerationEndpointUrl: "Endpoint URL for the document-generation provider. Use this for internal gateways, self-hosted providers, or OpenAI-compatible services. Locks app UI when set.",
   documentGenerationModel: "Model identifier used for document generation. Choose the organization-approved model for note formatting. Locks app UI when set.",
   documentGenerationApiKey: "Optional API key for the document-generation provider. Prefer internal gateways or tenant-scoped keys. If sent to the app, it should be treated as a managed credential.",
@@ -37,18 +37,14 @@ const speechProviders = [
   { value: "local", label: "Local", privacy: "Safe", endpoint: false, model: false, diarization: false, ready: true },
   { value: "apple_online", label: "Apple Online", privacy: "Use with caution", endpoint: false, model: false, diarization: false, ready: true },
   { value: "openai", label: "OpenAI Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: true, ready: true, endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-4o-transcribe" },
-  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, endpointDefault: "https://kvasetech.com/stt" },
-  { value: "gemini", label: "Gemini Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: false, ready: false, endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-live-2.5-flash-preview" }
+  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, endpointDefault: "https://kvasetech.com/stt" }
 ];
 
 const formatterProviders = [
   { value: "", label: "Not managed", ready: true, endpoint: false, model: false, privacy: "Local setting kept" },
   { value: "apple_intelligence", label: "Apple Intelligence", ready: true, endpoint: false, model: false, privacy: "Safe" },
-  { value: "openai", label: "OpenAI", ready: true, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-5-mini" },
-  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "openai_compatible", label: "OpenAI-compatible", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" },
-  { value: "gemini", label: "Gemini", ready: false, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-2.5-flash" },
-  { value: "claude", label: "Claude", ready: false, endpoint: true, model: true, privacy: "Unsafe by default", endpointDefault: "https://api.anthropic.com/v1", modelDefault: "claude-sonnet-4-6" }
+  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" }
 ];
 
 const privacyReviewProviders = [
@@ -106,6 +102,7 @@ const empty = {
 
 type ModelKind = "speech" | "formatter" | "review";
 type ModelLookupConfig = { providerDomain: string; providerType: string; endpointUrl: string; apiKey: string };
+const SAVED_SECRET_MASK = "********";
 
 export default function ConfigsPage() {
   const [profiles, setProfiles] = useState<any[]>([]);
@@ -120,6 +117,8 @@ export default function ConfigsPage() {
   const [modelLookupKeys, setModelLookupKeys] = useState<Record<ModelKind, string>>({ speech: "", formatter: "", review: "" });
   const [editorOpen, setEditorOpen] = useState(false);
   const { notify } = useToast();
+  const selectedSpeechProvider = speechProviders.find((item) => item.value === form.speechProviderType);
+  const selectedFormatterProvider = formatterProviders.find((item) => item.value === form.documentGenerationProviderType);
 
   async function load() {
     try {
@@ -142,11 +141,15 @@ export default function ConfigsPage() {
   function edit(profile: any) {
     const providerProfiles = profile.providerProfiles ?? {};
     const managedPolicy = profile.managedPolicy ?? {};
+    const documentGenerationProviderType = normalizeFormatterProviderType(profile.documentGenerationProviderType ?? "");
     setSelected(profile.id);
     setForm({
       ...empty,
       ...profile,
       partnerId: profile.partnerId ?? "",
+      documentGenerationProviderType,
+      speechApiKey: profile.speechApiKey ? SAVED_SECRET_MASK : "",
+      documentGenerationApiKey: profile.documentGenerationApiKey ? SAVED_SECRET_MASK : "",
       speechDiarizationEnabled: providerProfiles?.speech?.speakerDiarizationEnabled ?? false,
       piiScoreThreshold: String(providerProfiles?.presidio?.scoreThreshold ?? "0.70"),
       detectEmail: providerProfiles?.presidio?.detectEmail ?? true,
@@ -218,7 +221,7 @@ export default function ConfigsPage() {
         documentGenerationEndpointUrl: provider?.endpoint ? provider.endpointDefault ?? form.documentGenerationEndpointUrl : "",
         documentGenerationModel: provider?.model ? providerDefaultModel(provider) : "",
         documentGenerationApiKey: provider?.endpoint ? form.documentGenerationApiKey : "",
-        formatterPrivacyEmphasis: value === "apple_intelligence" ? "safe" : form.formatterPrivacyEmphasis
+        formatterPrivacyEmphasis: formatterPrivacyDefault(value, form.formatterPrivacyEmphasis)
       };
       setForm(next);
       refreshModelsForNextForm("formatter", next, Boolean(provider?.model));
@@ -341,7 +344,7 @@ export default function ConfigsPage() {
         speechProviderType: form.speechProviderType || null,
         speechEndpointUrl: speechProvider?.endpoint ? form.speechEndpointUrl || null : null,
         speechModelName: speechProvider?.model ? form.speechModelName || null : null,
-        speechApiKey: speechProvider?.endpoint ? form.speechApiKey || null : null,
+        speechApiKey: selected && form.speechApiKey === SAVED_SECRET_MASK ? undefined : speechProvider?.endpoint ? form.speechApiKey || null : null,
         privacyControlEnabled: Boolean(form.privacyControlEnabled),
         piiControlEnabled: Boolean(form.piiControlEnabled),
         presidioEndpointUrl: form.presidioEndpointUrl || null,
@@ -352,7 +355,7 @@ export default function ConfigsPage() {
         documentGenerationProviderType: form.documentGenerationProviderType || null,
         documentGenerationEndpointUrl: formatterProvider?.endpoint ? form.documentGenerationEndpointUrl || null : null,
         documentGenerationModel: formatterProvider?.model ? form.documentGenerationModel || null : null,
-        documentGenerationApiKey: formatterProvider?.endpoint ? form.documentGenerationApiKey || null : null,
+        documentGenerationApiKey: selected && form.documentGenerationApiKey === SAVED_SECRET_MASK ? undefined : formatterProvider?.endpoint ? form.documentGenerationApiKey || null : null,
         templateRepositoryUrl: form.templateRepositoryUrl || null,
         telemetryEndpointUrl: form.telemetryEndpointUrl || null,
         featureFlags,
@@ -424,7 +427,7 @@ export default function ConfigsPage() {
             <div className="panel">
               <PanelHeader title="Configuration profiles" description="List first. Open a profile to edit provider selections and policy in a slide-in panel." actions={<IconAction label="New profile" tone="primary" onClick={createNew}><Plus size={16} /></IconAction>} />
               {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech</th><th>Formatter</th><th>Privacy review</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.id} onDoubleClick={() => edit(profile)}><td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td><td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td><td>{profile.speechProviderType ? <span className="badge">{profile.speechProviderType}</span> : <span className="muted">Local</span>}</td><td>{profile.documentGenerationProviderType ? <span className="badge">{profile.documentGenerationProviderType}</span> : <span className="muted">Local</span>}</td><td><div className="row"><StatusBadge status={profile.privacyControlEnabled ? "active" : "draft"} />{profile.privacyReviewProviderType && <span className="badge">{profile.privacyReviewProviderType}</span>}</div></td><td className="row actions"><IconAction label="Edit profile" onClick={() => edit(profile)}><Settings size={14} /></IconAction><IconAction label="Clone profile" onClick={() => cloneProfile(profile)} disabled={cloningId === profile.id}><CopyPlus size={14} /></IconAction><IconAction label="Delete profile" tone="danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech</th><th>Formatter</th><th>Privacy review</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.id} onDoubleClick={() => edit(profile)}><td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td><td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td><td>{profile.speechProviderType ? <span className="badge">{profile.speechProviderType}</span> : <span className="muted">Local</span>}</td><td>{profile.documentGenerationProviderType ? <span className="badge">{normalizeFormatterProviderType(profile.documentGenerationProviderType)}</span> : <span className="muted">Local</span>}</td><td><div className="row"><StatusBadge status={profile.privacyControlEnabled ? "active" : "draft"} />{profile.privacyReviewProviderType && <span className="badge">{profile.privacyReviewProviderType}</span>}</div></td><td className="row actions"><IconAction label="Edit profile" onClick={() => edit(profile)}><Settings size={14} /></IconAction><IconAction label="Clone profile" onClick={() => cloneProfile(profile)} disabled={cloningId === profile.id}><CopyPlus size={14} /></IconAction><IconAction label="Delete profile" tone="danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
               )}
             </div>
           </div>
@@ -446,26 +449,26 @@ export default function ConfigsPage() {
                 </div>
               </FormSection>
 
-              <FormSection title="Speech provider" description="One selected speech source. This is separate from document generation and privacy review.">
-                <ProviderHint provider={speechProviders.find((item) => item.value === form.speechProviderType)} />
-                <div className="grid four">
+              <FormSection title="Speech processing" description="Choose the managed speech engine, its connection settings, and whether users may choose another provider locally.">
+                <ProviderHint provider={selectedSpeechProvider} />
+                <div className="grid two">
                   <div className="field"><FieldLabel help={helpText.speechProviderType}>Selected speech provider</FieldLabel><select value={form.speechProviderType ?? ""} onChange={(e) => applyProviderDefault("speech", e.target.value)}>{speechProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
-                  <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.speechEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, speechEndpointUrl: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} /></div>
-                  <ModelField label="Model name" help={helpText.speechModelName} value={form.speechModelName ?? ""} onChange={(value) => setForm({ ...form, speechModelName: value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.model} loading={modelLoading === "speech"} options={modelLookupKeys.speech === modelRequestKey("speech") ? modelOptions.speech : []} onOpen={() => lookupModels("speech")} />
-                  <div className="field"><FieldLabel help={helpText.speechApiKey}>API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.speechApiKey ?? ""} onChange={(e) => setForm({ ...form, speechApiKey: e.target.value })} disabled={!speechProviders.find((item) => item.value === form.speechProviderType)?.endpoint} placeholder="Optional managed key" /></div>
+                  {selectedSpeechProvider?.endpoint && <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.speechEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, speechEndpointUrl: e.target.value })} /></div>}
+                  {selectedSpeechProvider?.model && <ModelField label="Model name" help={helpText.speechModelName} value={form.speechModelName ?? ""} onChange={(value) => setForm({ ...form, speechModelName: value })} loading={modelLoading === "speech"} options={modelLookupKeys.speech === modelRequestKey("speech") ? modelOptions.speech : []} onOpen={() => lookupModels("speech")} />}
+                  {selectedSpeechProvider?.endpoint && <div className="field"><FieldLabel help={helpText.speechApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.speechApiKey ?? ""} onChange={(e) => setForm({ ...form, speechApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
                 </div>
                 <label className="checkbox-row"><input type="checkbox" checked={form.speechDiarizationEnabled} disabled={form.speechProviderType !== "openai"} onChange={(e) => setForm({ ...form, speechDiarizationEnabled: e.target.checked })} /> OpenAI saved-recording diarization enabled</label>
               </FormSection>
 
-              <FormSection title="Document generation formatter" description="The formatter creates the final document. It is not the speech provider and not the privacy review provider.">
-                <ProviderHint provider={formatterProviders.find((item) => item.value === form.documentGenerationProviderType)} />
-                <div className="grid four">
+              <FormSection title="Document generation" description="Choose the managed formatter provider, connection settings, and whether users may choose another formatter locally.">
+                <ProviderHint provider={selectedFormatterProvider} />
+                <div className="grid two">
                   <div className="field"><FieldLabel help={helpText.documentGenerationProviderType}>Selected formatter</FieldLabel><select value={form.documentGenerationProviderType ?? ""} onChange={(e) => applyProviderDefault("formatter", e.target.value)}>{formatterProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
-                  <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.documentGenerationEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, documentGenerationEndpointUrl: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} /></div>
-                  <ModelField label="Model name" help={helpText.documentGenerationModel} value={form.documentGenerationModel ?? ""} onChange={(value) => setForm({ ...form, documentGenerationModel: value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.model} loading={modelLoading === "formatter"} options={modelLookupKeys.formatter === modelRequestKey("formatter") ? modelOptions.formatter : []} onOpen={() => lookupModels("formatter")} />
-                  <div className="field"><FieldLabel help={helpText.documentGenerationApiKey}>API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.documentGenerationApiKey ?? ""} onChange={(e) => setForm({ ...form, documentGenerationApiKey: e.target.value })} disabled={!formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.endpoint} placeholder="Optional managed key" /></div>
-                  <div className="field"><FieldLabel help="Stored for admin policy warnings and privacy summaries. Use safe only for controlled or explicitly approved providers.">Privacy classification</FieldLabel><select value={form.formatterPrivacyEmphasis} onChange={(e) => setForm({ ...form, formatterPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
+                  {selectedFormatterProvider?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.documentGenerationEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, documentGenerationEndpointUrl: e.target.value })} /></div>}
+                  {selectedFormatterProvider?.model && <ModelField label="Model name" help={helpText.documentGenerationModel} value={form.documentGenerationModel ?? ""} onChange={(value) => setForm({ ...form, documentGenerationModel: value })} loading={modelLoading === "formatter"} options={modelLookupKeys.formatter === modelRequestKey("formatter") ? modelOptions.formatter : []} onOpen={() => lookupModels("formatter")} />}
+                  {selectedFormatterProvider?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.documentGenerationApiKey ?? ""} onChange={(e) => setForm({ ...form, documentGenerationApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
                 </div>
+                <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /> Allow users to choose another formatter</label>
               </FormSection>
 
               <FormSection title="Privacy control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review.">
@@ -526,7 +529,6 @@ export default function ConfigsPage() {
                       <label className="policy-toggle"><input type="checkbox" checked={form.hideSettings} onChange={(e) => setForm({ ...form, hideSettings: e.target.checked })} /><span><FieldLabel help={helpText.hideSettings}>Hide most app settings</FieldLabel><small>Keeps managed enterprise users focused on status, support, and daily use.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /><span><strong>User may change speech</strong><small>Allows local speech-provider changes for this managed profile.</small></span></label>
-                      <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /><span><strong>User may change formatter</strong><small>Allows local document-generation provider changes for this managed profile.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /><span><strong>User may change privacy review</strong><small>Allows local privacy-review provider changes for this managed profile.</small></span></label>
                     </div>
                   </div>
@@ -691,6 +693,17 @@ function providerDefaultModel(provider?: unknown) {
   if (!provider || typeof provider !== "object" || !("modelDefault" in provider)) return "";
   const value = (provider as { modelDefault?: unknown }).modelDefault;
   return typeof value === "string" ? value : "";
+}
+
+function formatterPrivacyDefault(providerType: string, fallback: string) {
+  if (providerType === "apple_intelligence") return "safe";
+  if (["ollama", "openai_compatible"].includes(providerType)) return "managed";
+  return fallback;
+}
+
+function normalizeFormatterProviderType(providerType?: string | null) {
+  if (providerType === "openai" || providerType === "vllm") return "openai_compatible";
+  return providerType ?? "";
 }
 
 function labelFor(key: string) {
