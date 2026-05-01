@@ -341,10 +341,16 @@ export class ActivationService {
     const source = isRecord(policy) ? policy : {};
     const overrideValue = firstBoolean(source.allowPolicyOverride, source.allowLocalOverride, source.userMayOverridePolicy);
     const hideSettingsValue = firstBoolean(source.hideSettings, source.hideAppSettings, source.hideSettingsUI);
+    const speechChangeValue = firstBoolean(source.userMayChangeSpeechProvider, source.userMayChangeSpeech, source.allowSpeechProviderChange);
+    const formatterChangeValue = firstBoolean(source.userMayChangeFormatter, source.userMayChangeDocumentGenerationProvider, source.allowFormatterChange);
+    const privacyReviewChangeValue = firstBoolean(source.userMayChangePrivacyReviewProvider, source.userMayChangePrivacyReview, source.allowPrivacyReviewProviderChange);
     return {
       ...source,
       allowPolicyOverride: overrideValue ?? false,
-      hideSettings: hideSettingsValue ?? false
+      hideSettings: hideSettingsValue ?? false,
+      userMayChangeSpeechProvider: speechChangeValue ?? false,
+      userMayChangeFormatter: formatterChangeValue ?? false,
+      userMayChangePrivacyReviewProvider: privacyReviewChangeValue ?? false
     };
   }
 }

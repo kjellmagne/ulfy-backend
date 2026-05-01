@@ -48,7 +48,16 @@ export const ManagedPolicyPayload = z.object({
   userMayOverridePolicy: z.boolean().optional(),
   hideSettings: z.boolean().default(false),
   hideAppSettings: z.boolean().optional(),
-  hideSettingsUI: z.boolean().optional()
+  hideSettingsUI: z.boolean().optional(),
+  userMayChangeSpeechProvider: z.boolean().default(false),
+  userMayChangeSpeech: z.boolean().optional(),
+  allowSpeechProviderChange: z.boolean().optional(),
+  userMayChangeFormatter: z.boolean().default(false),
+  userMayChangeDocumentGenerationProvider: z.boolean().optional(),
+  allowFormatterChange: z.boolean().optional(),
+  userMayChangePrivacyReviewProvider: z.boolean().default(false),
+  userMayChangePrivacyReview: z.boolean().optional(),
+  allowPrivacyReviewProviderChange: z.boolean().optional()
 }).passthrough();
 
 export const ConfigProfilePayload = z.object({

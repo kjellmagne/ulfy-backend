@@ -137,7 +137,13 @@ describe("ActivationService", () => {
           documentGenerationApiKey: "docgen-key",
           featureFlags: { enterpriseTemplates: true },
           allowedProviderRestrictions: [],
-          managedPolicy: { allowPolicyOverride: false, hideSettings: true }
+          managedPolicy: {
+            allowPolicyOverride: false,
+            hideSettings: true,
+            userMayChangeSpeechProvider: true,
+            userMayChangeFormatter: true,
+            userMayChangePrivacyReviewProvider: true
+          }
         }
       }
     });
@@ -160,7 +166,13 @@ describe("ActivationService", () => {
       name: "Default Enterprise Profile",
       speechApiKey: "speech-key",
       documentGenerationApiKey: "docgen-key",
-      managedPolicy: { allowPolicyOverride: false, hideSettings: true }
+      managedPolicy: {
+        allowPolicyOverride: false,
+        hideSettings: true,
+        userMayChangeSpeechProvider: true,
+        userMayChangeFormatter: true,
+        userMayChangePrivacyReviewProvider: true
+      }
     });
   });
 });
