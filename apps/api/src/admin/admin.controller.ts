@@ -264,10 +264,10 @@ export class ConfigDto {
   allowedProviderRestrictions?: string[];
   @ApiProperty({
     required: false,
-    description: "Admin-side provider profile metadata, privacy classifications and future app connection profile settings. Not required by the current mobile payload.",
+    description: "Provider catalog metadata returned to enterprise clients for richer provider availability UI. Top-level speech/documentGeneration fields still define the default managed provider; providerProfiles lists which providers are available and stores connection profiles for built-in and custom formatter providers.",
     example: {
-      speech: { selected: "azure", azure: { endpointURL: "http://192.168.222.171:5000" } },
-      formatter: { selected: "openai_compatible", privacyEmphasis: "managed" },
+      speech: { selected: "azure", available: ["local", "apple_online", "azure"], providers: { azure: { enabled: true, endpointUrl: "https://kvasetech.com/stt", privacyClass: "Safe" } } },
+      formatter: { selected: "openai_compatible", selectedProviderId: "openai_compatible", available: ["apple_intelligence", "openai_compatible"], providers: [{ id: "openai_compatible", name: "OpenAI-compatible", type: "openai_compatible", enabled: true, endpointUrl: "https://api.openai.com/v1", modelName: "gpt-5-mini", privacyEmphasis: "managed" }] },
       privacyReview: { selected: "local_heuristic" },
       presidio: { scoreThreshold: 0.7, detectEmail: true, detectPerson: true }
     }
@@ -1239,10 +1239,10 @@ export class AdminController {
   @ApiBody({ type: ConfigDto })
   @ApiOkResponse({ description: "Config profile updated." })
   async updateConfig(@Param("id") id: string, @Body() dto: ConfigDto, @Req() req: any) {
-    await this.assertConfigAccess(req, id);
+    const existing = await this.assertConfigAccess(req, id);
     const partnerId = this.scopedPartnerId(req);
     if (partnerId) dto.partnerId = partnerId;
-    const profile = await this.prisma.configProfile.update({ where: { id }, data: this.cleanConfig(dto) as any });
+    const profile = await this.prisma.configProfile.update({ where: { id }, data: this.cleanConfig(dto, existing) as any });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "config.update", targetType: "ConfigProfile", targetId: id });
     return this.maskAdminConfigSecrets(profile);
   }
@@ -1745,7 +1745,7 @@ export class AdminController {
     return this.prisma.activationAuditLog.findMany({ where: partnerId ? { actorAdminId: req.user.sub } : {}, orderBy: { createdAt: "desc" }, take: 200 });
   }
 
-  private cleanConfig(dto: ConfigDto) {
+  private cleanConfig(dto: ConfigDto, existing?: { providerProfiles?: unknown }) {
     const data: Record<string, unknown> = {
       name: dto.name,
       partnerId: this.emptyToNull(dto.partnerId),
@@ -1778,7 +1778,7 @@ export class AdminController {
       telemetryEndpointUrl: this.emptyToNull(dto.telemetryEndpointUrl),
       featureFlags: dto.featureFlags ?? {},
       allowedProviderRestrictions: dto.allowedProviderRestrictions ?? [],
-      providerProfiles: dto.providerProfiles ?? {},
+      providerProfiles: this.preserveMaskedProviderSecrets(dto.providerProfiles ?? {}, existing?.providerProfiles),
       managedPolicy: dto.managedPolicy ?? {},
       defaultTemplateId: this.emptyToNull(dto.defaultTemplateId ?? undefined)
     };
@@ -1803,8 +1803,35 @@ export class AdminController {
       speechApiKey: profile.speechApiKey ? ADMIN_SECRET_MASK : null,
       presidioApiKey: profile.presidioApiKey ? ADMIN_SECRET_MASK : null,
       privacyReviewApiKey: profile.privacyReviewApiKey ? ADMIN_SECRET_MASK : null,
-      documentGenerationApiKey: profile.documentGenerationApiKey ? ADMIN_SECRET_MASK : null
+      documentGenerationApiKey: profile.documentGenerationApiKey ? ADMIN_SECRET_MASK : null,
+      providerProfiles: this.maskNestedProviderSecrets((profile as T & { providerProfiles?: unknown }).providerProfiles)
     };
+  }
+
+  private preserveMaskedProviderSecrets(next: unknown, existing: unknown): unknown {
+    if (next === ADMIN_SECRET_MASK) return existing;
+    if (Array.isArray(next)) {
+      const existingItems = Array.isArray(existing) ? existing : [];
+      const existingById = new Map(existingItems.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item) && typeof (item as Record<string, unknown>).id === "string").map((item) => [item.id, item]));
+      return next.map((item, index) => {
+        const itemId = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>).id : undefined;
+        return this.preserveMaskedProviderSecrets(item, typeof itemId === "string" ? existingById.get(itemId) : existingItems[index]);
+      });
+    }
+    if (next && typeof next === "object") {
+      const source = next as Record<string, unknown>;
+      const existingRecord = existing && typeof existing === "object" && !Array.isArray(existing) ? existing as Record<string, unknown> : {};
+      return Object.fromEntries(Object.entries(source).map(([key, value]) => [key, key === "apiKey" && value === ADMIN_SECRET_MASK ? existingRecord[key] : this.preserveMaskedProviderSecrets(value, existingRecord[key])]));
+    }
+    return next;
+  }
+
+  private maskNestedProviderSecrets(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map((item) => this.maskNestedProviderSecrets(item));
+    if (value && typeof value === "object") {
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, key === "apiKey" && typeof item === "string" && item ? ADMIN_SECRET_MASK : this.maskNestedProviderSecrets(item)]));
+    }
+    return value;
   }
 
   private safeTemplatePreviewProviderSetting(value: unknown) {

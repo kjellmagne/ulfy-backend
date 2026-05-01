@@ -34,16 +34,46 @@ const helpText = {
   hideSettings: "When enabled, the iOS app should hide most local settings for managed enterprise users and leave only operational screens such as license status, about, support, and diagnostics. Full support once implemented in the app."
 };
 
-const speechProviders = [
-  { value: "", label: "Not managed", privacy: "Local setting kept", endpoint: false, model: false, diarization: false, ready: true },
+type ProviderDefinition = {
+  value: string;
+  label: string;
+  privacy: string;
+  endpoint: boolean;
+  model: boolean;
+  diarization?: boolean;
+  ready: boolean;
+  endpointDefault?: string;
+  modelDefault?: string;
+};
+
+type SpeechProviderConfig = {
+  endpointUrl: string;
+  modelName: string;
+  apiKey: string;
+  speakerDiarizationEnabled: boolean;
+};
+
+type FormatterProviderProfile = {
+  id: string;
+  name: string;
+  type: string;
+  enabled: boolean;
+  builtIn: boolean;
+  endpointUrl: string;
+  modelName: string;
+  apiKey: string;
+  privacyEmphasis: string;
+};
+
+const speechProviders: ProviderDefinition[] = [
   { value: "local", label: "Local", privacy: "Safe", endpoint: false, model: false, diarization: false, ready: true },
   { value: "apple_online", label: "Apple Online", privacy: "Use with caution", endpoint: false, model: false, diarization: false, ready: true },
   { value: "openai", label: "OpenAI Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: true, ready: true, endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-4o-transcribe" },
-  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, endpointDefault: "https://kvasetech.com/stt" }
+  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, endpointDefault: "https://kvasetech.com/stt" },
+  { value: "gemini", label: "Gemini Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: false, ready: false, endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-live-2.5-flash-preview" }
 ];
 
-const formatterProviders = [
-  { value: "", label: "Not managed", ready: true, endpoint: false, model: false, privacy: "Local setting kept" },
+const formatterProviders: ProviderDefinition[] = [
   { value: "apple_intelligence", label: "Apple Intelligence", ready: true, endpoint: false, model: false, privacy: "Safe" },
   { value: "openai_compatible", label: "OpenAI-compatible", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" }
@@ -60,11 +90,13 @@ const empty = {
   name: "",
   description: "",
   partnerId: "",
-  speechProviderType: "",
+  speechProviderType: "local",
   speechEndpointUrl: "",
   speechModelName: "",
   speechApiKey: "",
   speechDiarizationEnabled: false,
+  speechAvailableProviders: ["local", "apple_online", "openai", "azure"],
+  speechProviderConfigs: {},
   privacyControlEnabled: true,
   piiControlEnabled: true,
   presidioEndpointUrl: "",
@@ -87,6 +119,8 @@ const empty = {
   documentGenerationModel: "",
   documentGenerationApiKey: "",
   formatterPrivacyEmphasis: "safe",
+  selectedFormatterProviderId: "apple_intelligence",
+  formatterProviders: [],
   templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest",
   telemetryEndpointUrl: "",
   developerMode: false,
@@ -97,8 +131,7 @@ const empty = {
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
   externalFormattersAllowed: false,
-  defaultTemplateId: "",
-  allowedProviderRestrictionsText: "[\"openai_compatible\"]"
+  defaultTemplateId: ""
 };
 
 type ModelKind = "speech" | "formatter" | "review";
@@ -118,9 +151,9 @@ export default function ConfigsPage() {
   const [modelLookupKeys, setModelLookupKeys] = useState<Record<ModelKind, string>>({ speech: "", formatter: "", review: "" });
   const [editorOpen, setEditorOpen] = useState(false);
   const { notify } = useToast();
-  const selectedSpeechProvider = speechProviders.find((item) => item.value === form.speechProviderType);
-  const selectedFormatterProvider = formatterProviders.find((item) => item.value === form.documentGenerationProviderType);
   const selectedPrivacyReviewProvider = privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType);
+  const configuredFormatterProviders = currentFormatterProviders(form);
+  const selectedFormatterProvider = configuredFormatterProviders.find((provider) => provider.id === form.selectedFormatterProviderId) ?? configuredFormatterProviders[0];
 
   async function load() {
     try {
@@ -143,13 +176,28 @@ export default function ConfigsPage() {
   function edit(profile: any) {
     const providerProfiles = profile.providerProfiles ?? {};
     const managedPolicy = profile.managedPolicy ?? {};
+    const speechProviderType = profile.speechProviderType ?? "";
     const documentGenerationProviderType = normalizeFormatterProviderType(profile.documentGenerationProviderType ?? "");
     const privacyReviewProviderType = normalizeReviewProviderType(profile.privacyReviewProviderType ?? "");
+    const speechProviderConfigs = speechConfigFromProfile(profile, providerProfiles);
+    const speechAvailableProviders = providerProfiles?.speech?.available?.length
+      ? providerProfiles.speech.available
+      : speechProviderType
+        ? [speechProviderType]
+        : [];
+    const formatterProfiles = formatterProfilesFromProfile(profile, providerProfiles);
+    const selectedFormatterProviderId = providerProfiles?.formatter?.selectedProviderId
+      ?? formatterProfiles.find((provider) => provider.type === documentGenerationProviderType && provider.endpointUrl === (profile.documentGenerationEndpointUrl ?? ""))?.id
+      ?? documentGenerationProviderType
+      ?? "apple_intelligence";
     setSelected(profile.id);
     setForm({
       ...empty,
       ...profile,
       partnerId: profile.partnerId ?? "",
+      speechProviderType,
+      speechProviderConfigs,
+      speechAvailableProviders,
       documentGenerationProviderType,
       privacyReviewProviderType,
       speechApiKey: profile.speechApiKey ? SAVED_SECRET_MASK : "",
@@ -165,6 +213,8 @@ export default function ConfigsPage() {
       detectIdentifier: profile.presidioDetectIdentifier ?? providerProfiles?.presidio?.detectIdentifier ?? true,
       fullPersonNamesOnly: profile.presidioFullPersonNamesOnly ?? providerProfiles?.presidio?.fullPersonNamesOnly ?? false,
       formatterPrivacyEmphasis: providerProfiles?.formatter?.privacyEmphasis ?? "managed",
+      formatterProviders: formatterProfiles,
+      selectedFormatterProviderId,
       privacyReviewPrivacyEmphasis: providerProfiles?.privacyReview?.privacyEmphasis ?? "safe",
       developerMode: profile.featureFlags?.developerMode ?? false,
       allowExternalProviders: profile.featureFlags?.allowExternalProviders ?? false,
@@ -174,7 +224,6 @@ export default function ConfigsPage() {
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
       userMayChangePrivacyReviewProvider: managedPolicy?.userMayChangePrivacyReviewProvider ?? false,
       externalFormattersAllowed: managedPolicy?.externalFormattersAllowed ?? false,
-      allowedProviderRestrictionsText: JSON.stringify(profile.allowedProviderRestrictions ?? [], null, 2),
       defaultTemplateId: profile.defaultTemplateId ?? ""
     });
     setModelOptions({ speech: [], formatter: [], review: [] });
@@ -248,18 +297,20 @@ export default function ConfigsPage() {
   }
 
   function modelLookupConfig(kind: ModelKind, source = form): ModelLookupConfig {
+    const speechConfig = speechProviderConfig(source, source.speechProviderType);
+    const formatter = currentFormatterProviders(source).find((provider) => provider.id === source.selectedFormatterProviderId) ?? currentFormatterProviders(source)[0];
     return {
       speech: {
         providerDomain: "speech",
         providerType: source.speechProviderType ?? "",
-        endpointUrl: source.speechEndpointUrl ?? "",
-        apiKey: source.speechApiKey ?? ""
+        endpointUrl: speechConfig.endpointUrl ?? "",
+        apiKey: speechConfig.apiKey ?? ""
       },
       formatter: {
         providerDomain: "document_generation",
-        providerType: source.documentGenerationProviderType ?? "",
-        endpointUrl: source.documentGenerationEndpointUrl ?? "",
-        apiKey: source.documentGenerationApiKey ?? ""
+        providerType: formatter?.type ?? "",
+        endpointUrl: formatter?.endpointUrl ?? "",
+        apiKey: formatter?.apiKey ?? ""
       },
       review: {
         providerDomain: "privacy_review",
@@ -299,7 +350,17 @@ export default function ConfigsPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const allowedProviderRestrictions = JSON.parse(form.allowedProviderRestrictionsText || "[]");
+      const speechAvailableProviders = normalizedSpeechAvailable(form);
+      const formatterProfiles = currentFormatterProviders(form);
+      const enabledFormatterProfiles = formatterProfiles.filter((provider) => provider.enabled);
+      const selectedSpeechConfig = speechProviderConfig(form, form.speechProviderType);
+      const selectedFormatter = formatterProfiles.find((provider) => provider.id === form.selectedFormatterProviderId) ?? enabledFormatterProfiles[0] ?? formatterProfiles[0];
+      const selectedFormatterDefinition = formatterProviders.find((item) => item.value === selectedFormatter?.type);
+      const allowedProviderRestrictions = Array.from(new Set([
+        ...speechAvailableProviders,
+        ...enabledFormatterProfiles.map((provider) => provider.type),
+        form.privacyReviewProviderType
+      ].filter(Boolean)));
       const featureFlags = {
         enterpriseTemplates: true,
         developerMode: Boolean(form.developerMode),
@@ -308,13 +369,40 @@ export default function ConfigsPage() {
       const providerProfiles = {
         speech: {
           selected: form.speechProviderType || null,
-          speakerDiarizationEnabled: Boolean(form.speechDiarizationEnabled),
-          privacyClass: speechProviders.find((item) => item.value === form.speechProviderType)?.privacy ?? null
+          available: speechAvailableProviders,
+          providers: Object.fromEntries(speechProviders.map((provider) => {
+            const config = speechProviderConfig(form, provider.value);
+            return [provider.value, {
+              type: provider.value,
+              name: provider.label,
+              enabled: speechAvailableProviders.includes(provider.value),
+              endpointUrl: provider.endpoint ? config.endpointUrl || null : null,
+              modelName: provider.model ? config.modelName || null : null,
+              apiKey: provider.endpoint ? config.apiKey || null : null,
+              speakerDiarizationEnabled: provider.diarization ? Boolean(config.speakerDiarizationEnabled) : false,
+              privacyClass: provider.privacy,
+              ready: provider.ready
+            }];
+          }))
         },
         formatter: {
-          selected: form.documentGenerationProviderType || null,
-          privacyEmphasis: form.formatterPrivacyEmphasis,
-          privacyClass: formatterProviders.find((item) => item.value === form.documentGenerationProviderType)?.privacy ?? null
+          selected: selectedFormatter?.type || null,
+          selectedProviderId: selectedFormatter?.id || null,
+          available: enabledFormatterProfiles.map((provider) => provider.id),
+          privacyEmphasis: selectedFormatter?.privacyEmphasis ?? form.formatterPrivacyEmphasis,
+          providers: formatterProfiles.map((provider) => ({
+            id: provider.id,
+            name: provider.name,
+            type: provider.type,
+            enabled: Boolean(provider.enabled),
+            builtIn: Boolean(provider.builtIn),
+            endpointUrl: formatterProviderDefinition(provider.type)?.endpoint ? provider.endpointUrl || null : null,
+            modelName: formatterProviderDefinition(provider.type)?.model ? provider.modelName || null : null,
+            apiKey: formatterProviderDefinition(provider.type)?.endpoint ? provider.apiKey || null : null,
+            privacyEmphasis: provider.privacyEmphasis,
+            privacyClass: formatterProviderDefinition(provider.type)?.privacy ?? null
+          })),
+          privacyClass: selectedFormatterDefinition?.privacy ?? null
         },
         presidio: {
           scoreThreshold: Number(form.piiScoreThreshold || 0.7),
@@ -342,16 +430,15 @@ export default function ConfigsPage() {
         piiRequired: Boolean(form.piiControlEnabled)
       };
       const speechProvider = speechProviders.find((item) => item.value === form.speechProviderType);
-      const formatterProvider = formatterProviders.find((item) => item.value === form.documentGenerationProviderType);
       const reviewProvider = privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType);
       const payload = {
         name: form.name,
         description: form.description,
         partnerId: form.partnerId || null,
         speechProviderType: form.speechProviderType || null,
-        speechEndpointUrl: speechProvider?.endpoint ? form.speechEndpointUrl || null : null,
-        speechModelName: speechProvider?.model ? form.speechModelName || null : null,
-        speechApiKey: selected && form.speechApiKey === SAVED_SECRET_MASK ? undefined : speechProvider?.endpoint ? form.speechApiKey || null : null,
+        speechEndpointUrl: speechProvider?.endpoint ? selectedSpeechConfig.endpointUrl || null : null,
+        speechModelName: speechProvider?.model ? selectedSpeechConfig.modelName || null : null,
+        speechApiKey: selected && selectedSpeechConfig.apiKey === SAVED_SECRET_MASK ? undefined : speechProvider?.endpoint ? selectedSpeechConfig.apiKey || null : null,
         privacyControlEnabled: Boolean(form.privacyControlEnabled),
         piiControlEnabled: Boolean(form.piiControlEnabled),
         presidioEndpointUrl: form.presidioEndpointUrl || null,
@@ -368,10 +455,10 @@ export default function ConfigsPage() {
         privacyReviewEndpointUrl: reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewEndpointUrl || null : null,
         privacyReviewModel: reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewModel || null : null,
         privacyReviewApiKey: selected && form.privacyReviewApiKey === SAVED_SECRET_MASK ? undefined : reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewApiKey || null : null,
-        documentGenerationProviderType: form.documentGenerationProviderType || null,
-        documentGenerationEndpointUrl: formatterProvider?.endpoint ? form.documentGenerationEndpointUrl || null : null,
-        documentGenerationModel: formatterProvider?.model ? form.documentGenerationModel || null : null,
-        documentGenerationApiKey: selected && form.documentGenerationApiKey === SAVED_SECRET_MASK ? undefined : formatterProvider?.endpoint ? form.documentGenerationApiKey || null : null,
+        documentGenerationProviderType: selectedFormatter?.type || null,
+        documentGenerationEndpointUrl: selectedFormatterDefinition?.endpoint ? selectedFormatter.endpointUrl || null : null,
+        documentGenerationModel: selectedFormatterDefinition?.model ? selectedFormatter.modelName || null : null,
+        documentGenerationApiKey: selected && selectedFormatter?.apiKey === SAVED_SECRET_MASK ? undefined : selectedFormatterDefinition?.endpoint ? selectedFormatter?.apiKey || null : null,
         templateRepositoryUrl: form.templateRepositoryUrl || null,
         telemetryEndpointUrl: form.telemetryEndpointUrl || null,
         featureFlags,
@@ -388,7 +475,7 @@ export default function ConfigsPage() {
       setEditorOpen(false);
       await load();
     } catch (err: any) {
-      notify({ tone: "danger", title: "Could not save profile", message: err instanceof SyntaxError ? "Allowed providers must be valid JSON." : getErrorMessage(err) });
+      notify({ tone: "danger", title: "Could not save profile", message: getErrorMessage(err) });
     } finally {
       setSaving(false);
     }
@@ -425,6 +512,147 @@ export default function ConfigsPage() {
     } finally {
       setCloningId("");
     }
+  }
+
+  function toggleSpeechProvider(providerValue: string, enabled: boolean) {
+    const current = normalizedSpeechAvailable(form);
+    const nextAvailable = enabled ? Array.from(new Set([...current, providerValue])) : current.filter((value: string) => value !== providerValue);
+    const nextDefault = nextAvailable.includes(form.speechProviderType) ? form.speechProviderType : nextAvailable[0] ?? "";
+    const provider = speechProviders.find((item) => item.value === nextDefault);
+    const config = speechProviderConfig(form, nextDefault);
+    setForm({
+      ...form,
+      speechAvailableProviders: nextAvailable,
+      speechProviderType: nextDefault,
+      speechEndpointUrl: provider?.endpoint ? config.endpointUrl : "",
+      speechModelName: provider?.model ? config.modelName : "",
+      speechApiKey: provider?.endpoint ? config.apiKey : "",
+      speechDiarizationEnabled: provider?.diarization ? config.speakerDiarizationEnabled : false
+    });
+  }
+
+  function setSpeechDefault(providerValue: string) {
+    const provider = speechProviders.find((item) => item.value === providerValue);
+    const config = speechProviderConfig(form, providerValue);
+    setForm({
+      ...form,
+      speechAvailableProviders: Array.from(new Set([...normalizedSpeechAvailable(form), providerValue])),
+      speechProviderType: providerValue,
+      speechEndpointUrl: provider?.endpoint ? config.endpointUrl : "",
+      speechModelName: provider?.model ? config.modelName : "",
+      speechApiKey: provider?.endpoint ? config.apiKey : "",
+      speechDiarizationEnabled: provider?.diarization ? config.speakerDiarizationEnabled : false
+    });
+    refreshModelsForNextForm("speech", { ...form, speechProviderType: providerValue, speechProviderConfigs: form.speechProviderConfigs }, Boolean(provider?.model));
+  }
+
+  function updateSpeechConfig(providerValue: string, patch: Partial<SpeechProviderConfig>) {
+    const current = speechProviderConfig(form, providerValue);
+    const nextConfigs = {
+      ...(form.speechProviderConfigs ?? {}),
+      [providerValue]: { ...current, ...patch }
+    };
+    const next = { ...form, speechProviderConfigs: nextConfigs };
+    if (form.speechProviderType === providerValue) {
+      const provider = speechProviders.find((item) => item.value === providerValue);
+      const nextConfig = nextConfigs[providerValue];
+      Object.assign(next, {
+        speechEndpointUrl: provider?.endpoint ? nextConfig.endpointUrl : "",
+        speechModelName: provider?.model ? nextConfig.modelName : "",
+        speechApiKey: provider?.endpoint ? nextConfig.apiKey : "",
+        speechDiarizationEnabled: provider?.diarization ? nextConfig.speakerDiarizationEnabled : false
+      });
+    }
+    setForm(next);
+  }
+
+  function toggleFormatterProvider(providerId: string, enabled: boolean) {
+    const profiles = currentFormatterProviders(form).map((provider) => provider.id === providerId ? { ...provider, enabled } : provider);
+    const selectedStillEnabled = profiles.some((provider) => provider.id === form.selectedFormatterProviderId && provider.enabled);
+    const nextSelected = selectedStillEnabled ? form.selectedFormatterProviderId : profiles.find((provider) => provider.enabled)?.id ?? profiles[0]?.id ?? "";
+    const selectedProvider = profiles.find((provider) => provider.id === nextSelected);
+    setForm({
+      ...form,
+      formatterProviders: profiles,
+      selectedFormatterProviderId: nextSelected,
+      documentGenerationProviderType: selectedProvider?.type ?? "",
+      documentGenerationEndpointUrl: selectedProvider?.endpointUrl ?? "",
+      documentGenerationModel: selectedProvider?.modelName ?? "",
+      documentGenerationApiKey: selectedProvider?.apiKey ?? "",
+      formatterPrivacyEmphasis: selectedProvider?.privacyEmphasis ?? form.formatterPrivacyEmphasis
+    });
+  }
+
+  function setFormatterDefault(providerId: string) {
+    const profiles = currentFormatterProviders(form).map((provider) => provider.id === providerId ? { ...provider, enabled: true } : provider);
+    const selectedProvider = profiles.find((provider) => provider.id === providerId);
+    const next = {
+      ...form,
+      formatterProviders: profiles,
+      selectedFormatterProviderId: providerId,
+      documentGenerationProviderType: selectedProvider?.type ?? "",
+      documentGenerationEndpointUrl: selectedProvider?.endpointUrl ?? "",
+      documentGenerationModel: selectedProvider?.modelName ?? "",
+      documentGenerationApiKey: selectedProvider?.apiKey ?? "",
+      formatterPrivacyEmphasis: selectedProvider?.privacyEmphasis ?? form.formatterPrivacyEmphasis
+    };
+    setForm(next);
+    refreshModelsForNextForm("formatter", next, Boolean(formatterProviderDefinition(selectedProvider?.type)?.model));
+  }
+
+  function updateFormatterProvider(providerId: string, patch: Partial<FormatterProviderProfile>) {
+    const profiles = currentFormatterProviders(form).map((provider) => provider.id === providerId ? { ...provider, ...patch } : provider);
+    const selectedProvider = profiles.find((provider) => provider.id === form.selectedFormatterProviderId);
+    setForm({
+      ...form,
+      formatterProviders: profiles,
+      documentGenerationProviderType: selectedProvider?.type ?? "",
+      documentGenerationEndpointUrl: selectedProvider?.endpointUrl ?? "",
+      documentGenerationModel: selectedProvider?.modelName ?? "",
+      documentGenerationApiKey: selectedProvider?.apiKey ?? "",
+      formatterPrivacyEmphasis: selectedProvider?.privacyEmphasis ?? form.formatterPrivacyEmphasis
+    });
+  }
+
+  function addFormatterProvider() {
+    const id = `custom-${Date.now().toString(36)}`;
+    const profile: FormatterProviderProfile = {
+      id,
+      name: "New provider",
+      type: "openai_compatible",
+      enabled: true,
+      builtIn: false,
+      endpointUrl: "https://kvasetech.com/ollama",
+      modelName: "",
+      apiKey: "",
+      privacyEmphasis: "managed"
+    };
+    setForm({
+      ...form,
+      formatterProviders: [...currentFormatterProviders(form), profile],
+      selectedFormatterProviderId: id,
+      documentGenerationProviderType: profile.type,
+      documentGenerationEndpointUrl: profile.endpointUrl,
+      documentGenerationModel: profile.modelName,
+      documentGenerationApiKey: profile.apiKey,
+      formatterPrivacyEmphasis: profile.privacyEmphasis
+    });
+  }
+
+  function removeFormatterProvider(providerId: string) {
+    const profiles = currentFormatterProviders(form).filter((provider) => provider.id !== providerId || provider.builtIn);
+    const nextSelected = profiles.some((provider) => provider.id === form.selectedFormatterProviderId) ? form.selectedFormatterProviderId : profiles.find((provider) => provider.enabled)?.id ?? profiles[0]?.id ?? "";
+    const selectedProvider = profiles.find((provider) => provider.id === nextSelected);
+    setForm({
+      ...form,
+      formatterProviders: profiles,
+      selectedFormatterProviderId: nextSelected,
+      documentGenerationProviderType: selectedProvider?.type ?? "",
+      documentGenerationEndpointUrl: selectedProvider?.endpointUrl ?? "",
+      documentGenerationModel: selectedProvider?.modelName ?? "",
+      documentGenerationApiKey: selectedProvider?.apiKey ?? "",
+      formatterPrivacyEmphasis: selectedProvider?.privacyEmphasis ?? form.formatterPrivacyEmphasis
+    });
   }
 
   return (
@@ -465,26 +693,60 @@ export default function ConfigsPage() {
                 </div>
               </FormSection>
 
-              <FormSection title="Speech processing" description="Choose the managed speech engine, its connection settings, and whether users may choose another provider locally.">
-                <ProviderHint provider={selectedSpeechProvider} />
-                <div className="grid two">
-                  <div className="field"><FieldLabel help={helpText.speechProviderType}>Selected speech provider</FieldLabel><select value={form.speechProviderType ?? ""} onChange={(e) => applyProviderDefault("speech", e.target.value)}>{speechProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
-                  {selectedSpeechProvider?.endpoint && <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.speechEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, speechEndpointUrl: e.target.value })} /></div>}
-                  {selectedSpeechProvider?.model && <ModelField label="Model name" help={helpText.speechModelName} value={form.speechModelName ?? ""} onChange={(value) => setForm({ ...form, speechModelName: value })} loading={modelLoading === "speech"} options={modelLookupKeys.speech === modelRequestKey("speech") ? modelOptions.speech : []} onOpen={() => lookupModels("speech")} />}
-                  {selectedSpeechProvider?.endpoint && <div className="field"><FieldLabel help={helpText.speechApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.speechApiKey ?? ""} onChange={(e) => setForm({ ...form, speechApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
+              <FormSection title="Speech processing" description="Make speech providers available to the app, configure the providers that need connection details, and choose the default managed provider.">
+                <div className="provider-list">
+                  {speechProviders.map((provider) => {
+                    const available = normalizedSpeechAvailable(form).includes(provider.value);
+                    const config = speechProviderConfig(form, provider.value);
+                    return (
+                      <div className={`provider-row${available ? " enabled" : ""}`} key={provider.value}>
+                        <div className="provider-row-main">
+                          <label className="provider-enable"><input type="checkbox" checked={available} onChange={(e) => toggleSpeechProvider(provider.value, e.target.checked)} /><span><strong>{provider.label}</strong><small>{provider.privacy}{provider.ready ? "" : " · coming soon"}</small></span></label>
+                          <label className="provider-default"><input type="radio" name="speech-default-provider" checked={form.speechProviderType === provider.value} disabled={!available} onChange={() => setSpeechDefault(provider.value)} /> Default</label>
+                        </div>
+                        {available && (provider.endpoint || provider.model || provider.diarization) && (
+                          <div className="provider-config-grid">
+                            {provider.endpoint && <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={config.endpointUrl} onChange={(e) => updateSpeechConfig(provider.value, { endpointUrl: e.target.value })} /></div>}
+                            {provider.model && <ModelField label="Model name" help={helpText.speechModelName} value={config.modelName} onChange={(value) => updateSpeechConfig(provider.value, { modelName: value })} loading={modelLoading === "speech" && form.speechProviderType === provider.value} options={form.speechProviderType === provider.value && modelLookupKeys.speech === modelRequestKey("speech") ? modelOptions.speech : []} onOpen={() => setSpeechDefault(provider.value)} />}
+                            {provider.endpoint && <div className="field"><FieldLabel help={helpText.speechApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={config.apiKey} onChange={(e) => updateSpeechConfig(provider.value, { apiKey: e.target.value })} placeholder="Optional managed key" /></div>}
+                            {provider.diarization && <label className="checkbox-row provider-inline-check"><input type="checkbox" checked={Boolean(config.speakerDiarizationEnabled)} onChange={(e) => updateSpeechConfig(provider.value, { speakerDiarizationEnabled: e.target.checked })} /> Saved-recording diarization</label>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                <label className="checkbox-row"><input type="checkbox" checked={form.speechDiarizationEnabled} disabled={form.speechProviderType !== "openai"} onChange={(e) => setForm({ ...form, speechDiarizationEnabled: e.target.checked })} /> OpenAI saved-recording diarization enabled</label>
+                <label className="checkbox-row section-footer-check"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /> Allow users to choose another available speech provider</label>
               </FormSection>
 
-              <FormSection title="Document generation" description="Choose the managed formatter provider, connection settings, and whether users may choose another formatter locally.">
-                <ProviderHint provider={selectedFormatterProvider} />
-                <div className="grid two">
-                  <div className="field"><FieldLabel help={helpText.documentGenerationProviderType}>Selected formatter</FieldLabel><select value={form.documentGenerationProviderType ?? ""} onChange={(e) => applyProviderDefault("formatter", e.target.value)}>{formatterProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (coming soon)"}</option>)}</select></div>
-                  {selectedFormatterProvider?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.documentGenerationEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, documentGenerationEndpointUrl: e.target.value })} /></div>}
-                  {selectedFormatterProvider?.model && <ModelField label="Model name" help={helpText.documentGenerationModel} value={form.documentGenerationModel ?? ""} onChange={(value) => setForm({ ...form, documentGenerationModel: value })} loading={modelLoading === "formatter"} options={modelLookupKeys.formatter === modelRequestKey("formatter") ? modelOptions.formatter : []} onOpen={() => lookupModels("formatter")} />}
-                  {selectedFormatterProvider?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.documentGenerationApiKey ?? ""} onChange={(e) => setForm({ ...form, documentGenerationApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
+              <FormSection title="Document generation" description="Maintain the formatter providers the app may use. Add tenant-specific OpenAI-compatible or Ollama endpoints when needed." actions={<button type="button" className="button secondary" onClick={addFormatterProvider}><Plus size={14} /> Add provider</button>}>
+                <div className="provider-list">
+                  {configuredFormatterProviders.map((provider) => {
+                    const definition = formatterProviderDefinition(provider.type);
+                    return (
+                      <div className={`provider-row${provider.enabled ? " enabled" : ""}`} key={provider.id}>
+                        <div className="provider-row-main">
+                          <label className="provider-enable"><input type="checkbox" checked={provider.enabled} onChange={(e) => toggleFormatterProvider(provider.id, e.target.checked)} /><span><strong>{provider.name}</strong><small>{definition?.label ?? provider.type}{provider.builtIn ? " · built in" : " · custom"} · {provider.privacyEmphasis}</small></span></label>
+                          <div className="row provider-row-actions">
+                            <label className="provider-default"><input type="radio" name="formatter-default-provider" checked={form.selectedFormatterProviderId === provider.id} disabled={!provider.enabled} onChange={() => setFormatterDefault(provider.id)} /> Default</label>
+                            {!provider.builtIn && <IconAction label="Remove provider" tone="danger" onClick={() => removeFormatterProvider(provider.id)}><Trash2 size={14} /></IconAction>}
+                          </div>
+                        </div>
+                        {provider.enabled && (
+                          <div className="provider-config-grid">
+                            {!provider.builtIn && <div className="field"><FieldLabel>Provider name</FieldLabel><input className="input" value={provider.name} onChange={(e) => updateFormatterProvider(provider.id, { name: e.target.value })} /></div>}
+                            {!provider.builtIn && <div className="field"><FieldLabel help={helpText.documentGenerationProviderType}>Provider type</FieldLabel><select value={provider.type} onChange={(e) => updateFormatterProvider(provider.id, { type: e.target.value, endpointUrl: formatterProviderDefinition(e.target.value)?.endpointDefault ?? provider.endpointUrl, privacyEmphasis: formatterPrivacyDefault(e.target.value, provider.privacyEmphasis) })}>{formatterProviders.filter((item) => item.value !== "apple_intelligence").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>}
+                            {definition?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={provider.endpointUrl} onChange={(e) => updateFormatterProvider(provider.id, { endpointUrl: e.target.value })} /></div>}
+                            {definition?.model && <ModelField label="Model name" help={helpText.documentGenerationModel} value={provider.modelName} onChange={(value) => updateFormatterProvider(provider.id, { modelName: value })} loading={modelLoading === "formatter" && form.selectedFormatterProviderId === provider.id} options={form.selectedFormatterProviderId === provider.id && modelLookupKeys.formatter === modelRequestKey("formatter") ? modelOptions.formatter : []} onOpen={() => setFormatterDefault(provider.id)} />}
+                            {definition?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={provider.apiKey} onChange={(e) => updateFormatterProvider(provider.id, { apiKey: e.target.value })} placeholder="Optional managed key" /></div>}
+                            <div className="field"><FieldLabel>Privacy classification</FieldLabel><select value={provider.privacyEmphasis} onChange={(e) => updateFormatterProvider(provider.id, { privacyEmphasis: e.target.value })}><option value="safe">Safe</option><option value="managed">Managed</option><option value="caution">Use with caution</option><option value="unsafe">Unsafe</option></select></div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /> Allow users to choose another formatter</label>
+                <label className="checkbox-row section-footer-check"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /> Allow users to choose another available formatter</label>
               </FormSection>
 
               <FormSection title="Privacy control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review.">
@@ -556,14 +818,16 @@ export default function ConfigsPage() {
                   <div className="policy-card">
                     <div className="policy-card-header">
                       <h4>Feature flags and provider restrictions</h4>
-                      <p>Flags are sparse and conservative. Some decoded restrictions are reserved for stronger mobile enforcement later.</p>
+                      <p>Allowed provider restrictions are generated from the provider lists above and returned as backend provider values.</p>
                     </div>
                     <div className="policy-toggle-grid compact">
                       <label className="policy-toggle"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /><span><FieldLabel help={helpText.developerMode}>Developer mode</FieldLabel><small>Shows testing and validation tools in the app.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /><span><FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel><small>Decoded by the app, with stronger enforcement planned later.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.externalFormattersAllowed} onChange={(e) => setForm({ ...form, externalFormattersAllowed: e.target.checked })} /><span><strong>External formatters allowed</strong><small>Backend policy metadata for document-generation controls.</small></span></label>
                     </div>
-                    <div className="field policy-json-field"><FieldLabel help="Decoded by the app but not fully enforced yet. Keep this as canonical backend provider values.">Allowed provider restrictions JSON</FieldLabel><textarea value={form.allowedProviderRestrictionsText} onChange={(e) => setForm({ ...form, allowedProviderRestrictionsText: e.target.value })} /></div>
+                    <div className="provider-restriction-preview">
+                      {Array.from(new Set([...normalizedSpeechAvailable(form), ...configuredFormatterProviders.filter((provider) => provider.enabled).map((provider) => provider.type), form.privacyReviewProviderType].filter(Boolean))).map((value) => <span className="badge" key={value}>{value}</span>)}
+                    </div>
                   </div>
                 </div>
               </FormSection>
@@ -573,6 +837,97 @@ export default function ConfigsPage() {
       )}
     </RequireAuth>
   );
+}
+
+function normalizedSpeechAvailable(source: any) {
+  const values = Array.isArray(source.speechAvailableProviders) ? source.speechAvailableProviders : [];
+  const providerValues = new Set(speechProviders.map((provider) => provider.value));
+  return values.filter((value: unknown): value is string => typeof value === "string" && providerValues.has(value));
+}
+
+function speechProviderConfig(source: any, providerValue: string): SpeechProviderConfig {
+  const provider = speechProviders.find((item) => item.value === providerValue);
+  const existing = source.speechProviderConfigs?.[providerValue] ?? {};
+  return {
+    endpointUrl: existing.endpointUrl ?? provider?.endpointDefault ?? "",
+    modelName: existing.modelName ?? provider?.modelDefault ?? "",
+    apiKey: existing.apiKey ?? "",
+    speakerDiarizationEnabled: Boolean(existing.speakerDiarizationEnabled)
+  };
+}
+
+function speechConfigFromProfile(profile: any, providerProfiles: any) {
+  return Object.fromEntries(speechProviders.map((provider) => {
+    const stored = providerProfiles?.speech?.providers?.[provider.value] ?? {};
+    const selected = profile.speechProviderType === provider.value;
+    return [provider.value, {
+      endpointUrl: selected ? profile.speechEndpointUrl ?? stored.endpointUrl ?? provider.endpointDefault ?? "" : stored.endpointUrl ?? provider.endpointDefault ?? "",
+      modelName: selected ? profile.speechModelName ?? stored.modelName ?? provider.modelDefault ?? "" : stored.modelName ?? provider.modelDefault ?? "",
+      apiKey: selected ? profile.speechApiKey ?? stored.apiKey ?? "" : stored.apiKey ?? "",
+      speakerDiarizationEnabled: selected ? providerProfiles?.speech?.speakerDiarizationEnabled ?? stored.speakerDiarizationEnabled ?? false : stored.speakerDiarizationEnabled ?? false
+    }];
+  }));
+}
+
+function formatterProviderDefinition(providerType?: string | null) {
+  return formatterProviders.find((provider) => provider.value === normalizeFormatterProviderType(providerType));
+}
+
+function defaultFormatterProfiles(): FormatterProviderProfile[] {
+  return formatterProviders.map((provider) => ({
+    id: provider.value,
+    name: provider.label,
+    type: provider.value,
+    enabled: provider.value === "apple_intelligence",
+    builtIn: true,
+    endpointUrl: provider.endpointDefault ?? "",
+    modelName: provider.modelDefault ?? "",
+    apiKey: "",
+    privacyEmphasis: formatterPrivacyDefault(provider.value, "managed")
+  }));
+}
+
+function currentFormatterProviders(source: any): FormatterProviderProfile[] {
+  const stored = Array.isArray(source.formatterProviders) ? source.formatterProviders : [];
+  const base = defaultFormatterProfiles();
+  const merged = new Map<string, FormatterProviderProfile>();
+  for (const provider of base) merged.set(provider.id, provider);
+  for (const provider of stored) {
+    if (!provider?.id || !provider?.type) continue;
+    const definition = formatterProviderDefinition(provider.type);
+    merged.set(provider.id, {
+      id: String(provider.id),
+      name: String(provider.name || definition?.label || "Provider"),
+      type: normalizeFormatterProviderType(provider.type),
+      enabled: Boolean(provider.enabled),
+      builtIn: Boolean(provider.builtIn),
+      endpointUrl: String(provider.endpointUrl ?? definition?.endpointDefault ?? ""),
+      modelName: String(provider.modelName ?? definition?.modelDefault ?? ""),
+      apiKey: String(provider.apiKey ?? ""),
+      privacyEmphasis: String(provider.privacyEmphasis ?? formatterPrivacyDefault(provider.type, "managed"))
+    });
+  }
+  return Array.from(merged.values());
+}
+
+function formatterProfilesFromProfile(profile: any, providerProfiles: any): FormatterProviderProfile[] {
+  const storedProfiles = providerProfiles?.formatter?.providers;
+  const profiles = Array.isArray(storedProfiles) ? storedProfiles : defaultFormatterProfiles();
+  const selectedProviderId = providerProfiles?.formatter?.selectedProviderId;
+  const selectedType = normalizeFormatterProviderType(profile.documentGenerationProviderType ?? providerProfiles?.formatter?.selected);
+  const mapped = currentFormatterProviders({ formatterProviders: profiles });
+  return mapped.map((provider) => {
+    const isSelected = provider.id === selectedProviderId || (!selectedProviderId && provider.type === selectedType);
+    if (!isSelected) return provider;
+    return {
+      ...provider,
+      enabled: true,
+      endpointUrl: profile.documentGenerationEndpointUrl ?? provider.endpointUrl,
+      modelName: profile.documentGenerationModel ?? provider.modelName,
+      apiKey: profile.documentGenerationApiKey ?? provider.apiKey,
+      privacyEmphasis: providerProfiles?.formatter?.privacyEmphasis ?? provider.privacyEmphasis
+    };
+  });
 }
 
 function ProviderHint({ provider }: { provider?: { privacy?: string; ready?: boolean } }) {

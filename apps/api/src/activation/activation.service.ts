@@ -341,6 +341,7 @@ export class ActivationService {
       telemetryEndpointUrl: profile.telemetryEndpointUrl,
       featureFlags: profile.featureFlags,
       allowedProviderRestrictions: profile.allowedProviderRestrictions,
+      providerProfiles: profile.providerProfiles,
       managedPolicy: this.mapManagedPolicy(profile.managedPolicy),
       defaultTemplateId: profile.defaultTemplateId
     });

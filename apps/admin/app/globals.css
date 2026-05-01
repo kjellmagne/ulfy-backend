@@ -2725,6 +2725,103 @@ textarea {
   gap: 8px 16px;
 }
 
+.provider-list {
+  display: grid;
+  gap: 10px;
+}
+.provider-row {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  overflow: visible;
+}
+.provider-row.enabled {
+  border-color: #cbd5e1;
+  background: #fbfdff;
+}
+.provider-row-main {
+  min-height: 58px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+}
+.provider-enable {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.provider-enable input {
+  margin-top: 2px;
+}
+.provider-enable span {
+  display: grid;
+  gap: 3px;
+}
+.provider-enable strong {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+.provider-enable small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.provider-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.provider-default:has(input:checked) {
+  color: var(--accent-strong);
+}
+.provider-row-actions {
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+.provider-config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+.provider-config-grid .field {
+  margin-bottom: 0;
+}
+.provider-inline-check {
+  align-self: end;
+  min-height: 38px;
+}
+.section-footer-check {
+  margin-top: 12px;
+}
+.provider-restriction-preview {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+@media (max-width: 820px) {
+  .provider-row-main {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .provider-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .policy-section-stack {
   display: grid;
   gap: 14px;

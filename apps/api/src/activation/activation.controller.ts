@@ -130,6 +130,26 @@ const enterpriseConfigExample = {
   telemetryEndpointUrl: "https://telemetry.example.internal/events",
   featureFlags: { developerMode: false, allowExternalProviders: false, enterpriseTemplates: true, privacyReview: true },
   allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
+  providerProfiles: {
+    speech: {
+      selected: "azure",
+      available: ["local", "apple_online", "azure"],
+      providers: {
+        local: { type: "local", name: "Local", enabled: true, endpointUrl: null, modelName: null, privacyClass: "Safe", ready: true },
+        apple_online: { type: "apple_online", name: "Apple Online", enabled: true, endpointUrl: null, modelName: null, privacyClass: "Use with caution", ready: true },
+        azure: { type: "azure", name: "Azure / on-prem speech", enabled: true, endpointUrl: "https://kvasetech.com/stt", modelName: null, privacyClass: "Safe", ready: true }
+      }
+    },
+    formatter: {
+      selected: "openai_compatible",
+      selectedProviderId: "openai_compatible",
+      available: ["apple_intelligence", "openai_compatible"],
+      providers: [
+        { id: "apple_intelligence", name: "Apple Intelligence", type: "apple_intelligence", enabled: true, builtIn: true, endpointUrl: null, modelName: null, privacyEmphasis: "safe" },
+        { id: "openai_compatible", name: "OpenAI-compatible", type: "openai_compatible", enabled: true, builtIn: true, endpointUrl: "https://api.openai.com/v1", modelName: "gpt-5-mini", privacyEmphasis: "managed" }
+      ]
+    }
+  },
   managedPolicy: managedPolicyExample,
   defaultTemplateId: "00000000-0000-4000-8000-000000000401"
 };
@@ -274,6 +294,28 @@ const mobileConfigSchema = {
       description: "Boolean feature flags. Current app understands developerMode and may decode allowExternalProviders, enterpriseTemplates, privacyReview."
     },
     allowedProviderRestrictions: { type: "array", items: { type: "string" }, description: "Policy hint/list of allowed provider identifiers. Some app enforcement may be future-facing." },
+    providerProfiles: {
+      type: "object",
+      description: "Forward-compatible provider catalog for enterprise clients. Contains available speech providers and document-generation provider profiles, including tenant-specific OpenAI-compatible/Ollama endpoints. The selected top-level speech/documentGeneration fields remain the default/enforced provider for current app versions.",
+      example: {
+        speech: {
+          selected: "azure",
+          available: ["local", "apple_online", "azure"],
+          providers: {
+            azure: { type: "azure", name: "Azure / on-prem speech", enabled: true, endpointUrl: "https://kvasetech.com/stt", modelName: null, privacyClass: "Safe" }
+          }
+        },
+        formatter: {
+          selected: "openai_compatible",
+          selectedProviderId: "openai_compatible",
+          available: ["apple_intelligence", "openai_compatible"],
+          providers: [
+            { id: "apple_intelligence", name: "Apple Intelligence", type: "apple_intelligence", enabled: true, builtIn: true, privacyEmphasis: "safe" },
+            { id: "openai_compatible", name: "OpenAI-compatible", type: "openai_compatible", enabled: true, builtIn: true, endpointUrl: "https://api.openai.com/v1", modelName: "gpt-5-mini", privacyEmphasis: "managed" }
+          ]
+        }
+      }
+    },
     managedPolicy: managedPolicySchema,
     defaultTemplateId: { type: "string", format: "uuid", nullable: true, description: "Optional tenant default template id. Current app support is partial." }
   },
