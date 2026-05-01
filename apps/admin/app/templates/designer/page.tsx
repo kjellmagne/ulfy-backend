@@ -671,6 +671,11 @@ export default function TemplateDesignerRoute() {
               <div className="template-published-line">
                 Current published version: <strong>{latestVersion ? `v${latestVersion.version}` : "none yet"}</strong>
               </div>
+              <div className="template-title-tools">
+                <button className="button secondary" type="button" onClick={() => setAiDialogOpen(true)}>
+                  <Sparkles size={15} /> AI helper
+                </button>
+              </div>
             </div>
           </div>
           <div className="template-topbar-actions">
@@ -678,9 +683,6 @@ export default function TemplateDesignerRoute() {
               {saveState === "saving" && <Loader2 size={13} />}
               {saveLabel}
             </span>
-            <button className="button secondary" type="button" onClick={() => setAiDialogOpen(true)}>
-              <Sparkles size={15} /> AI helper
-            </button>
             <div className="publish-panel" aria-label="Publish changes">
               <div className="publish-panel-header">
                 <span>Publish changes as</span>

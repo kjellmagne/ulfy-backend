@@ -1642,6 +1642,13 @@ textarea {
   font-weight: 800;
 }
 
+.template-title-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .publish-panel-header {
   color: #64748b;
   font-size: 10px;
@@ -1859,17 +1866,12 @@ textarea {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border: 1px solid #e6eaf0;
+  border: 1px solid var(--accent);
   border-radius: 99px;
   background: #fff;
-  color: var(--muted);
+  color: var(--accent-strong);
   font-size: 10px;
   font-weight: 800;
-}
-
-.outline-number.required {
-  border-color: var(--accent);
-  color: var(--accent-strong);
   box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
 }
 
