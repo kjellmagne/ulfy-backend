@@ -2676,6 +2676,170 @@ textarea {
   font-size: 12px;
 }
 
+.config-editor-form {
+  display: grid;
+  gap: 16px;
+}
+.config-editor-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  padding: 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+}
+.config-editor-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--accent-strong);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.config-editor-hero h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 800;
+}
+.config-editor-hero p {
+  margin: 5px 0 0;
+  max-width: 720px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.config-editor-hero-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(112px, auto));
+  gap: 8px;
+}
+.config-editor-hero-meta span {
+  display: grid;
+  gap: 3px;
+  min-width: 112px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-sunken);
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.config-editor-hero-meta strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+.config-workbench {
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.config-outline {
+  position: sticky;
+  top: 18px;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+}
+.config-outline-title {
+  display: grid;
+  gap: 2px;
+  padding: 2px 2px 8px;
+}
+.config-outline-title span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+.config-outline-title small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+.config-outline-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: inherit;
+  text-decoration: none;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+.config-outline-item:hover,
+.config-outline-item:focus-visible {
+  border-color: var(--line-strong);
+  background: var(--surface-muted);
+  outline: none;
+  transform: translateY(-1px);
+}
+.config-outline-number {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1.5px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 800;
+}
+.config-outline-item strong,
+.config-outline-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.config-outline-item strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+.config-outline-item small {
+  margin-top: 2px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+.config-editor-content {
+  min-width: 0;
+}
+.config-editor-content > section {
+  scroll-margin-top: 18px;
+}
+.config-editor-content .form-section {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 18px rgba(15,23,42,0.045);
+}
+.config-editor-content .form-section-header {
+  padding: 16px 18px;
+  background: #fff;
+}
+.config-editor-content .form-section-body {
+  padding: 18px;
+  background: var(--surface-sunken);
+}
+
 .config-form {
   display: grid;
   gap: 16px;
@@ -2730,14 +2894,29 @@ textarea {
   gap: 10px;
 }
 .provider-row {
+  position: relative;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #fff;
   overflow: visible;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .provider-row.enabled {
-  border-color: #cbd5e1;
-  background: #fbfdff;
+  border-color: var(--line-strong);
+}
+.provider-row.enabled::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 12px 0 0 12px;
+  background: var(--accent);
+}
+.provider-row:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+  transform: translateY(-1px);
 }
 .provider-row-main {
   min-height: 58px;
@@ -2762,8 +2941,8 @@ textarea {
 }
 .provider-enable strong {
   color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
 }
 .provider-enable small {
   color: var(--muted);
@@ -2793,7 +2972,11 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  padding: 0 14px 14px;
+  margin: 0 14px 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-sunken);
 }
 .provider-config-grid .field {
   margin-bottom: 0;
@@ -2813,6 +2996,19 @@ textarea {
 }
 
 @media (max-width: 820px) {
+  .config-editor-hero,
+  .config-workbench {
+    grid-template-columns: 1fr;
+  }
+  .config-editor-hero-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .config-outline {
+    position: static;
+  }
+  .config-outline-item {
+    min-height: 44px;
+  }
   .provider-row-main {
     align-items: flex-start;
     flex-direction: column;
@@ -2827,10 +3023,11 @@ textarea {
   gap: 14px;
 }
 .policy-card {
-  padding: 14px;
-  border: 1px solid var(--line);
+  padding: 16px;
+  border: 1px solid var(--line-strong);
   border-radius: 12px;
-  background: var(--surface-muted);
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
 }
 .policy-card .field {
   margin-bottom: 0;
@@ -2844,8 +3041,8 @@ textarea {
 .policy-card-header h4 {
   margin: 0;
   color: var(--ink);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
 }
 .policy-card-header p {
   margin: 3px 0 0;
@@ -2869,8 +3066,19 @@ textarea {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #fff;
+  background: var(--surface-sunken);
   cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+.policy-toggle:hover,
+.policy-toggle:focus-within {
+  border-color: var(--line-strong);
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(15,23,42,0.05);
+}
+.policy-toggle:has(input:checked) {
+  border-color: rgba(13,148,136,0.36);
+  background: var(--accent-soft);
 }
 .policy-toggle input {
   margin-top: 2px;
@@ -2948,7 +3156,17 @@ textarea {
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+  box-shadow:
+    0 18px 38px rgba(15,23,42,0.10),
+    0 2px 6px rgba(15,23,42,0.06);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.template-family-card:hover {
+  border-color: rgba(13,148,136,0.34);
+  box-shadow:
+    0 24px 52px rgba(15,23,42,0.14),
+    0 8px 18px rgba(15,23,42,0.08);
+  transform: translateY(-2px);
 }
 .template-family-card::before {
   content: "";
@@ -3058,13 +3276,18 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
-  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  box-shadow:
+    0 10px 22px rgba(15,23,42,0.08),
+    0 1px 2px rgba(15,23,42,0.05);
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .template-variant-row:hover {
   border-color: var(--line-strong);
   background: var(--surface-muted);
-  box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+  box-shadow:
+    0 16px 34px rgba(15,23,42,0.12),
+    0 4px 10px rgba(15,23,42,0.07);
+  transform: translateY(-1px);
 }
 .variant-language,
 .variant-date {

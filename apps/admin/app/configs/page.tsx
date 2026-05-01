@@ -154,6 +154,19 @@ export default function ConfigsPage() {
   const selectedPrivacyReviewProvider = privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType);
   const configuredFormatterProviders = currentFormatterProviders(form);
   const selectedFormatterProvider = configuredFormatterProviders.find((provider) => provider.id === form.selectedFormatterProviderId) ?? configuredFormatterProviders[0];
+  const enabledSpeechProviders = normalizedSpeechAvailable(form);
+  const enabledFormatterProviders = configuredFormatterProviders.filter((provider) => provider.enabled);
+  const selectedPartnerName = partners.find((partner) => partner.id === form.partnerId)?.name ?? "Internal";
+  const selectedSpeechProviderLabel = speechProviders.find((provider) => provider.value === form.speechProviderType)?.label ?? "Not managed";
+  const selectedFormatterProviderLabel = selectedFormatterProvider?.name ?? "Not managed";
+  const selectedReviewProviderLabel = privacyReviewProviders.find((provider) => provider.value === form.privacyReviewProviderType)?.label ?? "Not managed";
+  const activePolicySwitches = [
+    form.hideSettings,
+    form.allowPolicyOverride,
+    form.userMayChangeSpeechProvider,
+    form.userMayChangeFormatter,
+    form.userMayChangePrivacyReviewProvider
+  ].filter(Boolean).length;
 
   async function load() {
     try {
@@ -684,7 +697,51 @@ export default function ConfigsPage() {
             onClose={() => !saving && setEditorOpen(false)}
             footer={<><button type="button" className="button secondary" onClick={() => setEditorOpen(false)} disabled={saving}>Cancel</button><button type="submit" form="config-editor-form" className="button" disabled={saving}><Save size={16} /> {saving ? "Saving..." : "Save profile"}</button></>}
           >
-            <form id="config-editor-form" onSubmit={save} className="form-stack">
+            <form id="config-editor-form" onSubmit={save} className="config-editor-form">
+              <div className="config-editor-hero">
+                <div>
+                  <span className="config-editor-kicker">Enterprise policy</span>
+                  <h3>{form.name || "Untitled config profile"}</h3>
+                  <p>{form.description || "Define the effective provider, privacy, repository, and device behavior policy returned to enterprise activations."}</p>
+                </div>
+                <div className="config-editor-hero-meta">
+                  <span><strong>{selectedPartnerName}</strong>Owner</span>
+                  <span><strong>{enabledSpeechProviders.length}</strong>Speech providers</span>
+                  <span><strong>{enabledFormatterProviders.length}</strong>Formatters</span>
+                  <span><strong>{activePolicySwitches}</strong>Policy switches</span>
+                </div>
+              </div>
+
+              <div className="config-workbench">
+                <aside className="config-outline" aria-label="Config profile sections">
+                  <div className="config-outline-title">
+                    <span>Profile map</span>
+                    <small>Click a section to jump.</small>
+                  </div>
+                  <a href="#config-profile-section" className="config-outline-item">
+                    <span className="config-outline-number">1</span>
+                    <span><strong>Profile</strong><small>{selectedPartnerName}</small></span>
+                  </a>
+                  <a href="#config-speech-section" className="config-outline-item">
+                    <span className="config-outline-number">2</span>
+                    <span><strong>Speech</strong><small>{selectedSpeechProviderLabel}</small></span>
+                  </a>
+                  <a href="#config-formatter-section" className="config-outline-item">
+                    <span className="config-outline-number">3</span>
+                    <span><strong>Document generation</strong><small>{selectedFormatterProviderLabel}</small></span>
+                  </a>
+                  <a href="#config-privacy-section" className="config-outline-item">
+                    <span className="config-outline-number">4</span>
+                    <span><strong>Privacy</strong><small>{form.privacyControlEnabled ? selectedReviewProviderLabel : "Disabled"}</small></span>
+                  </a>
+                  <a href="#config-policy-section" className="config-outline-item">
+                    <span className="config-outline-number">5</span>
+                    <span><strong>Repository & policy</strong><small>{form.hideSettings ? "Settings minimized" : "Normal settings"}</small></span>
+                  </a>
+                </aside>
+
+                <div className="config-editor-content form-stack">
+              <section id="config-profile-section">
               <FormSection title="Profile" description="Ownership and plain-language description.">
                 <div className="grid three">
                   <div className="field"><FieldLabel>Name</FieldLabel><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required /></div>
@@ -692,7 +749,9 @@ export default function ConfigsPage() {
                   <div className="field"><FieldLabel help="Partner admins assigned to this solution partner can manage this profile.">Solution partner</FieldLabel><select value={form.partnerId ?? ""} onChange={(e) => setForm({ ...form, partnerId: e.target.value })}><option value="">Internal / no partner</option>{partners.map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}</select></div>
                 </div>
               </FormSection>
+              </section>
 
+              <section id="config-speech-section">
               <FormSection title="Speech processing" description="Make speech providers available to the app, configure the providers that need connection details, and choose the default managed provider.">
                 <div className="provider-list">
                   {speechProviders.map((provider) => {
@@ -718,7 +777,9 @@ export default function ConfigsPage() {
                 </div>
                 <label className="checkbox-row section-footer-check"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /> Allow users to choose another available speech provider</label>
               </FormSection>
+              </section>
 
+              <section id="config-formatter-section">
               <FormSection title="Document generation" description="Maintain the formatter providers the app may use. Add tenant-specific OpenAI-compatible or Ollama endpoints when needed." actions={<button type="button" className="button secondary" onClick={addFormatterProvider}><Plus size={14} /> Add provider</button>}>
                 <div className="provider-list">
                   {configuredFormatterProviders.map((provider) => {
@@ -748,7 +809,9 @@ export default function ConfigsPage() {
                 </div>
                 <label className="checkbox-row section-footer-check"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /> Allow users to choose another available formatter</label>
               </FormSection>
+              </section>
 
+              <section id="config-privacy-section">
               <FormSection title="Privacy control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review.">
                 <div className="row checkbox-group">
                   <label className="checkbox-row"><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.privacyControlEnabled}>Privacy control enabled</FieldLabel></label>
@@ -788,7 +851,9 @@ export default function ConfigsPage() {
                   <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> Allow users to choose another privacy review provider</label>
                 </div>
               </FormSection>
+              </section>
 
+              <section id="config-policy-section">
               <FormSection title="Repository, telemetry and policy" description="Sparse managed config: leave fields blank when the tenant should keep local settings.">
                 <div className="policy-section-stack">
                   <div className="policy-card">
@@ -831,6 +896,9 @@ export default function ConfigsPage() {
                   </div>
                 </div>
               </FormSection>
+              </section>
+                </div>
+              </div>
             </form>
           </SidePanel>
         </>
