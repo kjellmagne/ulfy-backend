@@ -329,7 +329,7 @@ export default function TemplateDesignerRoute() {
         yamlContent: draft?.yamlContent ?? starterYaml(nextFamily, presetSections),
         sampleTranscript: draft?.sampleTranscript ?? "",
         bump: "patch",
-        aiUseCase: nextFamily.title,
+        aiUseCase: nextFamily.shortDescription || nextFamily.title,
         preview: previewFromDraft(draft)
       });
       setSelectedSectionIndex(null);
@@ -511,7 +511,7 @@ export default function TemplateDesignerRoute() {
     const doc = parseTemplateYaml(variantForm.yamlContent);
     if (!doc) {
       setSaveState("error");
-      if (!options.silent) notify({ title: "YAML has an error", message: "Fix the YAML before saving this draft.", tone: "danger" });
+      if (!options.silent) notify({ title: "YAML has an error", message: "Fix the YAML before saving changes.", tone: "danger" });
       return null;
     }
 
@@ -536,12 +536,12 @@ export default function TemplateDesignerRoute() {
       setDirty(false);
       setSaveState("saved");
       setLastSavedAt(new Date());
-      if (!options.silent) notify({ title: "Draft saved", message: "Mobile users will not see it until published.", tone: "success" });
+      if (!options.silent) notify({ title: "Changes saved", message: "Mobile users will not see these changes until you publish.", tone: "success" });
       return { variantId: nextVariantId, draftId: nextDraftId };
     } catch (err) {
       const message = getErrorMessage(err);
       setSaveState("error");
-      if (!options.silent) notify({ title: "Draft was not saved", message, tone: "danger" });
+      if (!options.silent) notify({ title: "Changes were not saved", message, tone: "danger" });
       else setError(message);
       return null;
     }
@@ -552,7 +552,7 @@ export default function TemplateDesignerRoute() {
     const saved = dirty || !variantForm.variantId ? await saveDraft({ silent: true }) : { variantId: variantForm.variantId, draftId: variantForm.draftId };
     const targetVariantId = saved?.variantId ?? variantForm.variantId;
     if (!targetVariantId) {
-      notify({ title: "Publish needs a saved draft", message: "Fix any YAML errors, then publish again.", tone: "danger" });
+      notify({ title: "Publish needs saved changes", message: "Fix any YAML errors, then publish again.", tone: "danger" });
       return;
     }
 
@@ -572,12 +572,17 @@ export default function TemplateDesignerRoute() {
 
   async function aiAssist() {
     if (!family) return;
+    const useCase = variantForm.aiUseCase.trim();
+    if (!useCase) {
+      notify({ title: "Describe the template first", message: "Tell AI what this template should be used for, then generate a suggestion.", tone: "danger" });
+      return;
+    }
     setSaveState("saving");
     try {
       const result = await api("/admin/template-drafts/ai-assist", {
         method: "POST",
         body: JSON.stringify({
-          useCase: variantForm.aiUseCase || family.title || "Template draft",
+          useCase,
           language: variantForm.language,
           category: family.category?.slug,
           title: family.title,
@@ -586,9 +591,9 @@ export default function TemplateDesignerRoute() {
       });
       updateVariantForm((current) => ({ ...current, yamlContent: result.yamlContent, sampleTranscript: result.sampleTranscript }));
       setSelectedSectionIndex(0);
-      notify({ title: "AI draft inserted", message: "Review the proposal before publishing.", tone: "success" });
+      notify({ title: "AI suggestion added", message: "Review and edit it before publishing.", tone: "success" });
     } catch (err) {
-      notify({ title: "AI assist failed", message: getErrorMessage(err), tone: "danger" });
+      notify({ title: "AI suggestion failed", message: getErrorMessage(err), tone: "danger" });
       setSaveState("error");
     }
   }
@@ -597,7 +602,7 @@ export default function TemplateDesignerRoute() {
     const saved = dirty || !variantForm.draftId ? await saveDraft({ silent: true }) : { variantId: variantForm.variantId, draftId: variantForm.draftId };
     const draftId = saved?.draftId ?? variantForm.draftId;
     if (!draftId) {
-      notify({ title: "Preview needs a saved draft", message: "Fix any YAML errors, then try again.", tone: "danger" });
+      notify({ title: "Preview needs saved changes", message: "Fix any YAML errors, then try again.", tone: "danger" });
       return;
     }
 
@@ -607,7 +612,7 @@ export default function TemplateDesignerRoute() {
       setVariantForm((current) => ({ ...current, draftId, preview }));
       setPreviewTab("document");
       if (preview.error) notify({ title: "Preview failed", message: preview.error, tone: "danger" });
-      else notify({ title: "Preview generated", message: "Generated from the current draft and sample transcript.", tone: "success" });
+      else notify({ title: "Preview generated", message: "Generated from the current template and sample transcript.", tone: "success" });
       setSaveState("saved");
     } catch (err) {
       notify({ title: "Preview failed", message: getErrorMessage(err), tone: "danger" });
@@ -616,14 +621,14 @@ export default function TemplateDesignerRoute() {
   }
 
   const saveLabel = saveState === "saving"
-    ? "Saving..."
+    ? "Saving changes..."
     : saveState === "dirty"
       ? "Unsaved changes"
       : saveState === "error"
-        ? "Save failed"
+        ? "Could not save"
         : lastSavedAt
           ? `Saved ${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-          : "Draft ready";
+          : "Saved";
 
   if (loading) {
     return (
@@ -668,11 +673,10 @@ export default function TemplateDesignerRoute() {
               {saveState === "saving" && <Loader2 size={13} />}
               {saveLabel}
             </span>
-            <button className="button secondary" type="button" onClick={aiAssist}><Sparkles size={15} /> Draft with AI</button>
-            <div className="publish-panel" aria-label="Publish draft">
+            <div className="publish-panel" aria-label="Publish changes">
               <div className="publish-panel-header">
-                <span>Publish draft as</span>
-                <InfoTip text="Patch is for small copy or prompt fixes. Minor is for meaningful template improvements. Major is for breaking structure or output changes." />
+                <span>Publish changes as</span>
+                <InfoTip text="Major changes the first version number for large structure changes. Minor changes the middle number for meaningful improvements. Patch changes the last number for small fixes." />
               </div>
               <div className="publish-control">
                 {(["major", "minor", "patch"] as const).map((bump) => (
@@ -694,6 +698,24 @@ export default function TemplateDesignerRoute() {
         </header>
 
         {error && <Alert tone="danger">{error}</Alert>}
+
+        <section className="ai-template-helper" aria-label="AI template helper">
+          <div>
+            <span className="eyebrow">AI template helper</span>
+            <h2>Describe what this template should be used for</h2>
+            <p>AI will generate a starting suggestion for the editable template and sample transcript. You review and edit everything before publishing.</p>
+          </div>
+          <div className="ai-template-controls">
+            <textarea
+              value={variantForm.aiUseCase}
+              onChange={(event) => setVariantForm((current) => ({ ...current, aiUseCase: event.target.value }))}
+              placeholder="Example: A Norwegian template for follow-up conversations after municipal health meetings. It should produce a short summary, decisions, next steps, and responsible people."
+            />
+            <button className="button secondary" type="button" onClick={aiAssist} disabled={saveState === "saving"}>
+              <Sparkles size={15} /> Generate suggestion
+            </button>
+          </div>
+        </section>
 
         <div className="template-workbench" aria-label="Template designer">
           <aside className="template-outline">
@@ -871,7 +893,7 @@ export default function TemplateDesignerRoute() {
                 variantForm.preview?.markdown ? (
                   <MarkdownDocument markdown={variantForm.preview.markdown} />
                 ) : (
-                  <EmptyState title="No generated preview" message="Generate a preview from the current draft and sample transcript." />
+                  <EmptyState title="No generated preview" message="Generate a preview from the current template and sample transcript." />
                 )
               )}
               {previewTab === "yaml" && (

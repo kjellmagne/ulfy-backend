@@ -1740,6 +1740,51 @@ textarea {
   min-height: 34px;
 }
 
+.ai-template-helper {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.78fr) minmax(360px, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  padding: 16px 18px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: #f8fbff;
+  box-shadow: 0 6px 18px rgba(15,23,42,0.04);
+}
+
+.ai-template-helper h2 {
+  margin: 5px 0 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.ai-template-helper p {
+  max-width: 560px;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-template-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.ai-template-controls textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.ai-template-controls .button {
+  align-self: end;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
 .template-workbench {
   display: grid;
   grid-template-columns: 240px minmax(420px, 1fr) minmax(360px, 440px);
@@ -3506,6 +3551,14 @@ textarea {
   }
   .template-topbar-actions {
     justify-content: flex-start;
+  }
+  .ai-template-helper,
+  .ai-template-controls {
+    grid-template-columns: 1fr;
+  }
+  .ai-template-controls .button {
+    justify-content: center;
+    width: 100%;
   }
   .template-workbench {
     grid-template-columns: 1fr;
