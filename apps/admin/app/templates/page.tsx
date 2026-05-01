@@ -6,7 +6,7 @@ import * as yaml from "js-yaml";
 import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, InfoTip, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
-import { IconPicker, LanguageCombobox, TagChipList, TagEditor, TemplateIcon, presetToTemplateSection } from "../../components/TemplateControls";
+import { IconPicker, LanguageCombobox, TagChipList, TagEditor, TemplateIcon, localizeTemplateSectionPresets, presetToTemplateSection } from "../../components/TemplateControls";
 import type { TemplateSectionPresetOption, TemplateTagOption } from "../../components/TemplateControls";
 import { useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
@@ -134,9 +134,10 @@ function uuid() {
   return globalThis.crypto?.randomUUID?.() ?? "00000000-0000-4000-8000-000000000999";
 }
 
-function starterYaml(family?: Partial<Family>) {
+function starterYaml(family?: Partial<Family>, language = "nb-NO") {
   const title = family?.title || "New Ulfy template";
   const category = family?.category?.slug || "annet";
+  const firstSection = localizeTemplateSectionPresets([fallbackSectionPresets[0]], language)[0];
   return `identity:
   id: ${uuid()}
   title: ${title}
@@ -145,7 +146,7 @@ function starterYaml(family?: Partial<Family>) {
   category: ${category}
   tags:
     - draft
-  language: nb-NO
+  language: ${language}
   version: 1.0.0
 context:
   purpose: Create a clear structured document from the transcript.
@@ -165,11 +166,12 @@ perspective:
   preserve_original_voice: false
 structure:
   sections:
-    - title: Summary
-      purpose: Summarize the transcript.
-      format: prose
-      required: true
-      extraction_hints: []
+    - title: ${firstSection.title}
+      purpose: ${firstSection.purpose}
+      format: ${firstSection.format}
+      required: ${firstSection.required}
+      extraction_hints:
+${firstSection.extraction_hints.map((hint) => `        - ${hint}`).join("\n")}
 content_rules:
   required_elements:
     - Include only information supported by the transcript.
@@ -205,7 +207,7 @@ function parseTemplateYaml(content: string): TemplateYamlDoc | null {
 }
 
 function ensureTemplateDoc(content: string, family?: Partial<Family> | null, language = "nb-NO") {
-  const fallback = parseTemplateYaml(starterYaml(family ?? undefined)) ?? {};
+  const fallback = parseTemplateYaml(starterYaml(family ?? undefined, language)) ?? {};
   const parsed = parseTemplateYaml(content) ?? fallback;
   parsed.identity = { ...(parsed.identity ?? {}) };
   parsed.identity.id = parsed.identity.id || uuid();
@@ -268,7 +270,8 @@ export default function TemplatesPage() {
   }, [variantForm.yamlContent]);
   const templateIdentity = templateDoc?.identity ?? {};
   const templateSections = templateDoc?.structure?.sections ?? [];
-  const sectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
+  const baseSectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
+  const sectionPresets = localizeTemplateSectionPresets(baseSectionPresets, variantForm.language);
   const requiredSectionCount = templateSections.filter((section) => section.required !== false).length;
   const optionalSectionCount = Math.max(templateSections.length - requiredSectionCount, 0);
   const latestSelectedVersion = selectedFamily?.variants.find((variant) => variant.id === variantForm.variantId)?.publishedVersions?.[0]?.version ?? "Draft only";
@@ -442,14 +445,15 @@ export default function TemplatesPage() {
 
   function openDesigner(family: Family, variant?: Variant) {
     const draft = variant?.draft;
+    const language = variant?.language ?? "nb-NO";
     setError(""); setNotice("");
     setSelectedFamily(family);
     setVariantForm({
       familyId: family.id,
       variantId: variant?.id ?? "",
       draftId: draft?.id ?? "",
-      language: variant?.language ?? "nb-NO",
-      yamlContent: draft?.yamlContent ?? starterYaml(family),
+      language,
+      yamlContent: draft?.yamlContent ?? starterYaml(family, language),
       sampleTranscript: draft?.sampleTranscript ?? "",
       bump: "patch",
       aiUseCase: family.title,

@@ -5,7 +5,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel, Modal } from "../../../components/AdminUI";
-import { IconPicker, LanguageCombobox, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
+import { IconPicker, LanguageCombobox, TagEditor, localizeTemplateSectionPresets, presetToTemplateSection } from "../../../components/TemplateControls";
 import type { TemplateCategoryOption, TemplateSectionPresetOption, TemplateTagOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../../components/ToastProvider";
@@ -163,7 +163,7 @@ function previewFromDraft(draft?: Draft | null): DraftPreview | null {
   };
 }
 
-function starterYaml(family: Family, presets: SectionPreset[] = fallbackSectionPresets): string {
+function starterYaml(family: Family, presets: SectionPreset[] = fallbackSectionPresets, language = "nb-NO"): string {
   const doc: TemplateYamlDoc = {
     identity: {
       id: uuid(),
@@ -172,12 +172,12 @@ function starterYaml(family: Family, presets: SectionPreset[] = fallbackSectionP
       short_description: family.shortDescription || "Describe what this template is for.",
       category: family.category?.slug || "general",
       tags: family.tags?.length ? family.tags : ["draft"],
-      language: "nb-NO",
+      language,
       version: "0.1.0"
     },
     context: {
       use_case: family.title || "New template",
-      output_language: "Norwegian Bokmal"
+      output_language: language
     },
     perspective: {
       voice: "professional",
@@ -302,7 +302,6 @@ export default function TemplateDesignerRoute() {
         api("/admin/template-tags"),
         api("/admin/settings/template-preview-provider/status")
       ]) as [Family[], TemplateCategoryOption[], TemplateSectionPresetOption[], TemplateTagOption[], PreviewProviderStatus];
-      const presetSections = sectionRows.length ? sectionRows.map(presetToTemplateSection) : fallbackSectionPresets;
       const nextFamily = families.find((item) => item.id === familyId) ?? null;
       if (!nextFamily) {
         setFamily(null);
@@ -315,6 +314,9 @@ export default function TemplateDesignerRoute() {
         ? null
         : nextFamily.variants.find((item) => item.id === variantId) ?? null;
       const draft = nextVariant?.draft;
+      const nextLanguage = nextVariant?.language ?? "nb-NO";
+      const basePresetSections = sectionRows.length ? sectionRows.map(presetToTemplateSection) : fallbackSectionPresets;
+      const presetSections = localizeTemplateSectionPresets(basePresetSections, nextLanguage);
 
       setCategories(categoryRows);
       setSectionPresetRows(sectionRows);
@@ -326,8 +328,8 @@ export default function TemplateDesignerRoute() {
         familyId: nextFamily.id,
         variantId: nextVariant?.id ?? "",
         draftId: draft?.id ?? "",
-        language: nextVariant?.language ?? "nb-NO",
-        yamlContent: draft?.yamlContent ?? starterYaml(nextFamily, presetSections),
+        language: nextLanguage,
+        yamlContent: draft?.yamlContent ?? starterYaml(nextFamily, presetSections, nextLanguage),
         sampleTranscript: draft?.sampleTranscript ?? "",
         bump: "patch",
         aiUseCase: nextFamily.shortDescription || nextFamily.title,
@@ -353,7 +355,8 @@ export default function TemplateDesignerRoute() {
   const templateDoc = useMemo(() => parseTemplateYaml(variantForm.yamlContent), [variantForm.yamlContent]);
   const templateIdentity = templateDoc?.identity;
   const templateSections = templateDoc?.structure?.sections ?? [];
-  const sectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
+  const baseSectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
+  const sectionPresets = localizeTemplateSectionPresets(baseSectionPresets, variantForm.language);
   const selectedSection = selectedSectionIndex === null ? null : templateSections[selectedSectionIndex] ?? null;
   const latestVersion = publishedVersion(variant);
   const nextPublishVersion = latestVersion
@@ -781,7 +784,7 @@ export default function TemplateDesignerRoute() {
             {!templateSections.length && (
               <div className="outline-skeleton">
                 <span>Start with a common structure</span>
-                <button type="button" onClick={addStarterSkeleton}>Summary · Decisions · Actions</button>
+                <button type="button" onClick={addStarterSkeleton}>{sectionPresets.slice(0, 3).map((preset) => preset.title).join(" · ")}</button>
               </div>
             )}
 

@@ -556,6 +556,124 @@ export function presetToTemplateSection(preset: TemplateSectionPresetOption) {
   };
 }
 
+type TemplateSectionLike = {
+  title: string;
+  purpose: string;
+  extraction_hints?: string[];
+  extractionHints?: string[];
+};
+
+const localizedSectionCopy: Record<string, Record<string, { title: string; purpose: string; extraction_hints: string[] }>> = {
+  nb: {
+    summary: {
+      title: "Sammendrag",
+      purpose: "Oppsummer hovedinnholdet kort og tydelig.",
+      extraction_hints: ["hovedtema", "viktig kontekst", "resultat"]
+    },
+    decisions: {
+      title: "Beslutninger",
+      purpose: "List opp beslutninger som ble tatt, med begrunnelse der det er relevant.",
+      extraction_hints: ["beslutning", "ansvarlig", "begrunnelse"]
+    },
+    "action items": {
+      title: "Oppfølgingspunkter",
+      purpose: "List opp konkrete tiltak, ansvarlige og frister når dette finnes.",
+      extraction_hints: ["tiltak", "ansvarlig", "frist"]
+    },
+    actions: {
+      title: "Oppfølgingspunkter",
+      purpose: "List opp konkrete tiltak, ansvarlige og frister når dette finnes.",
+      extraction_hints: ["tiltak", "ansvarlig", "frist"]
+    },
+    "open questions": {
+      title: "Åpne spørsmål",
+      purpose: "Fang opp uavklarte spørsmål eller temaer som trenger avklaring.",
+      extraction_hints: ["spørsmål", "manglende informasjon", "neste steg"]
+    },
+    risks: {
+      title: "Risikoer",
+      purpose: "Fang opp risikoer, hindringer, usikkerhet eller sensitive forhold som ble nevnt.",
+      extraction_hints: ["risiko", "hindring", "avhengighet"]
+    },
+    "risks and concerns": {
+      title: "Risikoer og bekymringer",
+      purpose: "Fremhev risikoer, bekymringer eller hindringer som ble nevnt.",
+      extraction_hints: ["risiko", "konsekvens", "tiltak"]
+    },
+    "follow-up plan": {
+      title: "Oppfølgingsplan",
+      purpose: "Beskriv anbefalte neste steg basert kun på transkripsjonen.",
+      extraction_hints: ["neste steg", "prioritet", "ansvarlig"]
+    }
+  },
+  nn: {
+    summary: {
+      title: "Samandrag",
+      purpose: "Oppsummer hovudinnhaldet kort og tydeleg.",
+      extraction_hints: ["hovudtema", "viktig kontekst", "resultat"]
+    },
+    decisions: {
+      title: "Avgjerder",
+      purpose: "List opp avgjerder som vart tekne, med grunngjeving der det er relevant.",
+      extraction_hints: ["avgjerd", "ansvarleg", "grunngjeving"]
+    },
+    "action items": {
+      title: "Oppfølgingspunkt",
+      purpose: "List opp konkrete tiltak, ansvarlege og fristar når dette finst.",
+      extraction_hints: ["tiltak", "ansvarleg", "frist"]
+    },
+    actions: {
+      title: "Oppfølgingspunkt",
+      purpose: "List opp konkrete tiltak, ansvarlege og fristar når dette finst.",
+      extraction_hints: ["tiltak", "ansvarleg", "frist"]
+    },
+    "open questions": {
+      title: "Opne spørsmål",
+      purpose: "Fang opp uavklarte spørsmål eller tema som treng avklaring.",
+      extraction_hints: ["spørsmål", "manglande informasjon", "neste steg"]
+    },
+    risks: {
+      title: "Risikoar",
+      purpose: "Fang opp risikoar, hindringar, uvisse eller sensitive forhold som vart nemnde.",
+      extraction_hints: ["risiko", "hindring", "avhengnad"]
+    },
+    "risks and concerns": {
+      title: "Risikoar og bekymringar",
+      purpose: "Framhev risikoar, bekymringar eller hindringar som vart nemnde.",
+      extraction_hints: ["risiko", "konsekvens", "tiltak"]
+    },
+    "follow-up plan": {
+      title: "Oppfølgingsplan",
+      purpose: "Beskriv tilrådde neste steg basert berre på transkripsjonen.",
+      extraction_hints: ["neste steg", "prioritet", "ansvarleg"]
+    }
+  }
+};
+
+function sectionLanguageFamily(languageCode: string) {
+  const normalized = languageCode.toLowerCase();
+  if (normalized.startsWith("nb")) return "nb";
+  if (normalized.startsWith("nn")) return "nn";
+  return "";
+}
+
+export function localizeTemplateSectionPreset<T extends TemplateSectionLike>(preset: T, languageCode: string): T {
+  const family = sectionLanguageFamily(languageCode);
+  const localized = localizedSectionCopy[family]?.[preset.title.trim().toLowerCase()];
+  if (!localized) return preset;
+  return {
+    ...preset,
+    title: localized.title,
+    purpose: localized.purpose,
+    extraction_hints: localized.extraction_hints,
+    ...(preset.extractionHints ? { extractionHints: localized.extraction_hints } : {})
+  };
+}
+
+export function localizeTemplateSectionPresets<T extends TemplateSectionLike>(presets: T[], languageCode: string): T[] {
+  return presets.map((preset) => localizeTemplateSectionPreset(preset, languageCode));
+}
+
 function normalizeTag(tag: string) {
   return tag.trim().replace(/\s+/g, " ");
 }
