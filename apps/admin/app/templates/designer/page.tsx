@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
-import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel, StatusBadge } from "../../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel } from "../../../components/AdminUI";
 import { IconPicker, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
 import type { TemplateCategoryOption, TemplateSectionPresetOption, TemplateTagOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
@@ -651,23 +651,19 @@ export default function TemplateDesignerRoute() {
         <header className="template-topbar">
           <div className="template-topbar-main">
             <a className="template-back-link" href={appPath("/templates")}><ArrowLeft size={16} /> Templates</a>
-            <div>
+            <div className="template-title-block">
               <div className="template-kicker">
                 <span>{family.title}</span>
                 <span>·</span>
                 <span>{variantForm.language}</span>
               </div>
               <h1>{templateIdentity?.title ?? family.title}</h1>
+              <div className="template-published-line">
+                Current published version: <strong>{latestVersion ? `v${latestVersion.version}` : "none yet"}</strong>
+              </div>
             </div>
           </div>
           <div className="template-topbar-actions">
-            <div className="template-version-summary" aria-label="Published template status">
-              <span className="summary-label">Published version</span>
-              <span className="summary-value">
-                <StatusBadge status={family.state} />
-                <strong>{latestVersion ? `v${latestVersion.version}` : "None yet"}</strong>
-              </span>
-            </div>
             <span className={`save-indicator ${saveState}`}>
               {saveState === "saving" && <Loader2 size={13} />}
               {saveLabel}
@@ -679,7 +675,7 @@ export default function TemplateDesignerRoute() {
                 <InfoTip text="Patch is for small copy or prompt fixes. Minor is for meaningful template improvements. Major is for breaking structure or output changes." />
               </div>
               <div className="publish-control">
-                {(["patch", "minor", "major"] as const).map((bump) => (
+                {(["major", "minor", "patch"] as const).map((bump) => (
                   <button
                     key={bump}
                     type="button"
