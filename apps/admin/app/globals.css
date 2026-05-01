@@ -3027,7 +3027,18 @@ textarea {
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  box-shadow:
+    0 12px 28px rgba(15,23,42,0.08),
+    0 2px 6px rgba(15,23,42,0.05);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.policy-card:hover,
+.policy-card:focus-within {
+  border-color: rgba(13,148,136,0.28);
+  box-shadow:
+    0 18px 42px rgba(15,23,42,0.12),
+    0 6px 14px rgba(15,23,42,0.07);
+  transform: translateY(-1px);
 }
 .policy-card .field {
   margin-bottom: 0;
@@ -3068,17 +3079,24 @@ textarea {
   border-radius: 10px;
   background: var(--surface-sunken);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .policy-toggle:hover,
 .policy-toggle:focus-within {
   border-color: var(--line-strong);
   background: #fff;
-  box-shadow: 0 4px 12px rgba(15,23,42,0.05);
+  box-shadow:
+    0 10px 22px rgba(15,23,42,0.10),
+    0 2px 6px rgba(15,23,42,0.05);
+  transform: translateY(-1px);
 }
 .policy-toggle:has(input:checked) {
   border-color: rgba(13,148,136,0.36);
   background: var(--accent-soft);
+  box-shadow:
+    0 12px 26px rgba(13,148,136,0.14),
+    0 2px 6px rgba(15,23,42,0.05);
 }
 .policy-toggle input {
   margin-top: 2px;
