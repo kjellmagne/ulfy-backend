@@ -3033,13 +3033,18 @@ textarea {
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  box-shadow:
+    0 18px 38px rgba(15,23,42,0.10),
+    0 2px 6px rgba(15,23,42,0.06);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 .policy-card:hover,
 .policy-card:focus-within {
-  border-color: rgba(13,148,136,0.28);
-  box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+  border-color: rgba(13,148,136,0.34);
+  box-shadow:
+    0 24px 52px rgba(15,23,42,0.14),
+    0 8px 18px rgba(15,23,42,0.08);
+  transform: translateY(-2px);
 }
 .policy-card::before {
   content: "";
@@ -3097,19 +3102,27 @@ textarea {
   border-radius: 10px;
   background: #fff;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
-  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  box-shadow:
+    0 10px 22px rgba(15,23,42,0.08),
+    0 1px 2px rgba(15,23,42,0.05);
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .policy-toggle:hover,
 .policy-toggle:focus-within {
   border-color: var(--line-strong);
   background: var(--surface-muted);
-  box-shadow: 0 4px 12px rgba(15,23,42,0.06);
+  box-shadow:
+    0 16px 34px rgba(15,23,42,0.12),
+    0 4px 10px rgba(15,23,42,0.07);
+  transform: translateY(-1px);
 }
 .policy-toggle:has(input:checked) {
   border-color: rgba(13,148,136,0.36);
   background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px rgba(15,23,42,0.04);
+  box-shadow:
+    inset 3px 0 0 var(--accent),
+    0 12px 26px rgba(13,148,136,0.14),
+    0 2px 6px rgba(15,23,42,0.05);
 }
 .policy-toggle input {
   margin-top: 2px;
