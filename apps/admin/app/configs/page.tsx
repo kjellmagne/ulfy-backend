@@ -500,24 +500,45 @@ export default function ConfigsPage() {
               </FormSection>
 
               <FormSection title="Repository, telemetry and policy" description="Sparse managed config: leave fields blank when the tenant should keep local settings.">
-                <div className="grid three">
-                  <div className="field"><FieldLabel help={helpText.templateRepositoryUrl}>Template repository URL</FieldLabel><input className="input" value={form.templateRepositoryUrl ?? ""} onChange={(e) => setForm({ ...form, templateRepositoryUrl: e.target.value })} /></div>
-                  <div className="field"><FieldLabel>Telemetry endpoint URL</FieldLabel><input className="input" value={form.telemetryEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, telemetryEndpointUrl: e.target.value })} /></div>
-                  <div className="field"><FieldLabel help={helpText.defaultTemplateId}>Default template ID</FieldLabel><input className="input" value={form.defaultTemplateId ?? ""} onChange={(e) => setForm({ ...form, defaultTemplateId: e.target.value })} /></div>
+                <div className="policy-section-stack">
+                  <div className="policy-card">
+                    <div className="policy-card-header">
+                      <h4>Repository and telemetry</h4>
+                      <p>Central catalog and optional operational endpoints returned to enterprise devices.</p>
+                    </div>
+                    <div className="grid two">
+                      <div className="field"><FieldLabel help={helpText.templateRepositoryUrl}>Template repository URL</FieldLabel><input className="input" value={form.templateRepositoryUrl ?? ""} onChange={(e) => setForm({ ...form, templateRepositoryUrl: e.target.value })} /></div>
+                      <div className="field"><FieldLabel>Telemetry endpoint URL</FieldLabel><input className="input" value={form.telemetryEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, telemetryEndpointUrl: e.target.value })} /></div>
+                    </div>
+                    <div className="field"><FieldLabel help={helpText.defaultTemplateId}>Default template ID</FieldLabel><input className="input" value={form.defaultTemplateId ?? ""} onChange={(e) => setForm({ ...form, defaultTemplateId: e.target.value })} /></div>
+                  </div>
+
+                  <div className="policy-card">
+                    <div className="policy-card-header">
+                      <h4>Device policy behavior</h4>
+                      <p>Keep override off for strict enterprise control. Only enable local changes deliberately.</p>
+                    </div>
+                    <div className="policy-toggle-grid">
+                      <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
+                      <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /><span><strong>User may change speech</strong><small>Allows local speech-provider changes when policy override is available.</small></span></label>
+                      <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /><span><strong>User may change formatter</strong><small>Allows local document-generation provider changes.</small></span></label>
+                      <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /><span><strong>User may change privacy review</strong><small>Allows local privacy-review provider changes.</small></span></label>
+                    </div>
+                  </div>
+
+                  <div className="policy-card">
+                    <div className="policy-card-header">
+                      <h4>Feature flags and provider restrictions</h4>
+                      <p>Flags are sparse and conservative. Some decoded restrictions are reserved for stronger mobile enforcement later.</p>
+                    </div>
+                    <div className="policy-toggle-grid compact">
+                      <label className="policy-toggle"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /><span><FieldLabel help={helpText.developerMode}>Developer mode</FieldLabel><small>Shows testing and validation tools in the app.</small></span></label>
+                      <label className="policy-toggle"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /><span><FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel><small>Decoded by the app, with stronger enforcement planned later.</small></span></label>
+                      <label className="policy-toggle"><input type="checkbox" checked={form.externalFormattersAllowed} onChange={(e) => setForm({ ...form, externalFormattersAllowed: e.target.checked })} /><span><strong>External formatters allowed</strong><small>Backend policy metadata for document-generation controls.</small></span></label>
+                    </div>
+                    <div className="field policy-json-field"><FieldLabel help="Decoded by the app but not fully enforced yet. Keep this as canonical backend provider values.">Allowed provider restrictions JSON</FieldLabel><textarea value={form.allowedProviderRestrictionsText} onChange={(e) => setForm({ ...form, allowedProviderRestrictionsText: e.target.value })} /></div>
+                  </div>
                 </div>
-                <div className="config-hint"><span>Unchecked override keeps strict mode: managed provider and privacy settings cannot be bypassed on device.</span></div>
-                <div className="row checkbox-group">
-                  <label className="checkbox-row"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /> <FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /> <FieldLabel help={helpText.developerMode}>Developer mode</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /> <FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.externalFormattersAllowed} onChange={(e) => setForm({ ...form, externalFormattersAllowed: e.target.checked })} /> External formatters allowed by policy</label>
-                </div>
-                <div className="row checkbox-group">
-                  <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /> User may change speech</label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangeFormatter} onChange={(e) => setForm({ ...form, userMayChangeFormatter: e.target.checked })} /> User may change formatter</label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> User may change privacy review</label>
-                </div>
-                <div className="field"><FieldLabel help="Decoded by the app but not fully enforced yet. Keep this as canonical backend provider values.">Allowed provider restrictions JSON</FieldLabel><textarea value={form.allowedProviderRestrictionsText} onChange={(e) => setForm({ ...form, allowedProviderRestrictionsText: e.target.value })} /></div>
               </FormSection>
             </form>
           </SidePanel>

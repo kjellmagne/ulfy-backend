@@ -5,7 +5,7 @@ import type { DragEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { Archive, Bot, CheckCircle, CopyPlus, Download, FileText, Globe2, GripVertical, Pencil, Plus, Save, Trash2, Wand2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, FormSection, IconAction, InfoTip, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
 import { IconPicker, TagChipList, TagEditor, TemplateIcon, presetToTemplateSection } from "../../components/TemplateControls";
 import type { TemplateSectionPresetOption, TemplateTagOption } from "../../components/TemplateControls";
 import { useToast } from "../../components/ToastProvider";
@@ -664,14 +664,18 @@ export default function TemplatesPage() {
                       <div className="template-family-title">
                         <span className="sf-symbol-tile" title={`Web preview for ${family.icon}`}><TemplateIcon symbol={family.icon} /></span>
                         <div>
-                          <div className="template-family-kicker">Template family</div>
                           <h3>{family.title}</h3>
                           <p>{family.shortDescription || "No description yet."}</p>
                           <div className="template-family-meta">
-                            <StatusBadge status={family.state} />
-                            <span className="badge">{family.category?.title ?? "Uncategorized"}</span>
-                            <span className="badge">{family.isGlobal ? "Global catalog" : `${family.entitlements.length} tenant${family.entitlements.length === 1 ? "" : "s"}`}</span>
-                            <span className="badge">{family.variants.length} variant{family.variants.length === 1 ? "" : "s"}</span>
+                            {family.isGlobal ? (
+                              <span className="badge status-active">Global</span>
+                            ) : family.entitlements.length ? (
+                              family.entitlements.map((entitlement) => (
+                                <span key={entitlement.id} className="badge">{entitlement.tenant.name}</span>
+                              ))
+                            ) : (
+                              <span className="badge status-draft">No assigned tenants</span>
+                            )}
                           </div>
                           <TagChipList tags={family.tags} options={tagOptions} />
                         </div>
@@ -685,8 +689,10 @@ export default function TemplatesPage() {
 
                     <div className="template-variant-section">
                       <div className="template-variant-heading">
-                        <span>Language variants</span>
-                        <small>Each row is one YAML draft/published track.</small>
+                        <span className="template-variant-title">
+                          Language variants
+                          <InfoTip text="Each row is one YAML draft or published language track. Open a row in the designer to edit its YAML, preview, and publish a new version." />
+                        </span>
                       </div>
                       {family.variants.length ? (
                         <div className="template-variant-list">
@@ -696,7 +702,6 @@ export default function TemplatesPage() {
                               <div key={variant.id} className="template-variant-row">
                                 <div className="variant-language">
                                   <strong>{variant.language}</strong>
-                                  <span>{variant.templateIdentityId}</span>
                                 </div>
                                 <div className="variant-status">
                                   {published ? <span className="badge status-published">Published v{published.version}</span> : <span className="badge status-draft">Draft only</span>}

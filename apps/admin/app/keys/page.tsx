@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Copy, Eye, KeyRound, Plus, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
+import { Copy, Eye, KeyRound, ShieldCheck, ShieldX, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatusBadge } from "../../components/AdminUI";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
@@ -134,9 +134,9 @@ export default function KeysPage() {
         meta={(
           <>
             {activeTab === "single" ? (
-              <IconAction label="Generate single-user key" tone="primary" onClick={() => setSingleModalOpen(true)}><KeyRound size={16} /></IconAction>
+              <button type="button" className="button" onClick={() => setSingleModalOpen(true)}><KeyRound size={16} /> Generate single-user key</button>
             ) : (
-              <IconAction label="Generate enterprise key" tone="primary" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><Plus size={16} /></IconAction>
+              <button type="button" className="button" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><KeyRound size={16} /> Generate enterprise key</button>
             )}
           </>
         )}
@@ -184,7 +184,7 @@ export default function KeysPage() {
               <PanelHeader
                 title="Single-user keys"
                 description="Double-click a row to view all associated details. Full activation keys are hashed and cannot be recovered later."
-                actions={<IconAction label="Generate single-user key" tone="primary" onClick={() => setSingleModalOpen(true)}><KeyRound size={15} /></IconAction>}
+                actions={<button type="button" className="button" onClick={() => setSingleModalOpen(true)}><KeyRound size={15} /> Generate key</button>}
               />
               {!single.length ? <EmptyState title="No single-user keys" message="Generate a key above to make it available for activation." /> : (
                 <div className="table-wrap"><table className="table"><thead><tr><th>Purchaser</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Device</th><th className="actions">Actions</th></tr></thead><tbody>{single.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "single", key: k })}><td><b>{k.purchaserFullName}</b><br /><span className="muted">{k.purchaserEmail}</span></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.deviceIdentifier ?? "-"}</td><td className="row actions"><IconAction label="View license details" onClick={() => setDetails({ kind: "single", key: k })}><Eye size={14} /></IconAction><IconAction label={k.status === "revoked" ? "Reactivate license" : "Revoke license"} onClick={() => toggleSingleKey(k)}>{k.status === "revoked" ? <ShieldCheck size={14} /> : <ShieldX size={14} />}</IconAction><IconAction label="Delete key" tone="danger" onClick={() => deleteSingleKey(k)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
@@ -197,7 +197,7 @@ export default function KeysPage() {
               <PanelHeader
                 title="Enterprise keys"
                 description="Double-click a row to inspect tenant, config, and device activation details."
-                actions={<IconAction label="Generate enterprise key" tone="primary" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><Plus size={15} /></IconAction>}
+                actions={<button type="button" className="button" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><KeyRound size={15} /> Generate key</button>}
               />
               {!enterprise.length ? <EmptyState title="No enterprise keys" message="Create a tenant and config profile, then generate an enterprise key." /> : (
                 <div className="table-wrap"><table className="table"><thead><tr><th>Tenant</th><th>Partner</th><th>Prefix</th><th>Status</th><th>Maintenance</th><th>Devices</th><th>Config</th><th className="actions">Actions</th></tr></thead><tbody>{enterprise.map((k) => <tr key={k.id} className="clickable-row" title="Double-click to view license details" onDoubleClick={() => setDetails({ kind: "enterprise", key: k })}><td><b>{k.tenant?.name}</b></td><td>{k.partner?.name ?? <span className="muted">Internal</span>}</td><td>{k.keyPrefix}</td><td><StatusBadge status={k.status} /></td><td>{formatDate(k.maintenanceUntil)}</td><td>{k.activations?.length ?? 0}/{k.maxDevices ?? "unlimited"}</td><td>{k.configProfile?.name}</td><td className="row actions"><IconAction label="View license details" onClick={() => setDetails({ kind: "enterprise", key: k })}><Eye size={14} /></IconAction><IconAction label="Delete key" tone="danger" onClick={() => deleteEnterpriseKey(k)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>

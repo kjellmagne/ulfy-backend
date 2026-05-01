@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
-import { Alert, EmptyState, FieldLabel, IconAction, LoadingPanel, StatusBadge } from "../../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel, StatusBadge } from "../../../components/AdminUI";
 import { IconPicker, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
 import type { TemplateCategoryOption, TemplateSectionPresetOption, TemplateTagOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
@@ -243,6 +243,18 @@ function publishedVersion(variant?: Variant | null) {
   return variant?.publishedVersions?.[0];
 }
 
+function previewBumpedVersion(version: string | undefined, bump: VariantForm["bump"]) {
+  if (!version) return null;
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if (!match) return null;
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  const patch = Number(match[3]);
+  if (bump === "major") return `${major + 1}.0.0`;
+  if (bump === "minor") return `${major}.${minor + 1}.0`;
+  return `${major}.${minor}.${patch + 1}`;
+}
+
 function formatTime(value?: string | null) {
   if (!value) return "Not generated";
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
@@ -343,6 +355,9 @@ export default function TemplateDesignerRoute() {
   const sectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
   const selectedSection = selectedSectionIndex === null ? null : templateSections[selectedSectionIndex] ?? null;
   const latestVersion = publishedVersion(variant);
+  const nextPublishVersion = latestVersion
+    ? previewBumpedVersion(latestVersion.version, variantForm.bump)
+    : templateIdentity?.version ?? "0.1.0";
   const requiredCount = templateSections.filter((section) => section.required).length;
   const activePreviewProviderType = variantForm.preview?.providerType ?? previewProviderStatus?.providerType ?? null;
   const activePreviewProviderModel = variantForm.preview?.providerModel ?? previewProviderStatus?.model ?? null;
@@ -646,20 +661,38 @@ export default function TemplateDesignerRoute() {
             </div>
           </div>
           <div className="template-topbar-actions">
-            <StatusBadge status={family.state} />
-            <span className="badge">{latestVersion ? `v${latestVersion.version}` : "Draft only"}</span>
+            <div className="template-version-summary" aria-label="Published template status">
+              <span className="summary-label">Published version</span>
+              <span className="summary-value">
+                <StatusBadge status={family.state} />
+                <strong>{latestVersion ? `v${latestVersion.version}` : "None yet"}</strong>
+              </span>
+            </div>
             <span className={`save-indicator ${saveState}`}>
               {saveState === "saving" && <Loader2 size={13} />}
               {saveLabel}
             </span>
             <button className="button secondary" type="button" onClick={aiAssist}><Sparkles size={15} /> Draft with AI</button>
-            <div className="publish-control">
-              <select value={variantForm.bump} onChange={(event) => setVariantForm((current) => ({ ...current, bump: event.target.value as VariantForm["bump"] }))}>
-                <option value="patch">Patch</option>
-                <option value="minor">Minor</option>
-                <option value="major">Major</option>
-              </select>
-              <button className="button" type="button" onClick={publishDraft}><Wand2 size={15} /> Publish</button>
+            <div className="publish-panel" aria-label="Publish draft">
+              <div className="publish-panel-header">
+                <span>Publish draft as</span>
+                <InfoTip text="Patch is for small copy or prompt fixes. Minor is for meaningful template improvements. Major is for breaking structure or output changes." />
+              </div>
+              <div className="publish-control">
+                {(["patch", "minor", "major"] as const).map((bump) => (
+                  <button
+                    key={bump}
+                    type="button"
+                    className={variantForm.bump === bump ? "active" : ""}
+                    aria-pressed={variantForm.bump === bump}
+                    title={`${bump[0].toUpperCase()}${bump.slice(1)} version bump`}
+                    onClick={() => setVariantForm((current) => ({ ...current, bump }))}
+                  >
+                    {bump}
+                  </button>
+                ))}
+              </div>
+              <button className="button" type="button" onClick={publishDraft}><Wand2 size={15} /> Publish{nextPublishVersion ? ` v${nextPublishVersion}` : ""}</button>
             </div>
           </div>
         </header>
