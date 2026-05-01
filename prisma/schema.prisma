@@ -102,9 +102,18 @@ model ConfigProfile {
   piiControlEnabled                Boolean  @default(false)
   presidioEndpointUrl              String?
   presidioSecretRef                String?
+  presidioApiKey                   String?
+  presidioScoreThreshold           Float?
+  presidioFullPersonNamesOnly      Boolean?
+  presidioDetectPerson             Boolean?
+  presidioDetectEmail              Boolean?
+  presidioDetectPhone              Boolean?
+  presidioDetectLocation           Boolean?
+  presidioDetectIdentifier         Boolean?
   privacyReviewProviderType        String?
   privacyReviewEndpointUrl         String?
   privacyReviewModel               String?
+  privacyReviewApiKey              String?
   documentGenerationProviderType   String?
   documentGenerationEndpointUrl    String?
   documentGenerationModel          String?

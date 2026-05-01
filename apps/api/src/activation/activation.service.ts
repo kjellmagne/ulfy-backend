@@ -321,10 +321,19 @@ export class ActivationService {
       piiControlEnabled: profile.piiControlEnabled,
       presidioEndpointUrl: profile.presidioEndpointUrl,
       presidioSecretRef: profile.presidioSecretRef,
-      privacyReviewProviderType: profile.privacyReviewProviderType,
+      presidioApiKey: profile.presidioApiKey,
+      presidioScoreThreshold: profile.presidioScoreThreshold,
+      presidioFullPersonNamesOnly: profile.presidioFullPersonNamesOnly,
+      presidioDetectPerson: profile.presidioDetectPerson,
+      presidioDetectEmail: profile.presidioDetectEmail,
+      presidioDetectPhone: profile.presidioDetectPhone,
+      presidioDetectLocation: profile.presidioDetectLocation,
+      presidioDetectIdentifier: profile.presidioDetectIdentifier,
+      privacyReviewProviderType: normalizeOpenAiCompatibleProvider(profile.privacyReviewProviderType),
       privacyReviewEndpointUrl: profile.privacyReviewEndpointUrl,
       privacyReviewModel: profile.privacyReviewModel,
-      documentGenerationProviderType: profile.documentGenerationProviderType,
+      privacyReviewApiKey: profile.privacyReviewApiKey,
+      documentGenerationProviderType: normalizeOpenAiCompatibleProvider(profile.documentGenerationProviderType),
       documentGenerationEndpointUrl: profile.documentGenerationEndpointUrl,
       documentGenerationModel: profile.documentGenerationModel,
       documentGenerationApiKey: profile.documentGenerationApiKey,
@@ -372,6 +381,11 @@ function compactObject(input: Record<string, unknown>) {
     if (typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length === 0) return false;
     return true;
   }));
+}
+
+function normalizeOpenAiCompatibleProvider(providerType?: string | null) {
+  if (providerType === "openai" || providerType === "vllm") return "openai_compatible";
+  return providerType;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

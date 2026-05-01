@@ -1,5 +1,5 @@
 import { BadRequestException, Body, ConflictException, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
-import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsObject, IsOptional, IsString, Min, MinLength } from "class-validator";
+import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import * as bcrypt from "bcryptjs";
 import * as yaml from "js-yaml";
@@ -83,15 +83,28 @@ export class ConfigDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ required: false, example: "openai-compatible" })
+  @ApiProperty({
+    required: false,
+    enum: ["local", "apple_online", "openai", "azure", "gemini"],
+    example: "azure",
+    description: "Managed speech provider for the iOS app. The admin UI should expose local, apple_online, openai and azure for v1; gemini is decoded by the app but treated as coming soon."
+  })
   @IsOptional()
   @IsString()
   speechProviderType?: string;
-  @ApiProperty({ required: false, example: "https://speech.example.internal/v1/audio/transcriptions" })
+  @ApiProperty({
+    required: false,
+    example: "https://kvasetech.com/stt",
+    description: "Speech endpoint URL for endpoint-driven providers, especially Azure Speech containers, internal STT gateways, or controlled-environment routes."
+  })
   @IsOptional()
   @IsString()
   speechEndpointUrl?: string;
-  @ApiProperty({ required: false, example: "whisper-large-v3" })
+  @ApiProperty({
+    required: false,
+    example: "gpt-4o-transcribe",
+    description: "Optional speech model identifier. Mainly useful for OpenAI speech; leave unset for local, apple_online and normal Azure container setups."
+  })
   @IsOptional()
   @IsString()
   speechModelName?: string;
@@ -99,43 +112,121 @@ export class ConfigDto {
   @IsOptional()
   @IsString()
   speechApiKey?: string;
-  @ApiProperty({ required: false, example: true })
+  @ApiProperty({
+    required: false,
+    example: true,
+    description: "Master privacy-control toggle. When sent to the app it becomes centrally managed unless policy flags allow local change."
+  })
   @IsOptional()
   @IsBoolean()
   privacyControlEnabled?: boolean;
-  @ApiProperty({ required: false, example: true })
+  @ApiProperty({
+    required: false,
+    example: true,
+    description: "Enables the Presidio-based PII step inside privacy control."
+  })
   @IsOptional()
   @IsBoolean()
   piiControlEnabled?: boolean;
-  @ApiProperty({ required: false, example: "https://presidio.example.internal" })
+  @ApiProperty({
+    required: false,
+    example: "https://presidio.example.internal",
+    description: "Base URL for Microsoft Presidio Analyzer. The iOS app appends /health and /analyze."
+  })
   @IsOptional()
   @IsString()
   presidioEndpointUrl?: string;
-  @ApiProperty({ required: false, example: "secret://ulfy/presidio" })
+  @ApiProperty({
+    required: false,
+    example: "secret://ulfy/presidio",
+    description: "Optional backend-side secret reference for Presidio. Retained for compatibility/internal operations; the app does not dereference this."
+  })
   @IsOptional()
   @IsString()
   presidioSecretRef?: string;
-  @ApiProperty({ required: false, example: "openai-compatible" })
+  @ApiProperty({ required: false, example: "managed-presidio-key", description: "Optional managed Presidio API key. The iOS app sends it as Authorization Bearer, X-API-Key, and apikey for common gateway compatibility." })
+  @IsOptional()
+  @IsString()
+  presidioApiKey?: string;
+  @ApiProperty({
+    required: false,
+    example: 0.35,
+    minimum: 0,
+    maximum: 1,
+    description: "Minimum Presidio detection confidence threshold. Typical values are 0.3-0.7."
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  presidioScoreThreshold?: number;
+  @ApiProperty({ required: false, example: true, description: "When true, person-name detection should only react to full names." })
+  @IsOptional()
+  @IsBoolean()
+  presidioFullPersonNamesOnly?: boolean;
+  @ApiProperty({ required: false, example: true, description: "Detect person names." })
+  @IsOptional()
+  @IsBoolean()
+  presidioDetectPerson?: boolean;
+  @ApiProperty({ required: false, example: true, description: "Detect email addresses." })
+  @IsOptional()
+  @IsBoolean()
+  presidioDetectEmail?: boolean;
+  @ApiProperty({ required: false, example: true, description: "Detect phone numbers." })
+  @IsOptional()
+  @IsBoolean()
+  presidioDetectPhone?: boolean;
+  @ApiProperty({ required: false, example: true, description: "Detect places and addresses." })
+  @IsOptional()
+  @IsBoolean()
+  presidioDetectLocation?: boolean;
+  @ApiProperty({ required: false, example: true, description: "Detect other identifiers such as case ids, national ids or reference numbers." })
+  @IsOptional()
+  @IsBoolean()
+  presidioDetectIdentifier?: boolean;
+  @ApiProperty({
+    required: false,
+    enum: ["local_heuristic", "openai_compatible", "ollama"],
+    example: "openai_compatible",
+    description: "Managed privacy-review/guardrail provider. Do not model OpenAI or vLLM as separate policy providers; use openai_compatible plus endpoint/model/API key."
+  })
   @IsOptional()
   @IsString()
   privacyReviewProviderType?: string;
-  @ApiProperty({ required: false, example: "https://privacy.example.internal/v1/chat/completions" })
+  @ApiProperty({
+    required: false,
+    example: "https://privacy.example.internal/v1",
+    description: "Endpoint URL for privacy-review providers. Visible/relevant for openai_compatible and ollama; hide for local_heuristic."
+  })
   @IsOptional()
   @IsString()
   privacyReviewEndpointUrl?: string;
-  @ApiProperty({ required: false, example: "privacy-review-v1" })
+  @ApiProperty({ required: false, example: "privacy-review-v1", description: "Model identifier used for the privacy-review step." })
   @IsOptional()
   @IsString()
   privacyReviewModel?: string;
-  @ApiProperty({ required: false, example: "openai-compatible" })
+  @ApiProperty({ required: false, example: "sk-privacy-review-key", description: "Optional managed privacy-review provider API key. Prefer internal gateway endpoints or short-lived tenant-scoped keys when possible." })
+  @IsOptional()
+  @IsString()
+  privacyReviewApiKey?: string;
+  @ApiProperty({
+    required: false,
+    enum: ["apple_intelligence", "openai_compatible", "ollama"],
+    example: "openai_compatible",
+    description: "Managed document-generation provider. OpenAI, vLLM and OpenAI-style gateways should all be represented as openai_compatible plus endpoint/model/API key."
+  })
   @IsOptional()
   @IsString()
   documentGenerationProviderType?: string;
-  @ApiProperty({ required: false, example: "https://docs.example.internal/v1/chat/completions" })
+  @ApiProperty({
+    required: false,
+    example: "https://api.openai.com/v1",
+    description: "Endpoint URL for document generation. Visible/relevant for openai_compatible and ollama; hide for apple_intelligence."
+  })
   @IsOptional()
   @IsString()
   documentGenerationEndpointUrl?: string;
-  @ApiProperty({ required: false, example: "docgen-v1" })
+  @ApiProperty({ required: false, example: "gpt-5-mini", description: "Model identifier used to generate/formulate the final document." })
   @IsOptional()
   @IsString()
   documentGenerationModel?: string;
@@ -143,19 +234,31 @@ export class ConfigDto {
   @IsOptional()
   @IsString()
   documentGenerationApiKey?: string;
-  @ApiProperty({ required: false, example: "https://kvasetech.com/backend/api/v1/templates/manifest" })
+  @ApiProperty({
+    required: false,
+    example: "https://kvasetech.com/backend/api/v1/templates/manifest",
+    description: "Enterprise template manifest URL. The app should call it with Authorization: Bearer <activationToken>."
+  })
   @IsOptional()
   @IsString()
   templateRepositoryUrl?: string;
-  @ApiProperty({ required: false, example: "https://telemetry.example.internal/events" })
+  @ApiProperty({ required: false, example: "https://telemetry.example.internal/events", description: "Optional telemetry endpoint for enterprise deployments." })
   @IsOptional()
   @IsString()
   telemetryEndpointUrl?: string;
-  @ApiProperty({ required: false, example: { enterpriseTemplates: true, privacyReview: true } })
+  @ApiProperty({
+    required: false,
+    example: { developerMode: false, allowExternalProviders: false, enterpriseTemplates: true, privacyReview: true },
+    description: "Boolean feature flags. The iOS app currently honors developerMode and decodes allowExternalProviders; additional flags are safe to ignore."
+  })
   @IsOptional()
   @IsObject()
   featureFlags?: Record<string, boolean>;
-  @ApiProperty({ required: false, example: ["openai-compatible", "internal"] })
+  @ApiProperty({
+    required: false,
+    example: ["azure", "openai_compatible", "local_heuristic"],
+    description: "Provider restriction hints for client/policy display. Strong enforcement depends on the iOS app version."
+  })
   @IsOptional()
   @IsArray()
   allowedProviderRestrictions?: string[];
@@ -174,20 +277,27 @@ export class ConfigDto {
   providerProfiles?: Record<string, unknown>;
   @ApiProperty({
     required: false,
-    description: "Admin-side policy switches, such as whether users may override provider selections or see local app settings.",
+    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; granular flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas.",
     example: {
       allowPolicyOverride: false,
       hideSettings: true,
       userMayChangeSpeechProvider: true,
-      userMayChangeFormatter: true,
-      userMayChangePrivacyReviewProvider: true,
-      externalFormattersAllowed: false
+      userMayChangeFormatter: false,
+      userMayChangePrivacyReviewProvider: false,
+      externalFormattersAllowed: false,
+      privacyControlRequired: true,
+      piiRequired: true
     }
   })
   @IsOptional()
   @IsObject()
   managedPolicy?: Record<string, unknown>;
-  @ApiProperty({ required: false, nullable: true, example: null })
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    example: "00000000-0000-4000-8000-000000000401",
+    description: "Optional tenant default template id. This guides the app toward a preferred template; strong enforcement is app-version dependent."
+  })
   @IsOptional()
   @IsString()
   defaultTemplateId?: string | null;
@@ -202,20 +312,31 @@ class CloneConfigDto {
 }
 
 class ProviderModelLookupDto {
-  @ApiProperty({ example: "document_generation", enum: ["speech", "document_generation", "privacy_review"] })
+  @ApiProperty({
+    example: "document_generation",
+    enum: ["speech", "document_generation", "privacy_review"],
+    description: "Provider domain whose model list should be queried."
+  })
   @IsIn(["speech", "document_generation", "privacy_review"])
   providerDomain!: "speech" | "document_generation" | "privacy_review";
 
-  @ApiProperty({ example: "openai_compatible" })
+  @ApiProperty({
+    example: "openai_compatible",
+    description: "Provider identifier. For document_generation and privacy_review, OpenAI and vLLM-style providers should be queried as openai_compatible."
+  })
   @IsString()
   providerType!: string;
 
-  @ApiProperty({ required: false, example: "https://llm.example.internal/v1" })
+  @ApiProperty({
+    required: false,
+    example: "https://api.openai.com/v1",
+    description: "Provider base URL or gateway URL used to fetch available model ids."
+  })
   @IsOptional()
   @IsString()
   endpointUrl?: string;
 
-  @ApiProperty({ required: false, example: "provider-api-key" })
+  @ApiProperty({ required: false, example: "provider-api-key", description: "Optional credential used only for this model-list lookup." })
   @IsOptional()
   @IsString()
   apiKey?: string;
@@ -1637,10 +1758,19 @@ export class AdminController {
       piiControlEnabled: dto.piiControlEnabled ?? false,
       presidioEndpointUrl: this.emptyToNull(dto.presidioEndpointUrl),
       presidioSecretRef: this.emptyToNull(dto.presidioSecretRef),
-      privacyReviewProviderType: this.emptyToNull(dto.privacyReviewProviderType),
+      presidioApiKey: this.emptySecretToNull(dto.presidioApiKey),
+      presidioScoreThreshold: dto.presidioScoreThreshold ?? null,
+      presidioFullPersonNamesOnly: dto.presidioFullPersonNamesOnly ?? null,
+      presidioDetectPerson: dto.presidioDetectPerson ?? null,
+      presidioDetectEmail: dto.presidioDetectEmail ?? null,
+      presidioDetectPhone: dto.presidioDetectPhone ?? null,
+      presidioDetectLocation: dto.presidioDetectLocation ?? null,
+      presidioDetectIdentifier: dto.presidioDetectIdentifier ?? null,
+      privacyReviewProviderType: normalizeOpenAiCompatibleProvider(this.emptyToNull(dto.privacyReviewProviderType)),
       privacyReviewEndpointUrl: this.emptyToNull(dto.privacyReviewEndpointUrl),
       privacyReviewModel: this.emptyToNull(dto.privacyReviewModel),
-      documentGenerationProviderType: this.emptyToNull(dto.documentGenerationProviderType),
+      privacyReviewApiKey: this.emptySecretToNull(dto.privacyReviewApiKey),
+      documentGenerationProviderType: normalizeOpenAiCompatibleProvider(this.emptyToNull(dto.documentGenerationProviderType)),
       documentGenerationEndpointUrl: this.emptyToNull(dto.documentGenerationEndpointUrl),
       documentGenerationModel: this.emptyToNull(dto.documentGenerationModel),
       documentGenerationApiKey: this.emptySecretToNull(dto.documentGenerationApiKey),
@@ -1667,10 +1797,12 @@ export class AdminController {
     return this.emptyToNull(value);
   }
 
-  private maskAdminConfigSecrets<T extends { speechApiKey?: string | null; documentGenerationApiKey?: string | null }>(profile: T) {
+  private maskAdminConfigSecrets<T extends { speechApiKey?: string | null; documentGenerationApiKey?: string | null; privacyReviewApiKey?: string | null; presidioApiKey?: string | null }>(profile: T) {
     return {
       ...profile,
       speechApiKey: profile.speechApiKey ? ADMIN_SECRET_MASK : null,
+      presidioApiKey: profile.presidioApiKey ? ADMIN_SECRET_MASK : null,
+      privacyReviewApiKey: profile.privacyReviewApiKey ? ADMIN_SECRET_MASK : null,
       documentGenerationApiKey: profile.documentGenerationApiKey ? ADMIN_SECRET_MASK : null
     };
   }
@@ -2243,4 +2375,9 @@ export class AdminController {
       availableDevices: licensedDevices == null ? null : Math.max(licensedDevices - activeDevices.size, 0)
     };
   }
+}
+
+function normalizeOpenAiCompatibleProvider(providerType?: string | null) {
+  if (providerType === "openai" || providerType === "vllm") return "openai_compatible";
+  return providerType;
 }

@@ -16,9 +16,18 @@ describe("AdminController config cloning", () => {
       piiControlEnabled: true,
       presidioEndpointUrl: "https://presidio.example.internal",
       presidioSecretRef: "secret://ulfy/presidio",
-      privacyReviewProviderType: "local_heuristic",
-      privacyReviewEndpointUrl: null,
-      privacyReviewModel: null,
+      presidioApiKey: "presidio-key",
+      presidioScoreThreshold: 0.35,
+      presidioFullPersonNamesOnly: true,
+      presidioDetectPerson: true,
+      presidioDetectEmail: true,
+      presidioDetectPhone: true,
+      presidioDetectLocation: true,
+      presidioDetectIdentifier: true,
+      privacyReviewProviderType: "openai_compatible",
+      privacyReviewEndpointUrl: "https://privacy.example.internal/v1/chat/completions",
+      privacyReviewModel: "privacy-review-v1",
+      privacyReviewApiKey: "privacy-key",
       documentGenerationProviderType: "openai_compatible",
       documentGenerationEndpointUrl: "https://llm.example.internal/v1",
       documentGenerationModel: "ulfy-docgen",
@@ -45,11 +54,17 @@ describe("AdminController config cloning", () => {
 
     const result = await controller.cloneConfig("profile-1", {}, { user: { sub: "admin-1", email: "admin@example.com", role: "superadmin" } });
 
-    expect(result).toEqual({ ...created, speechApiKey: "********", documentGenerationApiKey: "********" });
+    expect(result).toEqual({ ...created, speechApiKey: "********", presidioApiKey: "********", documentGenerationApiKey: "********", privacyReviewApiKey: "********" });
     expect(prisma.configProfile.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: "Copy of Strict enterprise policy",
         speechApiKey: "speech-key",
+        presidioApiKey: "presidio-key",
+        presidioScoreThreshold: 0.35,
+        presidioFullPersonNamesOnly: true,
+        presidioDetectPerson: true,
+        presidioDetectEmail: true,
+        privacyReviewApiKey: "privacy-key",
         documentGenerationApiKey: "docgen-key",
         managedPolicy: { allowPolicyOverride: false, hideSettings: true }
       }),

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { ChevronDown, CopyPlus, Loader2, Plus, Save, Settings, ShieldCheck, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
@@ -21,9 +21,11 @@ const helpText = {
   privacyReviewProviderType: "Choose which provider reviews transcript text for privacy concerns before document generation. Best supported with local_heuristic, ollama, or openai_compatible. Other values are partial.",
   privacyReviewEndpointUrl: "Endpoint URL for the privacy-review provider. Use this for internal or self-hosted privacy-review services. Locks app UI when set.",
   privacyReviewModel: "Model identifier used for the privacy-review step. Locks app UI when set.",
+  privacyReviewApiKey: "Optional API key for the privacy-review provider. Use this for authenticated OpenAI-compatible privacy gateways or protected Ollama routes.",
   piiControlEnabled: "Enables the Presidio-based PII step inside privacy control. This is the first step in the privacy pipeline. Locks app UI. Full support.",
   presidioEndpointUrl: "Endpoint URL for the Presidio analyzer used for PII detection. Typically an internal or protected service. Locks app UI when set.",
   presidioSecretRef: "Optional backend-side secret reference for Presidio access. Use when Presidio is protected by a gateway or internal auth layer. Partial support; no practical UI lock beyond managed connection.",
+  presidioApiKey: "Optional managed Presidio API key. The app sends it as Authorization Bearer, X-API-Key, and apikey for common gateway compatibility.",
   templateRepositoryUrl: "Catalog URL for centrally managed templates. Enterprise users use this repository to browse and download entitled templates. Locks app UI. Full support.",
   defaultTemplateId: "Optional default template for the tenant. Guides users toward the organization's preferred starting template. Partial support; not strongly enforced yet.",
   developerMode: "Shows internal testing tools and reusable recordings for provider and formatting validation. Locks app UI. Full support.",
@@ -50,11 +52,8 @@ const formatterProviders = [
 const privacyReviewProviders = [
   { value: "", label: "Not managed", ready: true, privacy: "Local setting kept" },
   { value: "local_heuristic", label: "Local heuristic", ready: true, privacy: "Safe" },
-  { value: "ollama", label: "Ollama", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama" },
   { value: "openai_compatible", label: "OpenAI-compatible", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama" },
-  { value: "openai", label: "OpenAI", ready: false, privacy: "Not recommended for privacy review" },
-  { value: "gemini", label: "Gemini", ready: false, privacy: "Coming soon / not recommended" },
-  { value: "claude", label: "Claude", ready: false, privacy: "Coming soon / not recommended" }
+  { value: "ollama", label: "Ollama", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama" }
 ];
 
 const empty = {
@@ -70,6 +69,7 @@ const empty = {
   piiControlEnabled: true,
   presidioEndpointUrl: "",
   presidioSecretRef: "",
+  presidioApiKey: "",
   piiScoreThreshold: "0.70",
   detectEmail: true,
   detectPhone: true,
@@ -80,6 +80,7 @@ const empty = {
   privacyReviewProviderType: "local_heuristic",
   privacyReviewEndpointUrl: "",
   privacyReviewModel: "",
+  privacyReviewApiKey: "",
   privacyReviewPrivacyEmphasis: "safe",
   documentGenerationProviderType: "apple_intelligence",
   documentGenerationEndpointUrl: "",
@@ -119,6 +120,7 @@ export default function ConfigsPage() {
   const { notify } = useToast();
   const selectedSpeechProvider = speechProviders.find((item) => item.value === form.speechProviderType);
   const selectedFormatterProvider = formatterProviders.find((item) => item.value === form.documentGenerationProviderType);
+  const selectedPrivacyReviewProvider = privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType);
 
   async function load() {
     try {
@@ -142,22 +144,26 @@ export default function ConfigsPage() {
     const providerProfiles = profile.providerProfiles ?? {};
     const managedPolicy = profile.managedPolicy ?? {};
     const documentGenerationProviderType = normalizeFormatterProviderType(profile.documentGenerationProviderType ?? "");
+    const privacyReviewProviderType = normalizeReviewProviderType(profile.privacyReviewProviderType ?? "");
     setSelected(profile.id);
     setForm({
       ...empty,
       ...profile,
       partnerId: profile.partnerId ?? "",
       documentGenerationProviderType,
+      privacyReviewProviderType,
       speechApiKey: profile.speechApiKey ? SAVED_SECRET_MASK : "",
+      presidioApiKey: profile.presidioApiKey ? SAVED_SECRET_MASK : "",
       documentGenerationApiKey: profile.documentGenerationApiKey ? SAVED_SECRET_MASK : "",
+      privacyReviewApiKey: profile.privacyReviewApiKey ? SAVED_SECRET_MASK : "",
       speechDiarizationEnabled: providerProfiles?.speech?.speakerDiarizationEnabled ?? false,
-      piiScoreThreshold: String(providerProfiles?.presidio?.scoreThreshold ?? "0.70"),
-      detectEmail: providerProfiles?.presidio?.detectEmail ?? true,
-      detectPhone: providerProfiles?.presidio?.detectPhone ?? true,
-      detectPerson: providerProfiles?.presidio?.detectPerson ?? true,
-      detectLocation: providerProfiles?.presidio?.detectLocation ?? true,
-      detectIdentifier: providerProfiles?.presidio?.detectIdentifier ?? true,
-      fullPersonNamesOnly: providerProfiles?.presidio?.fullPersonNamesOnly ?? false,
+      piiScoreThreshold: String(profile.presidioScoreThreshold ?? providerProfiles?.presidio?.scoreThreshold ?? "0.70"),
+      detectEmail: profile.presidioDetectEmail ?? providerProfiles?.presidio?.detectEmail ?? true,
+      detectPhone: profile.presidioDetectPhone ?? providerProfiles?.presidio?.detectPhone ?? true,
+      detectPerson: profile.presidioDetectPerson ?? providerProfiles?.presidio?.detectPerson ?? true,
+      detectLocation: profile.presidioDetectLocation ?? providerProfiles?.presidio?.detectLocation ?? true,
+      detectIdentifier: profile.presidioDetectIdentifier ?? providerProfiles?.presidio?.detectIdentifier ?? true,
+      fullPersonNamesOnly: profile.presidioFullPersonNamesOnly ?? providerProfiles?.presidio?.fullPersonNamesOnly ?? false,
       formatterPrivacyEmphasis: providerProfiles?.formatter?.privacyEmphasis ?? "managed",
       privacyReviewPrivacyEmphasis: providerProfiles?.privacyReview?.privacyEmphasis ?? "safe",
       developerMode: profile.featureFlags?.developerMode ?? false,
@@ -234,6 +240,7 @@ export default function ConfigsPage() {
       privacyReviewProviderType: value,
       privacyReviewEndpointUrl: canUseRemoteReview ? provider?.endpointDefault ?? form.privacyReviewEndpointUrl : "",
       privacyReviewModel: canUseRemoteReview ? providerDefaultModel(provider) : "",
+      privacyReviewApiKey: canUseRemoteReview ? form.privacyReviewApiKey : "",
       privacyReviewPrivacyEmphasis: ["local_heuristic", "ollama", "openai_compatible"].includes(value) ? "safe" : form.privacyReviewPrivacyEmphasis
     };
     setForm(next);
@@ -258,7 +265,7 @@ export default function ConfigsPage() {
         providerDomain: "privacy_review",
         providerType: source.privacyReviewProviderType ?? "",
         endpointUrl: source.privacyReviewEndpointUrl ?? "",
-        apiKey: ""
+        apiKey: source.privacyReviewApiKey ?? ""
       }
     }[kind];
   }
@@ -349,9 +356,18 @@ export default function ConfigsPage() {
         piiControlEnabled: Boolean(form.piiControlEnabled),
         presidioEndpointUrl: form.presidioEndpointUrl || null,
         presidioSecretRef: form.presidioSecretRef || null,
+        presidioApiKey: selected && form.presidioApiKey === SAVED_SECRET_MASK ? undefined : form.presidioApiKey || null,
+        presidioScoreThreshold: Number(form.piiScoreThreshold || 0.7),
+        presidioFullPersonNamesOnly: Boolean(form.fullPersonNamesOnly),
+        presidioDetectPerson: Boolean(form.detectPerson),
+        presidioDetectEmail: Boolean(form.detectEmail),
+        presidioDetectPhone: Boolean(form.detectPhone),
+        presidioDetectLocation: Boolean(form.detectLocation),
+        presidioDetectIdentifier: Boolean(form.detectIdentifier),
         privacyReviewProviderType: form.privacyReviewProviderType || null,
         privacyReviewEndpointUrl: reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewEndpointUrl || null : null,
         privacyReviewModel: reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewModel || null : null,
+        privacyReviewApiKey: selected && form.privacyReviewApiKey === SAVED_SECRET_MASK ? undefined : reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewApiKey || null : null,
         documentGenerationProviderType: form.documentGenerationProviderType || null,
         documentGenerationEndpointUrl: formatterProvider?.endpoint ? form.documentGenerationEndpointUrl || null : null,
         documentGenerationModel: formatterProvider?.model ? form.documentGenerationModel || null : null,
@@ -427,7 +443,7 @@ export default function ConfigsPage() {
             <div className="panel">
               <PanelHeader title="Configuration profiles" description="List first. Open a profile to edit provider selections and policy in a slide-in panel." actions={<IconAction label="New profile" tone="primary" onClick={createNew}><Plus size={16} /></IconAction>} />
               {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech</th><th>Formatter</th><th>Privacy review</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.id} onDoubleClick={() => edit(profile)}><td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td><td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td><td>{profile.speechProviderType ? <span className="badge">{profile.speechProviderType}</span> : <span className="muted">Local</span>}</td><td>{profile.documentGenerationProviderType ? <span className="badge">{normalizeFormatterProviderType(profile.documentGenerationProviderType)}</span> : <span className="muted">Local</span>}</td><td><div className="row"><StatusBadge status={profile.privacyControlEnabled ? "active" : "draft"} />{profile.privacyReviewProviderType && <span className="badge">{profile.privacyReviewProviderType}</span>}</div></td><td className="row actions"><IconAction label="Edit profile" onClick={() => edit(profile)}><Settings size={14} /></IconAction><IconAction label="Clone profile" onClick={() => cloneProfile(profile)} disabled={cloningId === profile.id}><CopyPlus size={14} /></IconAction><IconAction label="Delete profile" tone="danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
+                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech</th><th>Formatter</th><th>Privacy review</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((profile) => <tr key={profile.id} onDoubleClick={() => edit(profile)}><td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td><td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td><td>{profile.speechProviderType ? <span className="badge">{profile.speechProviderType}</span> : <span className="muted">Local</span>}</td><td>{profile.documentGenerationProviderType ? <span className="badge">{normalizeFormatterProviderType(profile.documentGenerationProviderType)}</span> : <span className="muted">Local</span>}</td><td><div className="row"><StatusBadge status={profile.privacyControlEnabled ? "active" : "draft"} />{profile.privacyReviewProviderType && <span className="badge">{normalizeReviewProviderType(profile.privacyReviewProviderType)}</span>}</div></td><td className="row actions"><IconAction label="Edit profile" onClick={() => edit(profile)}><Settings size={14} /></IconAction><IconAction label="Clone profile" onClick={() => cloneProfile(profile)} disabled={cloningId === profile.id}><CopyPlus size={14} /></IconAction><IconAction label="Delete profile" tone="danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /></IconAction></td></tr>)}</tbody></table></div>
               )}
             </div>
           </div>
@@ -481,28 +497,33 @@ export default function ConfigsPage() {
                     <h4>Presidio PII analyzer</h4>
                     <p>The app appends /health and /analyze to this base URL.</p>
                   </div>
-                  <div className="grid three">
+                  <div className="grid two">
                     <div className="field"><FieldLabel help={helpText.presidioEndpointUrl}>Presidio endpoint URL</FieldLabel><input className="input" value={form.presidioEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, presidioEndpointUrl: e.target.value })} /></div>
-                    <div className="field"><FieldLabel help={helpText.presidioSecretRef}>Secret reference</FieldLabel><input className="input" value={form.presidioSecretRef ?? ""} onChange={(e) => setForm({ ...form, presidioSecretRef: e.target.value })} placeholder="secret://ulfy/presidio" /></div>
-                    <div className="field"><FieldLabel>Score threshold</FieldLabel><input className="input" type="number" min="0" max="1" step="0.05" value={form.piiScoreThreshold} onChange={(e) => setForm({ ...form, piiScoreThreshold: e.target.value })} /></div>
+                    <div className="field"><FieldLabel help={helpText.presidioApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.presidioApiKey ?? ""} onChange={(e) => setForm({ ...form, presidioApiKey: e.target.value })} placeholder="Optional managed key" /></div>
+                    <div className="field"><FieldLabel>Minimum score</FieldLabel><input className="input" type="number" min="0" max="1" step="0.05" value={form.piiScoreThreshold} onChange={(e) => setForm({ ...form, piiScoreThreshold: e.target.value })} /></div>
                   </div>
                   <div className="row checkbox-group">
-                    {["detectEmail", "detectPhone", "detectPerson", "detectLocation", "detectIdentifier", "fullPersonNamesOnly"].map((key) => <label key={key} className="checkbox-row"><input type="checkbox" checked={Boolean(form[key])} onChange={(e) => setForm({ ...form, [key]: e.target.checked })} /> {labelFor(key)}</label>)}
+                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.fullPersonNamesOnly)} onChange={(e) => setForm({ ...form, fullPersonNamesOnly: e.target.checked })} /> Only react to full names</label>
+                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectPerson)} onChange={(e) => setForm({ ...form, detectPerson: e.target.checked })} /> Person names</label>
+                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectEmail)} onChange={(e) => setForm({ ...form, detectEmail: e.target.checked })} /> Email addresses</label>
+                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectPhone)} onChange={(e) => setForm({ ...form, detectPhone: e.target.checked })} /> Phone numbers</label>
+                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectLocation)} onChange={(e) => setForm({ ...form, detectLocation: e.target.checked })} /> Places and addresses</label>
+                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectIdentifier)} onChange={(e) => setForm({ ...form, detectIdentifier: e.target.checked })} /> Other identifiers</label>
                   </div>
                 </div>
                 <div className="form-subsection">
                   <div className="form-subsection-header">
                     <h4>Privacy review / guardrail</h4>
-                    <p>Custom review providers are eligible only when explicitly classified as safe.</p>
+                    <p>Use local heuristic, Ollama, or an OpenAI-compatible privacy gateway approved by the organization.</p>
                   </div>
-                  <ProviderHint provider={privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType)} />
-                  {form.privacyReviewProviderType && !["local_heuristic", "ollama", "openai_compatible"].includes(form.privacyReviewProviderType) && <Alert tone="danger">This provider is decoded by the app, but is not a good v1 privacy-review choice. Prefer local_heuristic, ollama, or openai_compatible.</Alert>}
-                  <div className="grid four">
+                  <ProviderHint provider={selectedPrivacyReviewProvider} />
+                  <div className="grid two">
                     <div className="field"><FieldLabel help={helpText.privacyReviewProviderType}>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
-                    <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} /></div>
-                    <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} disabled={form.privacyReviewProviderType === "local_heuristic" || !form.privacyReviewProviderType} loading={modelLoading === "review"} options={modelLookupKeys.review === modelRequestKey("review") ? modelOptions.review : []} onOpen={() => lookupModels("review")} />
-                    <div className="field"><FieldLabel>Privacy classification</FieldLabel><select value={form.privacyReviewPrivacyEmphasis} onChange={(e) => setForm({ ...form, privacyReviewPrivacyEmphasis: e.target.value })}><option value="safe">safe</option><option value="managed">managed</option><option value="caution">caution</option><option value="unsafe">unsafe</option></select></div>
+                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} /></div>}
+                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} loading={modelLoading === "review"} options={modelLookupKeys.review === modelRequestKey("review") ? modelOptions.review : []} onOpen={() => lookupModels("review")} />}
+                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.privacyReviewApiKey ?? ""} onChange={(e) => setForm({ ...form, privacyReviewApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
                   </div>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> Allow users to choose another privacy review provider</label>
                 </div>
               </FormSection>
 
@@ -529,7 +550,6 @@ export default function ConfigsPage() {
                       <label className="policy-toggle"><input type="checkbox" checked={form.hideSettings} onChange={(e) => setForm({ ...form, hideSettings: e.target.checked })} /><span><FieldLabel help={helpText.hideSettings}>Hide most app settings</FieldLabel><small>Keeps managed enterprise users focused on status, support, and daily use.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
                       <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /><span><strong>User may change speech</strong><small>Allows local speech-provider changes for this managed profile.</small></span></label>
-                      <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /><span><strong>User may change privacy review</strong><small>Allows local privacy-review provider changes for this managed profile.</small></span></label>
                     </div>
                   </div>
 
@@ -706,6 +726,7 @@ function normalizeFormatterProviderType(providerType?: string | null) {
   return providerType ?? "";
 }
 
-function labelFor(key: string) {
-  return key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase());
+function normalizeReviewProviderType(providerType?: string | null) {
+  if (providerType === "openai" || providerType === "vllm") return "openai_compatible";
+  return providerType ?? "";
 }
