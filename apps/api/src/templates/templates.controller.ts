@@ -86,7 +86,7 @@ export class TemplatesController {
   })
   @ApiHeader({ name: "Authorization", required: false, description: "Bearer enterprise activation token." })
   @ApiHeader({ name: "X-API-Key", required: false, description: "Internal/developer repository override key." })
-  @ApiQuery({ name: "tenantId", required: false, description: "Legacy development-only tenant filter. Do not use for normal enterprise mobile access." })
+  @ApiQuery({ name: "tenantId", required: false, description: "Optional internal tenant filter. Normal mobile clients should use Authorization: Bearer <activationToken>." })
   @ApiOkResponse({ description: "Published template manifest filtered by tenant entitlement.", schema: templateManifestSchema })
   @ApiUnauthorizedResponse({ description: "Missing or invalid enterprise activation token.", schema: mobileUnauthorizedSchema })
   manifest(@Headers("authorization") authorization?: string, @Headers("x-api-key") apiKey?: string, @Query("tenantId") tenantId?: string) {

@@ -262,7 +262,7 @@ const mobileConfigSchema = {
   properties: {
     id: { type: "string", format: "uuid", description: "Config profile id." },
     name: { type: "string", description: "Config profile display name." },
-    speechProviderType: { type: "string", enum: ["local", "apple_online", "openai", "azure", "gemini"], description: "Managed speech provider. Enterprise editor exposes local, apple_online, openai and azure for v1; gemini is app-supported but not production-ready." },
+    speechProviderType: { type: "string", enum: ["local", "apple_online", "openai", "azure", "gemini"], description: "Managed speech provider decoded by the iOS app. Enterprise policy profiles normally use local, apple_online, openai or azure." },
     speechEndpointUrl: { type: "string", nullable: true, example: "https://kvasetech.com/stt", description: "Speech endpoint URL for endpoint-driven providers such as Azure/STT container or internal gateways." },
     speechModelName: { type: "string", nullable: true, example: "gpt-4o-transcribe", description: "Optional speech model. Mainly used by OpenAI speech." },
     speechApiKey: { type: "string", nullable: true, description: "Optional managed speech credential. The app stores it securely and uses it only for the managed speech provider." },
@@ -291,12 +291,12 @@ const mobileConfigSchema = {
     featureFlags: {
       type: "object",
       additionalProperties: { type: "boolean" },
-      description: "Boolean feature flags. Current app understands developerMode and may decode allowExternalProviders, enterpriseTemplates, privacyReview."
+      description: "Boolean feature flags decoded by the app, including developerMode, allowExternalProviders, enterpriseTemplates and privacyReview."
     },
-    allowedProviderRestrictions: { type: "array", items: { type: "string" }, description: "Policy hint/list of allowed provider identifiers. Some app enforcement may be future-facing." },
+    allowedProviderRestrictions: { type: "array", items: { type: "string" }, description: "Policy hint/list of allowed provider identifiers for clients that support provider filtering." },
     providerProfiles: {
       type: "object",
-      description: "Forward-compatible provider catalog for enterprise clients. Contains available speech providers and document-generation provider profiles, including tenant-specific OpenAI-compatible/Ollama endpoints. The selected top-level speech/documentGeneration fields remain the default/enforced provider for current app versions.",
+      description: "Provider catalog for enterprise clients. Contains available speech providers and document-generation provider profiles, including tenant-specific OpenAI-compatible/Ollama endpoints. The selected top-level speech/documentGeneration fields remain the default/enforced provider.",
       example: {
         speech: {
           selected: "azure",
@@ -317,7 +317,7 @@ const mobileConfigSchema = {
       }
     },
     managedPolicy: managedPolicySchema,
-    defaultTemplateId: { type: "string", format: "uuid", nullable: true, description: "Optional tenant default template id. Current app support is partial." }
+    defaultTemplateId: { type: "string", format: "uuid", nullable: true, description: "Optional tenant default template id used to guide users toward an organization-approved starting template." }
   },
   additionalProperties: true,
   example: enterpriseConfigExample

@@ -87,7 +87,7 @@ export class ConfigDto {
     required: false,
     enum: ["local", "apple_online", "openai", "azure", "gemini"],
     example: "azure",
-    description: "Managed speech provider for the iOS app. The admin UI should expose local, apple_online, openai and azure for v1; gemini is decoded by the app but treated as coming soon."
+    description: "Managed speech provider for the iOS app. Enterprise policy profiles normally use local, apple_online, openai or azure."
   })
   @IsOptional()
   @IsString()
