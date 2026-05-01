@@ -332,10 +332,8 @@ export function IconPicker({ value, onChange }: { value: string; onChange: (valu
 
   return (
     <div className="icon-picker">
-      <button type="button" className="icon-picker-trigger" onClick={() => setOpen(true)} aria-label="Choose template icon" title="Choose template icon">
-        <span className="sf-symbol-tile" title={`Web preview for ${value || "doc.text"}`}>
-          <TemplateIcon symbol={value || "doc.text"} />
-        </span>
+      <button type="button" className="sf-symbol-tile icon-picker-trigger" onClick={() => setOpen(true)} aria-label="Choose template icon" title="Choose template icon">
+        <TemplateIcon symbol={value || "doc.text"} />
       </button>
 
       <Modal

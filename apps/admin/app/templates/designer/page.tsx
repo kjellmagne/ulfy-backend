@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
-import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel } from "../../../components/AdminUI";
+import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel, Modal } from "../../../components/AdminUI";
 import { IconPicker, LanguageCombobox, TagEditor, presetToTemplateSection } from "../../../components/TemplateControls";
 import type { TemplateCategoryOption, TemplateSectionPresetOption, TemplateTagOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
@@ -280,6 +280,7 @@ export default function TemplateDesignerRoute() {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [previewTab, setPreviewTab] = useState<"document" | "yaml" | "sample">("document");
   const [previewProviderStatus, setPreviewProviderStatus] = useState<PreviewProviderStatus | null>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -591,6 +592,7 @@ export default function TemplateDesignerRoute() {
       });
       updateVariantForm((current) => ({ ...current, yamlContent: result.yamlContent, sampleTranscript: result.sampleTranscript }));
       setSelectedSectionIndex(0);
+      setAiDialogOpen(false);
       notify({ title: "AI suggestion added", message: "Review and edit it before publishing.", tone: "success" });
     } catch (err) {
       notify({ title: "AI suggestion failed", message: getErrorMessage(err), tone: "danger" });
@@ -673,6 +675,9 @@ export default function TemplateDesignerRoute() {
               {saveState === "saving" && <Loader2 size={13} />}
               {saveLabel}
             </span>
+            <button className="button secondary" type="button" onClick={() => setAiDialogOpen(true)}>
+              <Sparkles size={15} /> AI helper
+            </button>
             <div className="publish-panel" aria-label="Publish changes">
               <div className="publish-panel-header">
                 <span>Publish changes as</span>
@@ -699,23 +704,30 @@ export default function TemplateDesignerRoute() {
 
         {error && <Alert tone="danger">{error}</Alert>}
 
-        <section className="ai-template-helper" aria-label="AI template helper">
-          <div>
-            <span className="eyebrow">AI template helper</span>
-            <h2>Describe what this template should be used for</h2>
-            <p>AI will generate a starting suggestion for the editable template and sample transcript. You review and edit everything before publishing.</p>
-          </div>
-          <div className="ai-template-controls">
+        <Modal
+          open={aiDialogOpen}
+          title="AI template helper"
+          description="Describe the intended use. AI will generate a starting suggestion for the editable template and sample transcript."
+          onClose={() => setAiDialogOpen(false)}
+          footer={(
+            <>
+              <button className="button secondary" type="button" onClick={() => setAiDialogOpen(false)}>Cancel</button>
+              <button className="button" type="button" onClick={aiAssist} disabled={saveState === "saving"}>
+                <Sparkles size={15} /> Generate suggestion
+              </button>
+            </>
+          )}
+        >
+          <div className="ai-template-dialog">
+            <FieldLabel>Template intention</FieldLabel>
             <textarea
               value={variantForm.aiUseCase}
               onChange={(event) => setVariantForm((current) => ({ ...current, aiUseCase: event.target.value }))}
               placeholder="Example: A Norwegian template for follow-up conversations after municipal health meetings. It should produce a short summary, decisions, next steps, and responsible people."
             />
-            <button className="button secondary" type="button" onClick={aiAssist} disabled={saveState === "saving"}>
-              <Sparkles size={15} /> Generate suggestion
-            </button>
+            <p>Nothing is published automatically. Review and edit the suggestion before publishing changes.</p>
           </div>
-        </section>
+        </Modal>
 
         <div className="template-workbench" aria-label="Template designer">
           <aside className="template-outline">
