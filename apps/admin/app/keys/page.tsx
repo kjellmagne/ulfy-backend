@@ -131,15 +131,6 @@ export default function KeysPage() {
       <PageHeader
         title="License keys"
         description="Generate, inspect, revoke/reactivate, and delete activation keys. Full keys are shown once after generation."
-        meta={(
-          <>
-            {activeTab === "single" ? (
-              <button type="button" className="button" onClick={() => setSingleModalOpen(true)}><KeyRound size={16} /> Generate single-user key</button>
-            ) : (
-              <button type="button" className="button" onClick={() => setEnterpriseModalOpen(true)} disabled={!tenants.length || !profiles.length}><KeyRound size={16} /> Generate enterprise key</button>
-            )}
-          </>
-        )}
       />
       {generated && (
         <div className="panel" style={{ marginBottom: 16, borderColor: "var(--accent)" }}>

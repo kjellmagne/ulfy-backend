@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent } from "react";
-import { Bot, ChevronDown, Edit3, KeyRound, Loader2, Plus, Save, ShieldCheck, Tag, Trash2 } from "lucide-react";
+import { Bot, ChevronDown, Edit3, Loader2, Plus, Save, Tag, Trash2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
 import { RequireAuth } from "../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
@@ -361,12 +361,6 @@ export default function SettingsPage() {
                   <div className="field">
                     <FieldLabel help="Write-only secret for the preview provider. Leave blank to keep the saved key; enter a new value to replace it.">API key</FieldLabel>
                     <input className="input" type="password" value={previewProviderForm.apiKey} onChange={(event) => setPreviewProviderForm({ ...previewProviderForm, apiKey: event.target.value })} placeholder={previewProvider?.apiKeyPreview ? `Saved: ${previewProvider.apiKeyPreview}` : "Paste preview provider API key"} />
-                    <p className="field-hint">If you change provider type or move to a different API host, paste the matching API key here. Leaving it blank will no longer carry an old saved key across provider switches.</p>
-                  </div>
-                  <div className="settings-provider-safe">
-                    <ShieldCheck size={16} />
-                    <span>Visible and editable by superadmins only.</span>
-                    {previewProvider?.apiKeyConfigured && <span><KeyRound size={14} /> Saved key is masked.</span>}
                   </div>
                 </div>
                 <div className="form-actions">
