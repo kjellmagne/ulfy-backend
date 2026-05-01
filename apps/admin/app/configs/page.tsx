@@ -861,11 +861,13 @@ export default function ConfigsPage() {
                       <h4>Repository and telemetry</h4>
                       <p>Central catalog and optional operational endpoints returned to enterprise devices.</p>
                     </div>
-                    <div className="grid two">
-                      <div className="field"><FieldLabel help={helpText.templateRepositoryUrl}>Template repository URL</FieldLabel><input className="input" value={form.templateRepositoryUrl ?? ""} onChange={(e) => setForm({ ...form, templateRepositoryUrl: e.target.value })} /></div>
-                      <div className="field"><FieldLabel>Telemetry endpoint URL</FieldLabel><input className="input" value={form.telemetryEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, telemetryEndpointUrl: e.target.value })} /></div>
+                    <div className="policy-card-body">
+                      <div className="grid two">
+                        <div className="field"><FieldLabel help={helpText.templateRepositoryUrl}>Template repository URL</FieldLabel><input className="input" value={form.templateRepositoryUrl ?? ""} onChange={(e) => setForm({ ...form, templateRepositoryUrl: e.target.value })} /></div>
+                        <div className="field"><FieldLabel>Telemetry endpoint URL</FieldLabel><input className="input" value={form.telemetryEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, telemetryEndpointUrl: e.target.value })} /></div>
+                      </div>
+                      <div className="field"><FieldLabel help={helpText.defaultTemplateId}>Default template ID</FieldLabel><input className="input" value={form.defaultTemplateId ?? ""} onChange={(e) => setForm({ ...form, defaultTemplateId: e.target.value })} /></div>
                     </div>
-                    <div className="field"><FieldLabel help={helpText.defaultTemplateId}>Default template ID</FieldLabel><input className="input" value={form.defaultTemplateId ?? ""} onChange={(e) => setForm({ ...form, defaultTemplateId: e.target.value })} /></div>
                   </div>
 
                   <div className="policy-card">
@@ -873,10 +875,12 @@ export default function ConfigsPage() {
                       <h4>Device policy behavior</h4>
                       <p>Keep override off for strict enterprise control. Only enable local changes deliberately.</p>
                     </div>
-                    <div className="policy-toggle-grid">
-                      <label className="policy-toggle"><input type="checkbox" checked={form.hideSettings} onChange={(e) => setForm({ ...form, hideSettings: e.target.checked })} /><span><FieldLabel help={helpText.hideSettings}>Hide most app settings</FieldLabel><small>Keeps managed enterprise users focused on status, support, and daily use.</small></span></label>
-                      <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
-                      <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /><span><strong>User may change speech</strong><small>Allows local speech-provider changes for this managed profile.</small></span></label>
+                    <div className="policy-card-body">
+                      <div className="policy-toggle-grid">
+                        <label className="policy-toggle"><input type="checkbox" checked={form.hideSettings} onChange={(e) => setForm({ ...form, hideSettings: e.target.checked })} /><span><FieldLabel help={helpText.hideSettings}>Hide most app settings</FieldLabel><small>Keeps managed enterprise users focused on status, support, and daily use.</small></span></label>
+                        <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
+                        <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangeSpeechProvider} onChange={(e) => setForm({ ...form, userMayChangeSpeechProvider: e.target.checked })} /><span><strong>User may change speech</strong><small>Allows local speech-provider changes for this managed profile.</small></span></label>
+                      </div>
                     </div>
                   </div>
 
@@ -885,13 +889,15 @@ export default function ConfigsPage() {
                       <h4>Feature flags and provider restrictions</h4>
                       <p>Allowed provider restrictions are generated from the provider lists above and returned as backend provider values.</p>
                     </div>
-                    <div className="policy-toggle-grid compact">
-                      <label className="policy-toggle"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /><span><FieldLabel help={helpText.developerMode}>Developer mode</FieldLabel><small>Shows testing and validation tools in the app.</small></span></label>
-                      <label className="policy-toggle"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /><span><FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel><small>Decoded by the app, with stronger enforcement planned later.</small></span></label>
-                      <label className="policy-toggle"><input type="checkbox" checked={form.externalFormattersAllowed} onChange={(e) => setForm({ ...form, externalFormattersAllowed: e.target.checked })} /><span><strong>External formatters allowed</strong><small>Backend policy metadata for document-generation controls.</small></span></label>
-                    </div>
-                    <div className="provider-restriction-preview">
-                      {Array.from(new Set([...normalizedSpeechAvailable(form), ...configuredFormatterProviders.filter((provider) => provider.enabled).map((provider) => provider.type), form.privacyReviewProviderType].filter(Boolean))).map((value) => <span className="badge" key={value}>{value}</span>)}
+                    <div className="policy-card-body">
+                      <div className="policy-toggle-grid compact">
+                        <label className="policy-toggle"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /><span><FieldLabel help={helpText.developerMode}>Developer mode</FieldLabel><small>Shows testing and validation tools in the app.</small></span></label>
+                        <label className="policy-toggle"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /><span><FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel><small>Decoded by the app, with stronger enforcement planned later.</small></span></label>
+                        <label className="policy-toggle"><input type="checkbox" checked={form.externalFormattersAllowed} onChange={(e) => setForm({ ...form, externalFormattersAllowed: e.target.checked })} /><span><strong>External formatters allowed</strong><small>Backend policy metadata for document-generation controls.</small></span></label>
+                      </div>
+                      <div className="provider-restriction-preview">
+                        {Array.from(new Set([...normalizedSpeechAvailable(form), ...configuredFormatterProviders.filter((provider) => provider.enabled).map((provider) => provider.type), form.privacyReviewProviderType].filter(Boolean))).map((value) => <span className="badge" key={value}>{value}</span>)}
+                      </div>
                     </div>
                   </div>
                 </div>
