@@ -21,6 +21,10 @@
   --sidebar-text: #94a3b8;
   --sidebar-active: #2dd4bf;
   --shadow: 0 1px 4px rgba(15,23,42,0.07);
+  --shadow-card: 0 18px 38px rgba(15,23,42,0.10), 0 2px 6px rgba(15,23,42,0.06);
+  --shadow-card-hover: 0 24px 52px rgba(15,23,42,0.14), 0 8px 18px rgba(15,23,42,0.08);
+  --shadow-row: 0 10px 22px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.05);
+  --shadow-row-hover: 0 16px 34px rgba(15,23,42,0.12), 0 4px 10px rgba(15,23,42,0.07);
 }
 
 * { box-sizing: border-box; }
@@ -588,8 +592,11 @@ button, input, textarea, select { font: inherit; }
 }
 .form-subsection {
   margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line-soft);
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-row);
 }
 .form-subsection-header {
   margin-bottom: 12px;
@@ -2689,7 +2696,7 @@ textarea {
   border: 1px solid var(--line-strong);
   border-radius: 14px;
   background: #fff;
-  box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+  box-shadow: var(--shadow-card);
 }
 .config-editor-kicker {
   display: block;
@@ -2757,7 +2764,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  box-shadow: var(--shadow-card);
 }
 .config-outline-title {
   display: grid;
@@ -2829,7 +2836,7 @@ textarea {
 }
 .config-editor-content .form-section {
   border-color: var(--line-strong);
-  box-shadow: 0 6px 18px rgba(15,23,42,0.045);
+  box-shadow: var(--shadow-card);
 }
 .config-editor-content .form-section-header {
   padding: 16px 18px;
@@ -2899,7 +2906,7 @@ textarea {
   border-radius: 12px;
   background: #fff;
   overflow: visible;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+  box-shadow: var(--shadow-row);
   transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .provider-row.enabled {
@@ -2915,7 +2922,7 @@ textarea {
 }
 .provider-row:hover {
   border-color: var(--line-strong);
-  box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+  box-shadow: var(--shadow-row-hover);
   transform: translateY(-1px);
 }
 .provider-row-main {
@@ -2977,6 +2984,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface-sunken);
+  box-shadow: 0 6px 14px rgba(15,23,42,0.06);
 }
 .provider-config-grid .field {
   margin-bottom: 0;
@@ -3033,17 +3041,13 @@ textarea {
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
-  box-shadow:
-    0 18px 38px rgba(15,23,42,0.10),
-    0 2px 6px rgba(15,23,42,0.06);
+  box-shadow: var(--shadow-card);
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 .policy-card:hover,
 .policy-card:focus-within {
   border-color: rgba(13,148,136,0.34);
-  box-shadow:
-    0 24px 52px rgba(15,23,42,0.14),
-    0 8px 18px rgba(15,23,42,0.08);
+  box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
 }
 .policy-card::before {
@@ -3102,18 +3106,14 @@ textarea {
   border-radius: 10px;
   background: #fff;
   cursor: pointer;
-  box-shadow:
-    0 10px 22px rgba(15,23,42,0.08),
-    0 1px 2px rgba(15,23,42,0.05);
+  box-shadow: var(--shadow-row);
   transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .policy-toggle:hover,
 .policy-toggle:focus-within {
   border-color: var(--line-strong);
   background: var(--surface-muted);
-  box-shadow:
-    0 16px 34px rgba(15,23,42,0.12),
-    0 4px 10px rgba(15,23,42,0.07);
+  box-shadow: var(--shadow-row-hover);
   transform: translateY(-1px);
 }
 .policy-toggle:has(input:checked) {
@@ -3200,16 +3200,12 @@ textarea {
   border-radius: 12px;
   background: #fff;
   overflow: hidden;
-  box-shadow:
-    0 18px 38px rgba(15,23,42,0.10),
-    0 2px 6px rgba(15,23,42,0.06);
+  box-shadow: var(--shadow-card);
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 .template-family-card:hover {
   border-color: rgba(13,148,136,0.34);
-  box-shadow:
-    0 24px 52px rgba(15,23,42,0.14),
-    0 8px 18px rgba(15,23,42,0.08);
+  box-shadow: var(--shadow-card-hover);
   transform: translateY(-2px);
 }
 .template-family-card::before {
@@ -3320,17 +3316,13 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  box-shadow:
-    0 10px 22px rgba(15,23,42,0.08),
-    0 1px 2px rgba(15,23,42,0.05);
+  box-shadow: var(--shadow-row);
   transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .template-variant-row:hover {
   border-color: var(--line-strong);
   background: var(--surface-muted);
-  box-shadow:
-    0 16px 34px rgba(15,23,42,0.12),
-    0 4px 10px rgba(15,23,42,0.07);
+  box-shadow: var(--shadow-row-hover);
   transform: translateY(-1px);
 }
 .variant-language,
