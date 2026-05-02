@@ -60,6 +60,12 @@ export const ManagedPolicyPayload = z.object({
   allowPrivacyReviewProviderChange: z.boolean().optional()
 }).passthrough();
 
+export const TemplateCategoryCatalogItem = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  icon: z.string().min(1)
+});
+
 export const ConfigProfilePayload = z.object({
   speechProviderType: z.enum(["local", "apple_online", "openai", "azure", "gemini"]).optional().nullable(),
   speechEndpointUrl: z.string().url().optional().nullable(),
@@ -90,6 +96,7 @@ export const ConfigProfilePayload = z.object({
   featureFlags: z.record(z.boolean()).default({}),
   allowedProviderRestrictions: z.array(z.string()).default([]),
   providerProfiles: z.record(z.unknown()).default({}).optional(),
+  templateCategories: z.array(TemplateCategoryCatalogItem).optional(),
   managedPolicy: ManagedPolicyPayload.default({ allowPolicyOverride: false }).optional(),
   defaultTemplateId: z.string().uuid().optional().nullable()
 });

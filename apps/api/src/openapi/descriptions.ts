@@ -21,17 +21,19 @@ const operationDescriptions: Record<string, string> = {
   "POST /api/v1/activate/enterprise": [
     "Mobile-facing endpoint used when an iPhone user manually enters an enterprise activation key.",
     "The backend validates the key, checks tenant/key/device-limit status, registers this device activation, resolves the effective config profile, and returns tenant, license, device and config metadata.",
-    "The activation token returned here is also used as the bearer token for enterprise template manifest/download access."
+    "The activation token returned here is also used as the bearer token for enterprise template manifest/download access.",
+    "When template categories exist, config.templateCategories contains the centrally managed category catalog; each item id matches YAML identity.category and manifest category values."
   ].join(" "),
   "POST /api/v1/activation/refresh": [
     "Mobile check-in endpoint for an already activated device.",
     "The app sends the activation token plus current device/app metadata; the backend verifies the token, updates lastSeenAt/lastCheckIn/appVersion/deviceSerialNumber, and returns current license status.",
-    "Enterprise responses include the latest effective config profile so central policy changes are picked up without reactivation."
+    "Enterprise responses include the latest effective config profile so central policy changes are picked up without reactivation, including config.templateCategories when the admin category catalog is available."
   ].join(" "),
   "GET /api/v1/config/effective": [
     "Returns the current effective enterprise configuration for the supplied activation token without requiring a full refresh body.",
     "The config payload is sparse: fields that are present are intentional managed policy, while omitted fields should leave local app settings unchanged.",
-    "For single-user activations this returns no tenant and an empty config object because single licenses do not receive central policy in v1."
+    "For single-user activations this returns no tenant and an empty config object because single licenses do not receive central policy in v1.",
+    "Enterprise config may include templateCategories so the app can use server-side category titles, SF Symbol icons and display order."
   ].join(" "),
   "GET /api/v1/license/details": [
     "Returns the canonical mobile Settings license-details payload for an activation token.",
@@ -317,18 +319,18 @@ const operationDescriptions: Record<string, string> = {
 
   "GET /api/v1/admin/template-categories": [
     "Lists reusable template categories used by template families and direct template metadata.",
-    "Categories provide stable slugs/titles for catalog grouping and the admin designer category dropdown.",
-    "The list is sorted by title for picker display."
+    "Categories provide stable slugs/titles plus SF Symbol icons for catalog grouping, the admin designer category dropdown and the enterprise mobile config templateCategories catalog.",
+    "The list is sorted by sortOrder and then title; the same order is returned to the iOS app when categories are centrally managed."
   ].join(" "),
   "POST /api/v1/admin/template-categories": [
     "Creates a reusable template category.",
-    "Superadmin-only endpoint; slugs are normalized and used by template metadata and YAML identity category values.",
-    "Categories help keep template browsing consistent across admin and mobile surfaces."
+    "Superadmin-only endpoint; slugs are normalized and used by template metadata, YAML identity.category values and manifest category values.",
+    "The icon field stores an SF Symbol name, and sortOrder controls category display ordering in admin and mobile config payloads."
   ].join(" "),
   "PATCH /api/v1/admin/template-categories/{id}": [
-    "Updates a template category's slug, title or description.",
+    "Updates a template category's slug, title, icon, sort order or description.",
     "Superadmin-only endpoint; existing templates keep their category relationship by id while display metadata changes.",
-    "Slug changes should be coordinated with YAML/editor expectations."
+    "Slug changes should be coordinated with YAML/editor expectations because template YAML identity.category and mobile manifest category should use the same canonical value."
   ].join(" "),
   "DELETE /api/v1/admin/template-categories/{id}": [
     "Deletes a template category only if no direct templates or template families use it.",

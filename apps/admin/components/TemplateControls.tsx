@@ -56,6 +56,8 @@ export type TemplateCategoryOption = {
   id: string;
   slug: string;
   title: string;
+  icon?: string | null;
+  sortOrder?: number;
   description?: string | null;
 };
 

@@ -99,6 +99,13 @@ const managedPolicyExample = {
   privacyControlRequired: true,
   piiRequired: true
 };
+const templateCategoriesExample = [
+  { id: "personlig_diktat", title: "Personlig diktat / logg", icon: "waveform.and.mic" },
+  { id: "avdelingsmote", title: "Avdelingsmøte", icon: "person.3.sequence.fill" },
+  { id: "oppfolgingssamtale", title: "Oppfølgingssamtale", icon: "arrow.triangle.2.circlepath" },
+  { id: "jobbintervju", title: "Jobbintervju", icon: "person.text.rectangle" },
+  { id: "kartleggingssamtale", title: "Kartleggingssamtale bruker", icon: "clipboard.fill" }
+];
 const enterpriseConfigExample = {
   id: "b5e33e6f-5ff1-4e8d-a7cc-2f2e9781612f",
   name: "Strict enterprise policy",
@@ -130,6 +137,7 @@ const enterpriseConfigExample = {
   telemetryEndpointUrl: "https://telemetry.example.internal/events",
   featureFlags: { developerMode: false, allowExternalProviders: false, enterpriseTemplates: true, privacyReview: true },
   allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
+  templateCategories: templateCategoriesExample,
   providerProfiles: {
     speech: {
       selected: "azure",
@@ -294,6 +302,25 @@ const mobileConfigSchema = {
       description: "Boolean feature flags decoded by the app, including developerMode, allowExternalProviders, enterpriseTemplates and privacyReview."
     },
     allowedProviderRestrictions: { type: "array", items: { type: "string" }, description: "Policy hint/list of allowed provider identifiers for clients that support provider filtering." },
+    templateCategories: {
+      type: "array",
+      description: [
+        "Optional centrally managed template category catalog for the iOS app.",
+        "id is the canonical category value stored in template YAML identity.category and returned as manifest.category.",
+        "title and icon are display metadata; icon is an SF Symbol name.",
+        "Array order is the display order. If this field is missing or empty, the app should keep local/default category definitions and local category editing behavior."
+      ].join(" "),
+      items: {
+        type: "object",
+        required: ["id", "title", "icon"],
+        properties: {
+          id: { type: "string", example: "oppfolgingssamtale", description: "Canonical category id/slug. Must match YAML identity.category and manifest category." },
+          title: { type: "string", example: "Oppfølgingssamtale", description: "Display title shown in the app." },
+          icon: { type: "string", example: "arrow.triangle.2.circlepath", description: "SF Symbol name shown by the app." }
+        }
+      },
+      example: templateCategoriesExample
+    },
     providerProfiles: {
       type: "object",
       description: "Provider catalog for enterprise clients. Contains available speech providers and document-generation provider profiles, including tenant-specific OpenAI-compatible/Ollama endpoints. The selected top-level speech/documentGeneration fields remain the default/enforced provider.",

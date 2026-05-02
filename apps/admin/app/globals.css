@@ -3675,6 +3675,11 @@ textarea {
   justify-content: center;
   flex: 0 0 auto;
 }
+.sf-symbol-tile.compact {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
 .sf-symbol-tile svg {
   display: block;
 }

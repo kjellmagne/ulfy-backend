@@ -262,12 +262,12 @@ async function seedTemplateRepository(tenantId: string) {
     });
   }
 
-  for (const template of seedTemplates) {
+  for (const [templateIndex, template] of seedTemplates.entries()) {
     const yamlContent = templateYaml(template);
     const category = await prisma.templateCategory.upsert({
       where: { slug: template.category },
-      update: { title: template.categoryTitle },
-      create: { slug: template.category, title: template.categoryTitle, description: `${template.categoryTitle} templates.` }
+      update: { title: template.categoryTitle, icon: template.icon, sortOrder: (templateIndex + 1) * 10 },
+      create: { slug: template.category, title: template.categoryTitle, icon: template.icon, sortOrder: (templateIndex + 1) * 10, description: `${template.categoryTitle} templates.` }
     });
 
     await prisma.templateFamily.upsert({

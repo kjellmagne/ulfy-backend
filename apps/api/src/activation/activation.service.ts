@@ -118,7 +118,7 @@ export class ActivationService {
       license: this.mapEnterpriseLicense(key, activation.activatedAt),
       tenant: this.mapTenant(key.tenant),
       device: this.mapDevice(activation),
-      config: this.mapConfig(key.configProfile)
+      config: await this.mapConfig(key.configProfile)
     };
   }
 
@@ -156,7 +156,7 @@ export class ActivationService {
       appVersion: input.appVersion ?? activation.appVersion,
       deviceSerialNumber: input.deviceSerialNumber ?? activation.deviceSerialNumber
     };
-    const config = activation.enterpriseLicenseKey?.configProfile ? this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {};
+    const config = activation.enterpriseLicenseKey?.configProfile ? await this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {};
     const tenant = activation.enterpriseLicenseKey?.tenant ? this.mapTenant(activation.enterpriseLicenseKey.tenant) : null;
     return {
       success: true,
@@ -180,7 +180,7 @@ export class ActivationService {
       success: true,
       tenant,
       license: this.mapActivationLicense(activation),
-      config: activation.enterpriseLicenseKey?.configProfile ? this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {}
+      config: activation.enterpriseLicenseKey?.configProfile ? await this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {}
     };
   }
 
@@ -195,7 +195,7 @@ export class ActivationService {
       license: this.mapActivationLicense(activation),
       tenant,
       device: this.mapDevice(activation),
-      config: activation.enterpriseLicenseKey?.configProfile ? this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {}
+      config: activation.enterpriseLicenseKey?.configProfile ? await this.mapConfig(activation.enterpriseLicenseKey.configProfile) : {}
     };
   }
 
@@ -309,7 +309,8 @@ export class ActivationService {
     };
   }
 
-  private mapConfig(profile: any) {
+  private async mapConfig(profile: any) {
+    const templateCategories = await this.templateCategoryCatalog();
     return compactObject({
       id: profile.id,
       name: profile.name,
@@ -342,9 +343,22 @@ export class ActivationService {
       featureFlags: profile.featureFlags,
       allowedProviderRestrictions: profile.allowedProviderRestrictions,
       providerProfiles: profile.providerProfiles,
+      templateCategories,
       managedPolicy: this.mapManagedPolicy(profile.managedPolicy),
       defaultTemplateId: profile.defaultTemplateId
     });
+  }
+
+  private async templateCategoryCatalog() {
+    const categories = await this.prisma.templateCategory.findMany({
+      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+      select: { slug: true, title: true, icon: true }
+    });
+    return categories.map((category) => ({
+      id: category.slug,
+      title: category.title,
+      icon: category.icon || "folder"
+    }));
   }
 
   private mapManagedPolicy(policy: unknown) {

@@ -5,10 +5,11 @@ import type { CSSProperties, KeyboardEvent } from "react";
 import { Bot, ChevronDown, Edit3, Loader2, Plus, Save, Tag, Trash2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, FormSection, IconAction, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
 import { RequireAuth } from "../../components/RequireAuth";
+import { IconPicker, TemplateIcon } from "../../components/TemplateControls";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
-type Category = { id: string; slug: string; title: string; description?: string | null };
+type Category = { id: string; slug: string; title: string; icon: string; sortOrder: number; description?: string | null };
 type SectionPreset = {
   id: string;
   slug: string;
@@ -28,7 +29,7 @@ type PreviewProviderSetting = {
 };
 type TemplateTag = { id: string; slug: string; name: string; color: string; description?: string | null };
 
-const blankCategory = { id: "", slug: "", title: "", description: "" };
+const blankCategory = { id: "", slug: "", title: "", icon: "folder", sortOrder: 0, description: "" };
 const blankSection = { id: "", slug: "", title: "", purpose: "", format: "prose", required: false, extractionHintsText: "", sortOrder: 0 };
 const blankTag = { id: "", name: "", color: "#0d9488", description: "" };
 const blankPreviewProvider = { providerType: "openai-compatible", endpointUrl: "", model: "", apiKey: "" };
@@ -114,6 +115,8 @@ export default function SettingsPage() {
       id: category.id,
       slug: category.slug,
       title: category.title,
+      icon: category.icon || "folder",
+      sortOrder: category.sortOrder ?? 0,
       description: category.description ?? ""
     } : blankCategory);
     setCategoryPanel(true);
@@ -158,7 +161,13 @@ export default function SettingsPage() {
   async function saveCategory() {
     setSaving(true);
     try {
-      const payload = { slug: categoryForm.slug, title: categoryForm.title, description: categoryForm.description || undefined };
+      const payload = {
+        slug: categoryForm.slug,
+        title: categoryForm.title,
+        icon: categoryForm.icon || "folder",
+        sortOrder: Number(categoryForm.sortOrder) || 0,
+        description: categoryForm.description || undefined
+      };
       const path = categoryForm.id ? `/admin/template-categories/${categoryForm.id}` : "/admin/template-categories";
       await api(path, { method: categoryForm.id ? "PATCH" : "POST", body: JSON.stringify(payload) });
       notify({ title: "Category saved", tone: "success" });
@@ -405,11 +414,17 @@ export default function SettingsPage() {
               {!categories.length ? <EmptyState title="No categories" message="Create categories for template families." /> : (
                 <div className="table-wrap">
                   <table className="table">
-                    <thead><tr><th>Category</th><th>Slug</th><th className="actions">Actions</th></tr></thead>
+                    <thead><tr><th>Category</th><th>Slug</th><th>Order</th><th className="actions">Actions</th></tr></thead>
                     <tbody>{categories.map((category) => (
                       <tr key={category.id}>
-                        <td><b>{category.title}</b><br /><span className="muted">{category.description || "No description"}</span></td>
+                        <td>
+                          <div className="row">
+                            <span className="sf-symbol-tile compact"><TemplateIcon symbol={category.icon} size={16} /></span>
+                            <span><b>{category.title}</b><br /><span className="muted">{category.description || "No description"}</span></span>
+                          </div>
+                        </td>
                         <td><span className="code">{category.slug}</span></td>
+                        <td>{category.sortOrder}</td>
                         <td className="actions">
                           <IconAction label="Edit category" onClick={() => openCategory(category)} disabled={!canManageSettings}><Edit3 size={14} /></IconAction>
                           <IconAction label="Delete category" tone="danger" onClick={() => deleteCategory(category)} disabled={!canManageSettings}><Trash2 size={14} /></IconAction>
@@ -481,7 +496,7 @@ export default function SettingsPage() {
       <SidePanel
         open={categoryPanel}
         title={categoryForm.id ? "Edit Category" : "New Category"}
-        description="Categories become dropdown choices in template family and designer metadata."
+        description="Categories become dropdown choices in template family and designer metadata, and are returned to enterprise iOS clients as the managed category catalog."
         onClose={() => setCategoryPanel(false)}
         footer={<><button className="button secondary" onClick={() => setCategoryPanel(false)}>Cancel</button><button className="button" onClick={saveCategory} disabled={saving}><Save size={15} /> Save</button></>}
       >
@@ -489,6 +504,10 @@ export default function SettingsPage() {
           <div className="grid two">
             <div className="field"><FieldLabel>Title</FieldLabel><input className="input" value={categoryForm.title} onChange={(event) => setCategoryForm({ ...categoryForm, title: event.target.value })} /></div>
             <div className="field"><FieldLabel>Slug</FieldLabel><input className="input" value={categoryForm.slug} onChange={(event) => setCategoryForm({ ...categoryForm, slug: event.target.value })} placeholder="oppfolgingssamtale" /></div>
+          </div>
+          <div className="grid two">
+            <div className="field"><FieldLabel>Icon</FieldLabel><IconPicker value={categoryForm.icon} onChange={(icon) => setCategoryForm({ ...categoryForm, icon })} /></div>
+            <div className="field"><FieldLabel>Display order</FieldLabel><input className="input" type="number" value={categoryForm.sortOrder} onChange={(event) => setCategoryForm({ ...categoryForm, sortOrder: Number(event.target.value) })} /></div>
           </div>
           <div className="field"><FieldLabel>Description</FieldLabel><textarea value={categoryForm.description} onChange={(event) => setCategoryForm({ ...categoryForm, description: event.target.value })} /></div>
         </FormSection>

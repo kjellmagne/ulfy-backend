@@ -18,6 +18,9 @@ describe("ActivationService", () => {
         upsert: vi.fn(),
         findUnique: vi.fn(),
         update: vi.fn()
+      },
+      templateCategory: {
+        findMany: vi.fn().mockResolvedValue([])
       }
     };
     service = new ActivationService(prisma, { log: vi.fn() } as any, new JwtService());
@@ -106,6 +109,10 @@ describe("ActivationService", () => {
 
   it("returns enterprise tenant, license, and config details", async () => {
     const maintenanceUntil = new Date("2027-04-29T00:00:00.000Z");
+    prisma.templateCategory.findMany.mockResolvedValue([
+      { slug: "personlig_diktat", title: "Personlig diktat", icon: "waveform.and.mic" },
+      { slug: "oppfolgingssamtale", title: "Oppfølgingssamtale", icon: "arrow.triangle.2.circlepath" }
+    ]);
     prisma.deviceActivation.findUnique.mockResolvedValue({
       id: "act-2",
       kind: "enterprise",
@@ -183,6 +190,10 @@ describe("ActivationService", () => {
       privacyReviewApiKey: "privacy-key",
       documentGenerationProviderType: "openai_compatible",
       documentGenerationApiKey: "docgen-key",
+      templateCategories: [
+        { id: "personlig_diktat", title: "Personlig diktat", icon: "waveform.and.mic" },
+        { id: "oppfolgingssamtale", title: "Oppfølgingssamtale", icon: "arrow.triangle.2.circlepath" }
+      ],
       managedPolicy: {
         allowPolicyOverride: false,
         hideSettings: true,

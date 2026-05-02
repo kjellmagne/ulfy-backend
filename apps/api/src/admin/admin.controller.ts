@@ -532,6 +532,16 @@ class TemplateCategoryDto {
   @IsString()
   title!: string;
 
+  @ApiProperty({ required: false, example: "arrow.triangle.2.circlepath", description: "SF Symbol name used by the iOS app and mapped to a matching admin icon where possible." })
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @ApiProperty({ required: false, example: 30, description: "Display order for centrally managed category catalogs. Lower values appear first." })
+  @IsOptional()
+  @IsInt()
+  sortOrder?: number;
+
   @ApiProperty({ required: false, example: "Templates for structured follow-up conversations." })
   @IsOptional()
   @IsString()
@@ -1497,7 +1507,7 @@ export class AdminController {
   @ApiOperation({ summary: "List template categories" })
   @ApiOkResponse({ description: "Template categories." })
   categories() {
-    return this.prisma.templateCategory.findMany({ orderBy: { title: "asc" } });
+    return this.prisma.templateCategory.findMany({ orderBy: [{ sortOrder: "asc" }, { title: "asc" }] });
   }
 
   @Post("template-categories")
@@ -1507,7 +1517,7 @@ export class AdminController {
   async createTemplateCategory(@Body() dto: TemplateCategoryDto, @Req() req: any) {
     this.requireSuperadmin(req);
     const category = await this.prisma.templateCategory.create({
-      data: { slug: this.normalizeSlug(dto.slug), title: dto.title, description: dto.description }
+      data: { slug: this.normalizeSlug(dto.slug), title: dto.title, icon: dto.icon || "folder", sortOrder: dto.sortOrder ?? 0, description: dto.description }
     });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "template.category.create", targetType: "TemplateCategory", targetId: category.id });
     return category;
@@ -1525,6 +1535,8 @@ export class AdminController {
       data: {
         slug: dto.slug ? this.normalizeSlug(dto.slug) : undefined,
         title: dto.title,
+        icon: dto.icon,
+        sortOrder: dto.sortOrder,
         description: dto.description
       }
     });

@@ -231,6 +231,8 @@ model TemplateCategory {
   id          String     @id @default(uuid())
   slug        String     @unique
   title       String
+  icon        String     @default("folder")
+  sortOrder   Int        @default(0)
   description String?
   templates   Template[]
   families    TemplateFamily[]
