@@ -334,6 +334,7 @@ export class ActivationService {
       privacyReviewEndpointUrl: profile.privacyReviewEndpointUrl,
       privacyReviewModel: profile.privacyReviewModel,
       privacyReviewApiKey: profile.privacyReviewApiKey,
+      privacyPrompt: profile.privacyPrompt,
       documentGenerationProviderType: normalizeOpenAiCompatibleProvider(profile.documentGenerationProviderType),
       documentGenerationEndpointUrl: profile.documentGenerationEndpointUrl,
       documentGenerationModel: profile.documentGenerationModel,
@@ -368,10 +369,12 @@ export class ActivationService {
     const speechChangeValue = firstBoolean(source.userMayChangeSpeechProvider, source.userMayChangeSpeech, source.allowSpeechProviderChange);
     const formatterChangeValue = firstBoolean(source.userMayChangeFormatter, source.userMayChangeDocumentGenerationProvider, source.allowFormatterChange);
     const privacyReviewChangeValue = firstBoolean(source.userMayChangePrivacyReviewProvider, source.userMayChangePrivacyReview, source.allowPrivacyReviewProviderChange);
+    const visibleSettingsWhenHidden = normalizeVisibleSettingsWhenHidden(source.visibleSettingsWhenHidden, source.settingsVisibleWhenHidden, source.allowedSettingsWhenHidden);
     return {
       ...source,
       allowPolicyOverride: overrideValue ?? false,
       hideSettings: hideSettingsValue ?? false,
+      visibleSettingsWhenHidden,
       userMayChangeSpeechProvider: speechChangeValue ?? false,
       userMayChangeFormatter: formatterChangeValue ?? false,
       userMayChangePrivacyReviewProvider: privacyReviewChangeValue ?? false
@@ -409,4 +412,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function firstBoolean(...values: unknown[]) {
   return values.find((value): value is boolean => typeof value === "boolean");
+}
+
+const visibleSettingsWhenHiddenValues = new Set([
+  "live_transcription_during_recording",
+  "audio_source",
+  "language",
+  "privacy_info",
+  "dim_screen_during_recording",
+  "optimize_openai_recording",
+  "privacy_prompt",
+  "categories"
+]);
+
+function normalizeVisibleSettingsWhenHidden(...values: unknown[]) {
+  const raw = values.find(Array.isArray);
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((value): value is string => typeof value === "string" && visibleSettingsWhenHiddenValues.has(value));
 }

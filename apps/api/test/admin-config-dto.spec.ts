@@ -28,6 +28,7 @@ describe("ConfigDto", () => {
       privacyReviewEndpointUrl: "https://privacy.example.internal/v1/chat/completions",
       privacyReviewModel: "privacy-review-v1",
       privacyReviewApiKey: "privacy-key",
+      privacyPrompt: "Check for sensitive details before document generation.",
       documentGenerationProviderType: "openai_compatible",
       documentGenerationEndpointUrl: "https://llm.example.internal/v1",
       documentGenerationModel: "ulfy-docgen",
@@ -40,6 +41,7 @@ describe("ConfigDto", () => {
       managedPolicy: {
         allowPolicyOverride: false,
         hideSettings: true,
+        visibleSettingsWhenHidden: ["privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true,
@@ -73,6 +75,7 @@ describe("ConfigDto", () => {
       privacyReviewEndpointUrl: "https://privacy.example.internal/v1/chat/completions",
       privacyReviewModel: "privacy-review-v1",
       privacyReviewApiKey: "privacy-key",
+      privacyPrompt: "Check for sensitive details before document generation.",
       documentGenerationProviderType: "openai_compatible",
       documentGenerationEndpointUrl: "https://llm.example.internal/v1",
       documentGenerationModel: "ulfy-docgen",
@@ -85,6 +88,7 @@ describe("ConfigDto", () => {
       managedPolicy: {
         allowPolicyOverride: false,
         hideSettings: true,
+        visibleSettingsWhenHidden: ["privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true,

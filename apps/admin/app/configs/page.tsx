@@ -22,6 +22,7 @@ const helpText = {
   privacyReviewEndpointUrl: "Endpoint URL for the privacy-review provider. Use this for internal or self-hosted privacy-review services. Locks app UI when set.",
   privacyReviewModel: "Model identifier used for the privacy-review step. Locks app UI when set.",
   privacyReviewApiKey: "Optional API key for the privacy-review provider. Use this for authenticated OpenAI-compatible privacy gateways or protected Ollama routes.",
+  privacyPrompt: "Optional centrally managed privacy prompt shown/used by the app for privacy review guidance. Leave blank when the tenant should keep the local/default prompt.",
   piiControlEnabled: "Enables the Presidio-based PII step inside privacy control. This is the first step in the privacy pipeline. Locks app UI. Full support.",
   presidioEndpointUrl: "Endpoint URL for the Presidio analyzer used for PII detection. Typically an internal or protected service. Locks app UI when set.",
   presidioSecretRef: "Optional backend-side secret reference for Presidio access. Use when Presidio is protected by a gateway or internal auth layer. Partial support; no practical UI lock beyond managed connection.",
@@ -33,7 +34,8 @@ const helpText = {
   allowExternalProviders: "Intended to control whether external providers may be used. Partial/future support; no current strong enforcement.",
   allowPolicyOverride: "When enabled, the user can temporarily ignore centrally managed provider and privacy settings on this device. When disabled, centrally managed settings stay enforced. Locks app UI. Full support.",
   userMayChangeSpeechProvider: "When enabled, the app starts with the default speech provider from this policy, but the user may switch to another speech provider that is checked as available in the list above. When disabled, the default speech provider is enforced and cannot be changed locally.",
-  hideSettings: "When enabled, the iOS app should hide most local settings for managed enterprise users and leave only operational screens such as license status, about, support, and diagnostics. Full support once implemented in the app."
+  hideSettings: "When enabled, the iOS app should hide most local settings for managed enterprise users and leave only operational screens such as license status, about, support, and diagnostics. Optional items below can be kept visible/editable.",
+  visibleSettingsWhenHidden: "Optional exceptions to Hide most app settings. Checked items may remain visible/editable in the app even when the rest of Settings is hidden."
 };
 
 type ProviderDefinition = {
@@ -88,6 +90,17 @@ const privacyReviewProviders = [
   { value: "ollama", label: "Ollama", ready: true, privacy: "Safe only when explicitly approved", endpointDefault: "https://kvasetech.com/ollama" }
 ];
 
+const hiddenSettingsOptions = [
+  { value: "live_transcription_during_recording", label: "Live talegjenkjenning under opptak", description: "Let users change live speech recognition behavior during recording." },
+  { value: "audio_source", label: "Lyd kilde", description: "Let users choose the recording input/source when available." },
+  { value: "language", label: "Språk", description: "Let users choose transcription/template language locally." },
+  { value: "privacy_info", label: "Vis personverninfo", description: "Let users show or hide privacy information in the app." },
+  { value: "dim_screen_during_recording", label: "Demp skjermen under opptak", description: "Let users control screen dimming while recording." },
+  { value: "optimize_openai_recording", label: "Optimalisere OpenAI-opptak", description: "Let users control OpenAI recording optimization options." },
+  { value: "privacy_prompt", label: "Personvern prompt", description: "Let users view or adjust the privacy prompt when most settings are hidden." },
+  { value: "categories", label: "Kategorier", description: "Let users open category controls. If templateCategories is centrally managed, local editing should still be read-only." }
+];
+
 const empty = {
   name: "",
   description: "",
@@ -115,6 +128,7 @@ const empty = {
   privacyReviewEndpointUrl: "",
   privacyReviewModel: "",
   privacyReviewApiKey: "",
+  privacyPrompt: "",
   privacyReviewPrivacyEmphasis: "safe",
   documentGenerationProviderType: "",
   documentGenerationEndpointUrl: "",
@@ -129,6 +143,7 @@ const empty = {
   allowExternalProviders: false,
   allowPolicyOverride: false,
   hideSettings: false,
+  visibleSettingsWhenHidden: [],
   userMayChangeSpeechProvider: false,
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
@@ -177,7 +192,8 @@ export default function ConfigsPage() {
     form.allowPolicyOverride,
     form.userMayChangeSpeechProvider,
     form.userMayChangeFormatter,
-    form.userMayChangePrivacyReviewProvider
+    form.userMayChangePrivacyReviewProvider,
+    ...normalizeVisibleSettingsWhenHidden(form)
   ].filter(Boolean).length;
 
   async function load() {
@@ -282,6 +298,7 @@ export default function ConfigsPage() {
       presidioApiKey: profile.presidioApiKey ? SAVED_SECRET_MASK : "",
       documentGenerationApiKey: profile.documentGenerationApiKey ? SAVED_SECRET_MASK : "",
       privacyReviewApiKey: profile.privacyReviewApiKey ? SAVED_SECRET_MASK : "",
+      privacyPrompt: profile.privacyPrompt ?? "",
       speechDiarizationEnabled: providerProfiles?.speech?.speakerDiarizationEnabled ?? false,
       piiScoreThreshold: String(profile.presidioScoreThreshold ?? providerProfiles?.presidio?.scoreThreshold ?? "0.70"),
       detectEmail: profile.presidioDetectEmail ?? providerProfiles?.presidio?.detectEmail ?? true,
@@ -298,6 +315,7 @@ export default function ConfigsPage() {
       allowExternalProviders: profile.featureFlags?.allowExternalProviders ?? false,
       allowPolicyOverride: managedPolicy?.allowPolicyOverride ?? managedPolicy?.allowLocalOverride ?? managedPolicy?.userMayOverridePolicy ?? false,
       hideSettings: managedPolicy?.hideSettings ?? managedPolicy?.hideAppSettings ?? managedPolicy?.hideSettingsUI ?? false,
+      visibleSettingsWhenHidden: normalizeVisibleSettingsWhenHidden(managedPolicy),
       userMayChangeSpeechProvider: managedPolicy?.userMayChangeSpeechProvider ?? false,
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
       userMayChangePrivacyReviewProvider: managedPolicy?.userMayChangePrivacyReviewProvider ?? false,
@@ -372,6 +390,14 @@ export default function ConfigsPage() {
     };
     setForm(next);
     refreshModelsForNextForm("review", next, canUseRemoteReview);
+  }
+
+  function toggleHiddenSetting(value: string, checked: boolean) {
+    const current = new Set(normalizeVisibleSettingsWhenHidden(form));
+    if (checked) current.add(value);
+    else current.delete(value);
+    const next = hiddenSettingsOptions.map((option) => option.value).filter((optionValue) => current.has(optionValue));
+    setForm({ ...form, visibleSettingsWhenHidden: next });
   }
 
   function modelLookupConfig(kind: ModelKind, source = form): ModelLookupConfig {
@@ -521,6 +547,7 @@ export default function ConfigsPage() {
       const managedPolicy = {
         allowPolicyOverride: Boolean(form.allowPolicyOverride),
         hideSettings: Boolean(form.hideSettings),
+        visibleSettingsWhenHidden: normalizeVisibleSettingsWhenHidden(form),
         userMayChangeSpeechProvider: Boolean(form.userMayChangeSpeechProvider),
         userMayChangeFormatter: Boolean(form.userMayChangeFormatter),
         userMayChangePrivacyReviewProvider: Boolean(form.userMayChangePrivacyReviewProvider),
@@ -554,6 +581,7 @@ export default function ConfigsPage() {
         privacyReviewEndpointUrl: reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewEndpointUrl || null : null,
         privacyReviewModel: reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewModel || null : null,
         privacyReviewApiKey: selected && form.privacyReviewApiKey === SAVED_SECRET_MASK ? undefined : reviewProvider && form.privacyReviewProviderType !== "local_heuristic" ? form.privacyReviewApiKey || null : null,
+        privacyPrompt: form.privacyPrompt || null,
         documentGenerationProviderType: selectedFormatter?.type || null,
         documentGenerationEndpointUrl: selectedFormatterDefinition?.endpoint ? selectedFormatter.endpointUrl || null : null,
         documentGenerationModel: selectedFormatterDefinition?.model ? selectedFormatter.modelName || null : null,
@@ -956,6 +984,16 @@ export default function ConfigsPage() {
                   </div>
                   <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> Allow users to choose another privacy review provider</label>
                 </div>
+                <div className="form-subsection">
+                  <div className="form-subsection-header">
+                    <h4>Personvern prompt</h4>
+                    <p>Optional central guidance shown or used by the app for privacy review. Leave blank to keep the app default.</p>
+                  </div>
+                  <div className="field">
+                    <FieldLabel help={helpText.privacyPrompt}>Managed privacy prompt</FieldLabel>
+                    <textarea value={form.privacyPrompt ?? ""} onChange={(e) => setForm({ ...form, privacyPrompt: e.target.value })} placeholder="Describe how privacy review should behave for this tenant..." />
+                  </div>
+                </div>
               </FormSection>
               </section>
 
@@ -985,6 +1023,25 @@ export default function ConfigsPage() {
                       <div className="policy-toggle-grid">
                         <label className="policy-toggle"><input type="checkbox" checked={form.hideSettings} onChange={(e) => setForm({ ...form, hideSettings: e.target.checked })} /><span><FieldLabel help={helpText.hideSettings}>Hide most app settings</FieldLabel><small>Keeps managed enterprise users focused on status, support, and daily use.</small></span></label>
                         <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
+                      </div>
+                      <div className={`hidden-settings-exceptions${form.hideSettings ? "" : " disabled"}`}>
+                        <div className="form-subsection-header">
+                          <h4>Keep visible when most settings are hidden <InfoTip text={helpText.visibleSettingsWhenHidden} /></h4>
+                          <p>{form.hideSettings ? "Checked settings remain available in the app." : "Enable Hide most app settings to use these exceptions."}</p>
+                        </div>
+                        <div className="policy-toggle-grid compact">
+                          {hiddenSettingsOptions.map((option) => (
+                            <label className="policy-toggle" key={option.value}>
+                              <input
+                                type="checkbox"
+                                checked={normalizeVisibleSettingsWhenHidden(form).includes(option.value)}
+                                disabled={!form.hideSettings}
+                                onChange={(event) => toggleHiddenSetting(option.value, event.target.checked)}
+                              />
+                              <span><strong>{option.label}</strong><small>{option.description}</small></span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1274,4 +1331,11 @@ function normalizeFormatterProviderType(providerType?: string | null) {
 function normalizeReviewProviderType(providerType?: string | null) {
   if (providerType === "openai" || providerType === "vllm") return "openai_compatible";
   return providerType ?? "";
+}
+
+function normalizeVisibleSettingsWhenHidden(source: any) {
+  const raw = source?.visibleSettingsWhenHidden ?? source?.settingsVisibleWhenHidden ?? source?.allowedSettingsWhenHidden;
+  if (!Array.isArray(raw)) return [];
+  const allowed = new Set(hiddenSettingsOptions.map((option) => option.value));
+  return raw.filter((value): value is string => typeof value === "string" && allowed.has(value));
 }

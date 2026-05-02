@@ -148,6 +148,7 @@ describe("ActivationService", () => {
           presidioDetectEmail: true,
           privacyReviewProviderType: "vllm",
           privacyReviewApiKey: "privacy-key",
+          privacyPrompt: "Check for sensitive details before document generation.",
           documentGenerationProviderType: "openai",
           documentGenerationApiKey: "docgen-key",
           featureFlags: { enterpriseTemplates: true },
@@ -155,6 +156,7 @@ describe("ActivationService", () => {
           managedPolicy: {
             allowPolicyOverride: false,
             hideSettings: true,
+            visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "unknown_setting"],
             userMayChangeSpeechProvider: true,
             userMayChangeFormatter: true,
             userMayChangePrivacyReviewProvider: true
@@ -188,6 +190,7 @@ describe("ActivationService", () => {
       presidioDetectEmail: true,
       privacyReviewProviderType: "openai_compatible",
       privacyReviewApiKey: "privacy-key",
+      privacyPrompt: "Check for sensitive details before document generation.",
       documentGenerationProviderType: "openai_compatible",
       documentGenerationApiKey: "docgen-key",
       templateCategories: [
@@ -197,6 +200,7 @@ describe("ActivationService", () => {
       managedPolicy: {
         allowPolicyOverride: false,
         hideSettings: true,
+        visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true

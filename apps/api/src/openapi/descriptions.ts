@@ -202,6 +202,7 @@ const operationDescriptions: Record<string, string> = {
   "POST /api/v1/admin/config-profiles": [
     "Creates an enterprise config profile used by tenants and enterprise activation keys.",
     "The payload can manage speech providers, document generation, privacy control, Presidio, privacy review, template repository, telemetry and managedPolicy behavior.",
+    "managedPolicy.hideSettings can be paired with visibleSettingsWhenHidden to keep specific app settings such as audio source, language, privacy info, recording dimming, OpenAI recording optimization, privacy prompt, live transcription and categories visible/editable.",
     "Only fields intentionally set in the profile should be sent to the app as managed policy."
   ].join(" "),
   "POST /api/v1/admin/config-profiles/{id}/clone": [
@@ -217,6 +218,7 @@ const operationDescriptions: Record<string, string> = {
   "PATCH /api/v1/admin/config-profiles/{id}": [
     "Updates an existing config/policy profile.",
     "Masked secrets are preserved when the admin does not submit a replacement key; explicit empty values clear a managed secret.",
+    "Use managedPolicy.visibleSettingsWhenHidden as the exception list for settings that should remain visible when hideSettings is enabled; include privacy_prompt when the Personvern prompt UI should remain available.",
     "Changes affect future enterprise activation/refresh/effective-config responses for tenants or keys using this profile."
   ].join(" "),
   "DELETE /api/v1/admin/config-profiles/{id}": [

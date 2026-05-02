@@ -114,6 +114,7 @@ model ConfigProfile {
   privacyReviewEndpointUrl         String?
   privacyReviewModel               String?
   privacyReviewApiKey              String?
+  privacyPrompt                    String?
   documentGenerationProviderType   String?
   documentGenerationEndpointUrl    String?
   documentGenerationModel          String?

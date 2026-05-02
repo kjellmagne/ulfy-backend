@@ -211,6 +211,14 @@ export class ConfigDto {
   privacyReviewApiKey?: string;
   @ApiProperty({
     required: false,
+    example: "Review the transcript for sensitive personal information before document generation. Prefer caution when uncertain.",
+    description: "Optional centrally managed privacy prompt shown or used by the app for privacy review guidance. Omit or clear to keep the app default prompt."
+  })
+  @IsOptional()
+  @IsString()
+  privacyPrompt?: string;
+  @ApiProperty({
+    required: false,
     enum: ["apple_intelligence", "openai_compatible", "ollama"],
     example: "openai_compatible",
     description: "Managed document-generation provider. OpenAI, vLLM and OpenAI-style gateways should all be represented as openai_compatible plus endpoint/model/API key."
@@ -277,10 +285,11 @@ export class ConfigDto {
   providerProfiles?: Record<string, unknown>;
   @ApiProperty({
     required: false,
-    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; granular flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas.",
+    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; granular flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas. visibleSettingsWhenHidden lists the specific settings/menu items that may remain visible/editable while hideSettings is true.",
     example: {
       allowPolicyOverride: false,
       hideSettings: true,
+      visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "categories"],
       userMayChangeSpeechProvider: true,
       userMayChangeFormatter: false,
       userMayChangePrivacyReviewProvider: false,
@@ -1801,6 +1810,7 @@ export class AdminController {
       privacyReviewEndpointUrl: this.emptyToNull(dto.privacyReviewEndpointUrl),
       privacyReviewModel: this.emptyToNull(dto.privacyReviewModel),
       privacyReviewApiKey: this.emptySecretToNull(dto.privacyReviewApiKey),
+      privacyPrompt: this.emptyToNull(dto.privacyPrompt),
       documentGenerationProviderType: normalizeOpenAiCompatibleProvider(this.emptyToNull(dto.documentGenerationProviderType)),
       documentGenerationEndpointUrl: this.emptyToNull(dto.documentGenerationEndpointUrl),
       documentGenerationModel: this.emptyToNull(dto.documentGenerationModel),

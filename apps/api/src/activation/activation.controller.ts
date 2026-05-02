@@ -92,6 +92,7 @@ const singleLicenseExample = {
 const managedPolicyExample = {
   allowPolicyOverride: false,
   hideSettings: true,
+  visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "categories"],
   userMayChangeSpeechProvider: true,
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
@@ -129,6 +130,7 @@ const enterpriseConfigExample = {
   privacyReviewEndpointUrl: "https://privacy.example.internal/v1",
   privacyReviewModel: "privacy-review-v1",
   privacyReviewApiKey: "optional-managed-privacy-review-key",
+  privacyPrompt: "Review the transcript for sensitive personal information before document generation. Prefer caution when uncertain.",
   documentGenerationProviderType: "openai_compatible",
   documentGenerationEndpointUrl: "https://api.openai.com/v1",
   documentGenerationModel: "gpt-5-mini",
@@ -242,6 +244,30 @@ const managedPolicySchema = {
     hideSettings: { type: "boolean", default: false, description: "When true, the iOS app should hide or strongly minimize local settings screens for managed areas." },
     hideAppSettings: { type: "boolean", description: "Accepted alias for hideSettings." },
     hideSettingsUI: { type: "boolean", description: "Accepted alias for hideSettings." },
+    visibleSettingsWhenHidden: {
+      type: "array",
+      description: [
+        "Optional exceptions applied only when hideSettings is true.",
+        "Missing or empty means strict hide-most-settings behavior.",
+        "Each value identifies an app setting/menu item that may remain visible and editable while the rest of Settings is hidden."
+      ].join(" "),
+      items: {
+        type: "string",
+        enum: [
+          "live_transcription_during_recording",
+          "audio_source",
+          "language",
+          "privacy_info",
+          "dim_screen_during_recording",
+          "optimize_openai_recording",
+          "privacy_prompt",
+          "categories"
+        ]
+      },
+      example: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "categories"]
+    },
+    settingsVisibleWhenHidden: { type: "array", items: { type: "string" }, description: "Accepted alias for visibleSettingsWhenHidden." },
+    allowedSettingsWhenHidden: { type: "array", items: { type: "string" }, description: "Accepted alias for visibleSettingsWhenHidden." },
     userMayChangeSpeechProvider: { type: "boolean", default: false, description: "Allows the user to choose another speech provider locally without enabling full policy override." },
     userMayChangeSpeech: { type: "boolean", description: "Accepted alias for userMayChangeSpeechProvider." },
     allowSpeechProviderChange: { type: "boolean", description: "Accepted alias for userMayChangeSpeechProvider." },
@@ -290,6 +316,7 @@ const mobileConfigSchema = {
     privacyReviewEndpointUrl: { type: "string", nullable: true, example: "https://privacy.example.internal/v1", description: "Endpoint URL for privacy-review providers. Hidden/unused for local_heuristic." },
     privacyReviewModel: { type: "string", nullable: true, example: "privacy-review-v1", description: "Model identifier for the privacy-review step." },
     privacyReviewApiKey: { type: "string", nullable: true, description: "Optional managed privacy-review credential. Used for openai_compatible or authenticated Ollama/gateway setups." },
+    privacyPrompt: { type: "string", nullable: true, description: "Optional centrally managed privacy prompt shown or used by the app for privacy review guidance. If omitted, the app should keep its local/default prompt." },
     documentGenerationProviderType: { type: "string", enum: ["apple_intelligence", "openai_compatible", "ollama"], nullable: true, description: "Document generation formatter provider. OpenAI, vLLM and internal OpenAI-style gateways are all openai_compatible." },
     documentGenerationEndpointUrl: { type: "string", nullable: true, example: "https://api.openai.com/v1", description: "Endpoint URL for document-generation provider. Hidden/unused for Apple Intelligence." },
     documentGenerationModel: { type: "string", nullable: true, example: "gpt-5-mini", description: "Model identifier for document generation." },
