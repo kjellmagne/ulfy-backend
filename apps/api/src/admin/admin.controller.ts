@@ -340,6 +340,24 @@ class ProviderModelLookupDto {
   @IsOptional()
   @IsString()
   apiKey?: string;
+
+  @ApiProperty({
+    required: false,
+    example: "config-profile-uuid",
+    description: "Optional ConfigProfile id. When the admin form contains a masked saved key, the server uses this id to reuse the stored credential for model lookup."
+  })
+  @IsOptional()
+  @IsString()
+  configProfileId?: string;
+
+  @ApiProperty({
+    required: false,
+    example: "custom-openai-compatible",
+    description: "Optional provider profile id inside providerProfiles.formatter.providers or providerProfiles.speech.providers. Used to resolve saved nested provider credentials."
+  })
+  @IsOptional()
+  @IsString()
+  providerProfileId?: string;
 }
 
 class TemplatePreviewProviderSettingDto {
@@ -1229,7 +1247,8 @@ export class AdminController {
   @ApiBody({ type: ProviderModelLookupDto })
   @ApiOkResponse({ description: "Provider models.", schema: { example: { success: true, providerType: "openai_compatible", models: [{ id: "my-model", name: "my-model" }] } } })
   async providerModels(@Body() dto: ProviderModelLookupDto) {
-    const models = await this.lookupProviderModels(dto);
+    const lookup = await this.resolveProviderModelLookup(dto);
+    const models = await this.lookupProviderModels(lookup);
     return { success: true, providerType: dto.providerType, models };
   }
 
@@ -1913,6 +1932,91 @@ export class AdminController {
     return "openai_compatible";
   }
 
+  private async resolveProviderModelLookup(dto: ProviderModelLookupDto): Promise<ProviderModelLookupDto> {
+    const providedApiKey = this.emptySecretToNull(dto.apiKey);
+    const shouldTrySavedSecret = dto.configProfileId && (dto.apiKey === undefined || dto.apiKey === ADMIN_SECRET_MASK);
+    if (!shouldTrySavedSecret) {
+      return { ...dto, apiKey: providedApiKey ?? undefined };
+    }
+
+    const profile = await this.prisma.configProfile.findUnique({
+      where: { id: dto.configProfileId },
+      select: {
+        speechProviderType: true,
+        speechEndpointUrl: true,
+        speechApiKey: true,
+        privacyReviewProviderType: true,
+        privacyReviewEndpointUrl: true,
+        privacyReviewApiKey: true,
+        documentGenerationProviderType: true,
+        documentGenerationEndpointUrl: true,
+        documentGenerationApiKey: true,
+        providerProfiles: true
+      }
+    });
+    if (!profile) return { ...dto, apiKey: providedApiKey ?? undefined };
+
+    const saved = this.savedProviderModelLookup(profile, dto);
+    return {
+      ...dto,
+      endpointUrl: this.emptyToNull(dto.endpointUrl) ?? saved.endpointUrl ?? dto.endpointUrl,
+      apiKey: providedApiKey ?? saved.apiKey ?? undefined
+    };
+  }
+
+  private savedProviderModelLookup(profile: {
+    speechProviderType?: string | null;
+    speechEndpointUrl?: string | null;
+    speechApiKey?: string | null;
+    privacyReviewProviderType?: string | null;
+    privacyReviewEndpointUrl?: string | null;
+    privacyReviewApiKey?: string | null;
+    documentGenerationProviderType?: string | null;
+    documentGenerationEndpointUrl?: string | null;
+    documentGenerationApiKey?: string | null;
+    providerProfiles?: unknown;
+  }, dto: ProviderModelLookupDto) {
+    const providerProfiles = profile.providerProfiles && typeof profile.providerProfiles === "object" && !Array.isArray(profile.providerProfiles)
+      ? profile.providerProfiles as Record<string, any>
+      : {};
+
+    if (dto.providerDomain === "speech") {
+      const providers = providerProfiles.speech?.providers;
+      const profileKey = dto.providerProfileId ?? dto.providerType;
+      const nested = providers && typeof providers === "object" && !Array.isArray(providers) ? providers[profileKey] : null;
+      return {
+        endpointUrl: this.stringValue(nested?.endpointUrl) ?? (profile.speechProviderType === dto.providerType ? profile.speechEndpointUrl : null),
+        apiKey: this.stringValue(nested?.apiKey) ?? (profile.speechProviderType === dto.providerType ? profile.speechApiKey : null)
+      };
+    }
+
+    if (dto.providerDomain === "document_generation") {
+      const providers = Array.isArray(providerProfiles.formatter?.providers) ? providerProfiles.formatter.providers : [];
+      const selectedProviderId = this.stringValue(providerProfiles.formatter?.selectedProviderId);
+      const nested = providers.find((provider: any) => {
+        if (!provider || typeof provider !== "object") return false;
+        return provider.id === dto.providerProfileId || (!dto.providerProfileId && provider.id === selectedProviderId) || (!dto.providerProfileId && provider.type === dto.providerType);
+      });
+      return {
+        endpointUrl: this.stringValue(nested?.endpointUrl) ?? profile.documentGenerationEndpointUrl,
+        apiKey: this.stringValue(nested?.apiKey) ?? profile.documentGenerationApiKey
+      };
+    }
+
+    if (dto.providerDomain === "privacy_review") {
+      return {
+        endpointUrl: profile.privacyReviewProviderType === dto.providerType ? profile.privacyReviewEndpointUrl : null,
+        apiKey: profile.privacyReviewProviderType === dto.providerType ? profile.privacyReviewApiKey : null
+      };
+    }
+
+    return { endpointUrl: null, apiKey: null };
+  }
+
+  private stringValue(value: unknown) {
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  }
+
   private async lookupProviderModels(dto: ProviderModelLookupDto) {
     const provider = dto.providerType;
     if (!provider || ["", "local", "apple_online", "apple_intelligence", "local_heuristic"].includes(provider)) {
@@ -1994,7 +2098,7 @@ export class AdminController {
 
   private providerHeaders(apiKey?: string) {
     const headers: Record<string, string> = { "Accept": "application/json" };
-    const key = apiKey?.trim();
+    const key = this.emptySecretToNull(apiKey) ?? undefined;
     if (key) {
       headers.Authorization = `Bearer ${key}`;
       headers["X-API-Key"] = key;

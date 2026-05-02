@@ -137,7 +137,14 @@ const empty = {
 };
 
 type ModelKind = "speech" | "formatter" | "review";
-type ModelLookupConfig = { providerDomain: string; providerType: string; endpointUrl: string; apiKey: string };
+type ModelLookupConfig = {
+  providerDomain: string;
+  providerType: string;
+  endpointUrl: string;
+  apiKey: string;
+  configProfileId?: string;
+  providerProfileId?: string;
+};
 const SAVED_SECRET_MASK = "********";
 
 export default function ConfigsPage() {
@@ -149,6 +156,7 @@ export default function ConfigsPage() {
   const [saving, setSaving] = useState(false);
   const [cloningId, setCloningId] = useState("");
   const [modelLoading, setModelLoading] = useState("");
+  const [modelLoadingKey, setModelLoadingKey] = useState("");
   const [modelOptions, setModelOptions] = useState<Record<ModelKind, string[]>>({ speech: [], formatter: [], review: [] });
   const [modelLookupKeys, setModelLookupKeys] = useState<Record<ModelKind, string>>({ speech: "", formatter: "", review: "" });
   const [editorOpen, setEditorOpen] = useState(false);
@@ -374,36 +382,56 @@ export default function ConfigsPage() {
         providerDomain: "speech",
         providerType: source.speechProviderType ?? "",
         endpointUrl: speechConfig.endpointUrl ?? "",
-        apiKey: speechConfig.apiKey ?? ""
+        apiKey: speechConfig.apiKey ?? "",
+        configProfileId: selected || undefined,
+        providerProfileId: source.speechProviderType || undefined
       },
-      formatter: {
-        providerDomain: "document_generation",
-        providerType: formatter?.type ?? "",
-        endpointUrl: formatter?.endpointUrl ?? "",
-        apiKey: formatter?.apiKey ?? ""
-      },
+      formatter: formatterModelLookupConfig(formatter),
       review: {
         providerDomain: "privacy_review",
         providerType: source.privacyReviewProviderType ?? "",
         endpointUrl: source.privacyReviewEndpointUrl ?? "",
-        apiKey: source.privacyReviewApiKey ?? ""
+        apiKey: source.privacyReviewApiKey ?? "",
+        configProfileId: selected || undefined
       }
     }[kind];
   }
 
+  function formatterModelLookupConfig(provider?: FormatterProviderProfile): ModelLookupConfig {
+    return {
+      providerDomain: "document_generation",
+      providerType: provider?.type ?? "",
+      endpointUrl: provider?.endpointUrl ?? "",
+      apiKey: provider?.apiKey ?? "",
+      configProfileId: selected || undefined,
+      providerProfileId: provider?.id || undefined
+    };
+  }
+
   function modelRequestKey(kind: ModelKind, source = form) {
-    const config = modelLookupConfig(kind, source);
-    return [config.providerDomain, config.providerType, config.endpointUrl, keyFingerprint(config.apiKey)].join("|");
+    return modelRequestKeyFromConfig(modelLookupConfig(kind, source));
+  }
+
+  function modelRequestKeyFromConfig(config: ModelLookupConfig) {
+    return [
+      config.providerDomain,
+      config.providerType,
+      config.endpointUrl,
+      keyFingerprint(config.apiKey),
+      config.configProfileId ?? "",
+      config.providerProfileId ?? ""
+    ].join("|");
   }
 
   async function lookupModels(kind: ModelKind, config = modelLookupConfig(kind), options: { silent?: boolean } = {}) {
-    const requestKey = [config.providerDomain, config.providerType, config.endpointUrl, keyFingerprint(config.apiKey)].join("|");
-    if (modelLoading === kind || modelLookupKeys[kind] === requestKey) return;
+    const requestKey = modelRequestKeyFromConfig(config);
+    if ((modelLoading === kind && modelLoadingKey === requestKey) || modelLookupKeys[kind] === requestKey) return;
     if (!config.providerType) {
       if (!options.silent) notify({ tone: "info", title: "No provider selected", message: "Choose a managed provider before loading models." });
       return;
     }
     setModelLoading(kind);
+    setModelLoadingKey(requestKey);
     try {
       const response = await api("/admin/provider-models", { method: "POST", body: JSON.stringify(config) });
       const models = (response.models ?? []).map((model: any) => model.id ?? model.name).filter(Boolean);
@@ -413,6 +441,7 @@ export default function ConfigsPage() {
       if (!options.silent) notify({ tone: "danger", title: "Could not load models", message: getErrorMessage(err) });
     } finally {
       setModelLoading("");
+      setModelLoadingKey("");
     }
   }
 
@@ -670,6 +699,20 @@ export default function ConfigsPage() {
     refreshModelsForNextForm("formatter", next, Boolean(formatterProviderDefinition(selectedProvider?.type)?.model));
   }
 
+  function lookupFormatterModels(provider: FormatterProviderProfile) {
+    const definition = formatterProviderDefinition(provider.type);
+    if (!definition?.model) {
+      resetModelLookup("formatter");
+      return;
+    }
+    const config = formatterModelLookupConfig(provider);
+    if (definition.endpoint && !config.endpointUrl.trim()) {
+      resetModelLookup("formatter");
+      return;
+    }
+    lookupModels("formatter", config, { silent: true }).catch(() => undefined);
+  }
+
   function updateFormatterProvider(providerId: string, patch: Partial<FormatterProviderProfile>) {
     const profiles = currentFormatterProviders(form).map((provider) => provider.id === providerId ? { ...provider, ...patch } : provider);
     const selectedProvider = profiles.find((provider) => provider.id === form.selectedFormatterProviderId);
@@ -826,7 +869,7 @@ export default function ConfigsPage() {
                         {available && (provider.endpoint || provider.model || provider.diarization) && (
                           <div className="provider-config-grid">
                             {provider.endpoint && <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={config.endpointUrl} onChange={(e) => updateSpeechConfig(provider.value, { endpointUrl: e.target.value })} /></div>}
-                            {provider.model && <ModelField label="Model name" help={helpText.speechModelName} value={config.modelName} onChange={(value) => updateSpeechConfig(provider.value, { modelName: value })} loading={modelLoading === "speech" && form.speechProviderType === provider.value} options={form.speechProviderType === provider.value && modelLookupKeys.speech === modelRequestKey("speech") ? modelOptions.speech : []} onOpen={() => setSpeechDefault(provider.value)} />}
+                            {provider.model && <ModelField label="Model name" help={helpText.speechModelName} value={config.modelName} onChange={(value) => updateSpeechConfig(provider.value, { modelName: value })} loading={modelLoading === "speech" && modelLoadingKey === modelRequestKey("speech")} options={form.speechProviderType === provider.value && modelLookupKeys.speech === modelRequestKey("speech") ? modelOptions.speech : []} onOpen={() => setSpeechDefault(provider.value)} />}
                             {provider.endpoint && <div className="field"><FieldLabel help={helpText.speechApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={config.apiKey} onChange={(e) => updateSpeechConfig(provider.value, { apiKey: e.target.value })} placeholder="Optional managed key" /></div>}
                             {provider.diarization && <label className="checkbox-row provider-inline-check"><input type="checkbox" checked={Boolean(config.speakerDiarizationEnabled)} onChange={(e) => updateSpeechConfig(provider.value, { speakerDiarizationEnabled: e.target.checked })} /> Saved-recording diarization</label>}
                           </div>
@@ -846,6 +889,7 @@ export default function ConfigsPage() {
                 ) : <div className="provider-list">
                   {configuredFormatterProviders.map((provider) => {
                     const definition = formatterProviderDefinition(provider.type);
+                    const formatterLookupKey = modelRequestKeyFromConfig(formatterModelLookupConfig(provider));
                     return (
                       <div className={`provider-row${provider.enabled ? " enabled" : ""}`} key={provider.id}>
                         <div className="provider-row-main">
@@ -860,7 +904,7 @@ export default function ConfigsPage() {
                             <div className="field"><FieldLabel>Provider name</FieldLabel><input className="input" value={provider.name} onChange={(e) => updateFormatterProvider(provider.id, { name: e.target.value })} /></div>
                             <div className="field"><FieldLabel help={helpText.documentGenerationProviderType}>Provider type</FieldLabel><select value={provider.type} onChange={(e) => updateFormatterProvider(provider.id, { type: e.target.value, endpointUrl: formatterProviderDefinition(e.target.value)?.endpointDefault ?? provider.endpointUrl, privacyEmphasis: formatterPrivacyDefault(e.target.value, provider.privacyEmphasis) })}>{formatterProviders.filter((item) => item.value !== "apple_intelligence").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
                             {definition?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={provider.endpointUrl} onChange={(e) => updateFormatterProvider(provider.id, { endpointUrl: e.target.value })} /></div>}
-                            {definition?.model && <ModelField label="Model name" help={helpText.documentGenerationModel} value={provider.modelName} onChange={(value) => updateFormatterProvider(provider.id, { modelName: value })} loading={modelLoading === "formatter" && form.selectedFormatterProviderId === provider.id} options={form.selectedFormatterProviderId === provider.id && modelLookupKeys.formatter === modelRequestKey("formatter") ? modelOptions.formatter : []} onOpen={() => setFormatterDefault(provider.id)} />}
+                            {definition?.model && <ModelField label="Model name" help={helpText.documentGenerationModel} value={provider.modelName} onChange={(value) => updateFormatterProvider(provider.id, { modelName: value })} loading={modelLoading === "formatter" && modelLoadingKey === formatterLookupKey} options={modelLookupKeys.formatter === formatterLookupKey ? modelOptions.formatter : []} onOpen={() => lookupFormatterModels(provider)} />}
                             {definition?.endpoint && <div className="field"><FieldLabel help={helpText.documentGenerationApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={provider.apiKey} onChange={(e) => updateFormatterProvider(provider.id, { apiKey: e.target.value })} placeholder="Optional managed key" /></div>}
                             <div className="field"><FieldLabel>Privacy classification</FieldLabel><select value={provider.privacyEmphasis} onChange={(e) => updateFormatterProvider(provider.id, { privacyEmphasis: e.target.value })}><option value="safe">Safe</option><option value="managed">Managed</option><option value="caution">Use with caution</option><option value="unsafe">Unsafe</option></select></div>
                           </div>
@@ -907,7 +951,7 @@ export default function ConfigsPage() {
                   <div className="grid two">
                     <div className="field"><FieldLabel help={helpText.privacyReviewProviderType}>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
                     {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} /></div>}
-                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} loading={modelLoading === "review"} options={modelLookupKeys.review === modelRequestKey("review") ? modelOptions.review : []} onOpen={() => lookupModels("review")} />}
+                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} loading={modelLoading === "review" && modelLoadingKey === modelRequestKey("review")} options={modelLookupKeys.review === modelRequestKey("review") ? modelOptions.review : []} onOpen={() => lookupModels("review")} />}
                     {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.privacyReviewApiKey ?? ""} onChange={(e) => setForm({ ...form, privacyReviewApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
                   </div>
                   <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> Allow users to choose another privacy review provider</label>
