@@ -1479,6 +1479,23 @@ textarea {
   .shell:has(.login-page) {
     grid-template-columns: 1fr;
   }
+  .shell:has(.template-route) {
+    position: relative;
+  }
+  .shell:has(.template-route)::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    background: rgba(15,23,42,0.16);
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.13s ease-out;
+  }
+  .shell:has(.template-route) .main {
+    position: relative;
+    z-index: 30;
+  }
   .main:has(.login-page) {
     width: 100%;
     max-width: none;
