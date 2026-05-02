@@ -494,6 +494,41 @@ button, input, textarea, select { font: inherit; }
 .input::placeholder, textarea::placeholder {
   color: #94a3b8;
 }
+.range-control {
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.range-control:hover,
+.range-control:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+}
+.range-control input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.range-control output {
+  justify-self: end;
+  min-width: 46px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
 .model-combobox {
   position: relative;
 }
