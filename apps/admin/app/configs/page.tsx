@@ -93,7 +93,7 @@ const privacyReviewProviders = [
 const hiddenSettingsOptions = [
   { value: "live_transcription_during_recording", label: "Live talegjenkjenning under opptak", description: "Let users change live speech recognition behavior during recording." },
   { value: "audio_source", label: "Lyd kilde", description: "Let users choose the recording input/source when available." },
-  { value: "language", label: "Appspråk", description: "La brukeren velge språk for appen lokalt." },
+  { value: "language", label: "Språk", description: "App language - Let users choose the app language locally." },
   { value: "privacy_info", label: "Vis personverninfo", description: "Let users show or hide privacy information in the app." },
   { value: "dim_screen_during_recording", label: "Demp skjermen under opptak", description: "Let users control screen dimming while recording." },
   { value: "optimize_openai_recording", label: "Optimalisere OpenAI-opptak", description: "Let users control OpenAI recording optimization options." },
