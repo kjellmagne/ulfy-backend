@@ -249,7 +249,9 @@ const managedPolicySchema = {
       description: [
         "Optional exceptions applied only when hideSettings is true.",
         "Missing or empty means strict hide-most-settings behavior.",
-        "Each value identifies an app setting/menu item that may remain visible and editable while the rest of Settings is hidden."
+        "Each value identifies an app setting/menu item that may remain visible and editable while the rest of Settings is hidden.",
+        "This list controls visibility only; it does not centrally manage the setting value.",
+        "The language value means app UI language, not speech transcription language or template/transcript output language."
       ].join(" "),
       items: {
         type: "string",

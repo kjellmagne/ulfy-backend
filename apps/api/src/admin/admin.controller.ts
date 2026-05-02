@@ -285,7 +285,7 @@ export class ConfigDto {
   providerProfiles?: Record<string, unknown>;
   @ApiProperty({
     required: false,
-    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; granular flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas. visibleSettingsWhenHidden lists the specific settings/menu items that may remain visible/editable while hideSettings is true.",
+    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; granular flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas. visibleSettingsWhenHidden lists the specific settings/menu items that may remain visible/editable while hideSettings is true. It is only a visibility exception list and does not centrally manage the setting value. The language exception means app UI language, not speech transcription language or template/transcript output language.",
     example: {
       allowPolicyOverride: false,
       hideSettings: true,

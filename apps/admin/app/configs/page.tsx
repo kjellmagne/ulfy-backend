@@ -35,7 +35,7 @@ const helpText = {
   allowPolicyOverride: "When enabled, the user can temporarily ignore centrally managed provider and privacy settings on this device. When disabled, centrally managed settings stay enforced. Locks app UI. Full support.",
   userMayChangeSpeechProvider: "When enabled, the app starts with the default speech provider from this policy, but the user may switch to another speech provider that is checked as available in the list above. When disabled, the default speech provider is enforced and cannot be changed locally.",
   hideSettings: "When enabled, the iOS app should hide most local settings for managed enterprise users and leave only operational screens such as license status, about, support, and diagnostics. Optional items below can be kept visible/editable.",
-  visibleSettingsWhenHidden: "Optional exceptions to Hide most app settings. Checked items may remain visible/editable in the app even when the rest of Settings is hidden."
+  visibleSettingsWhenHidden: "Optional visibility exceptions to Hide most app settings. Checked items remain visible in the app even when the rest of Settings is hidden. This does not centrally manage the setting value."
 };
 
 type ProviderDefinition = {
@@ -93,7 +93,7 @@ const privacyReviewProviders = [
 const hiddenSettingsOptions = [
   { value: "live_transcription_during_recording", label: "Live talegjenkjenning under opptak", description: "Let users change live speech recognition behavior during recording." },
   { value: "audio_source", label: "Lyd kilde", description: "Let users choose the recording input/source when available." },
-  { value: "language", label: "Språk", description: "Let users choose transcription/template language locally." },
+  { value: "language", label: "Appspråk", description: "La brukeren velge språk for appen lokalt." },
   { value: "privacy_info", label: "Vis personverninfo", description: "Let users show or hide privacy information in the app." },
   { value: "dim_screen_during_recording", label: "Demp skjermen under opptak", description: "Let users control screen dimming while recording." },
   { value: "optimize_openai_recording", label: "Optimalisere OpenAI-opptak", description: "Let users control OpenAI recording optimization options." },
