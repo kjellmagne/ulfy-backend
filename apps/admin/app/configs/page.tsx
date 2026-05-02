@@ -152,6 +152,8 @@ export default function ConfigsPage() {
   const [modelOptions, setModelOptions] = useState<Record<ModelKind, string[]>>({ speech: [], formatter: [], review: [] });
   const [modelLookupKeys, setModelLookupKeys] = useState<Record<ModelKind, string>>({ speech: "", formatter: "", review: "" });
   const [editorOpen, setEditorOpen] = useState(false);
+  const autoFormatterLookupKey = useRef("");
+  const autoReviewLookupKey = useRef("");
   const { notify } = useToast();
   const selectedPrivacyReviewProvider = privacyReviewProviders.find((item) => item.value === form.privacyReviewProviderType);
   const configuredFormatterProviders = currentFormatterProviders(form);
@@ -180,6 +182,59 @@ export default function ConfigsPage() {
     }
   }
   useEffect(() => { load().catch((err) => notify({ tone: "danger", title: "Could not load profiles", message: getErrorMessage(err) })); }, []);
+
+  useEffect(() => {
+    if (!editorOpen) return;
+    const formatter = currentFormatterProviders(form).find((provider) => provider.id === form.selectedFormatterProviderId);
+    const definition = formatterProviderDefinition(formatter?.type);
+    if (!formatter || !formatter.enabled || !definition?.model) {
+      autoFormatterLookupKey.current = "";
+      resetModelLookup("formatter");
+      return;
+    }
+
+    const config = modelLookupConfig("formatter");
+    if (definition.endpoint && !config.endpointUrl.trim()) {
+      autoFormatterLookupKey.current = "";
+      resetModelLookup("formatter");
+      return;
+    }
+
+    const requestKey = modelRequestKey("formatter");
+    if (modelLoading === "formatter" || modelLookupKeys.formatter === requestKey || autoFormatterLookupKey.current === requestKey) return;
+
+    const timeout = window.setTimeout(() => {
+      autoFormatterLookupKey.current = requestKey;
+      lookupModels("formatter", config, { silent: true }).catch(() => undefined);
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, [editorOpen, form.selectedFormatterProviderId, form.formatterProviders, modelLookupKeys.formatter, modelLoading]);
+
+  useEffect(() => {
+    if (!editorOpen) return;
+    const providerType = form.privacyReviewProviderType ?? "";
+    if (!providerType || providerType === "local_heuristic") {
+      autoReviewLookupKey.current = "";
+      resetModelLookup("review");
+      return;
+    }
+
+    const config = modelLookupConfig("review");
+    if (!config.endpointUrl.trim()) {
+      autoReviewLookupKey.current = "";
+      resetModelLookup("review");
+      return;
+    }
+
+    const requestKey = modelRequestKey("review");
+    if (modelLoading === "review" || modelLookupKeys.review === requestKey || autoReviewLookupKey.current === requestKey) return;
+
+    const timeout = window.setTimeout(() => {
+      autoReviewLookupKey.current = requestKey;
+      lookupModels("review", config, { silent: true }).catch(() => undefined);
+    }, 500);
+    return () => window.clearTimeout(timeout);
+  }, [editorOpen, form.privacyReviewProviderType, form.privacyReviewEndpointUrl, form.privacyReviewApiKey, modelLookupKeys.review, modelLoading]);
 
   const stats = useMemo(() => ({
     total: profiles.length,

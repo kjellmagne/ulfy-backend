@@ -1682,6 +1682,7 @@ textarea {
   width: min(1480px, 100%);
   margin: 0 auto;
   display: grid;
+  justify-items: stretch;
   gap: 14px;
 }
 
@@ -1699,7 +1700,7 @@ textarea {
 
 .template-topbar-main {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
   min-width: 0;
 }
@@ -1708,15 +1709,33 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  justify-self: start;
   flex: 0 0 auto;
-  color: var(--muted);
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  box-shadow: 0 10px 22px rgba(13, 148, 136, 0.12), 0 2px 5px rgba(15, 23, 42, 0.04);
+  color: var(--accent-strong);
   font-size: 12px;
   font-weight: 700;
-  transition: color 130ms ease;
+  text-decoration: none;
+  transition: background 130ms ease, border-color 130ms ease, box-shadow 130ms ease, color 130ms ease, transform 130ms ease;
 }
 
-.template-back-link:hover {
-  color: var(--ink);
+.template-back-link:hover,
+.template-back-link:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: 0 14px 30px rgba(13, 148, 136, 0.2), 0 3px 8px rgba(15, 23, 42, 0.06);
+  color: #fff;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.template-back-link:active {
+  transform: translateY(0);
 }
 
 .template-kicker {

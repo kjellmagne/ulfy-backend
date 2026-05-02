@@ -658,9 +658,9 @@ export default function TemplateDesignerRoute() {
   return (
     <RequireAuth>
       <div className="template-route">
+        <a className="template-back-link" href={appPath("/templates")}><ArrowLeft size={16} /> Templates</a>
         <header className="template-topbar">
           <div className="template-topbar-main">
-            <a className="template-back-link" href={appPath("/templates")}><ArrowLeft size={16} /> Templates</a>
             <div className="template-title-block">
               <div className="template-kicker">
                 <span>{family.title}</span>
