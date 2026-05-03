@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { ChevronDown, CopyPlus, Loader2, Plus, Save, Settings, ShieldCheck, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
-import { EmptyState, FieldLabel, FormSection, IconAction, InfoTip, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard, StatusBadge } from "../../components/AdminUI";
+import { EmptyState, FieldLabel, FormSection, IconAction, InfoTip, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
@@ -812,10 +812,36 @@ export default function ConfigsPage() {
             <div className="panel">
               <PanelHeader title="Configuration profiles" description="List first. Open a profile to edit provider selections and policy in a slide-in panel." actions={<IconAction label="New profile" tone="primary" onClick={createNew}><Plus size={16} /></IconAction>} />
               {!profiles.length ? <EmptyState title="No config profiles" message="Create the first profile before generating enterprise keys." /> : (
-                <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Partner</th><th>Speech</th><th>Formatter</th><th>Privacy review</th><th className="actions">Actions</th></tr></thead><tbody>{profiles.map((profile) => {
-                  const formatterType = normalizeFormatterProviderType(profile.documentGenerationProviderType);
-                  return <tr key={profile.id} onDoubleClick={() => edit(profile)}><td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td><td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td><td>{profile.speechProviderType ? <span className="badge">{profile.speechProviderType}</span> : <span className="muted">Local</span>}</td><td>{formatterType && formatterType !== "apple_intelligence" ? <span className="badge">{formatterType}</span> : <span className="muted">Not managed</span>}</td><td><div className="row"><StatusBadge status={profile.privacyControlEnabled ? "active" : "draft"} />{profile.privacyReviewProviderType && <span className="badge">{normalizeReviewProviderType(profile.privacyReviewProviderType)}</span>}</div></td><td className="row actions"><IconAction label="Edit profile" onClick={() => edit(profile)}><Settings size={14} /></IconAction><IconAction label="Clone profile" onClick={() => cloneProfile(profile)} disabled={cloningId === profile.id}><CopyPlus size={14} /></IconAction><IconAction label="Delete profile" tone="danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /></IconAction></td></tr>;
-                })}</tbody></table></div>
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Partner</th>
+                        <th>Speech model</th>
+                        <th>Formatter model</th>
+                        <th>Privacy model</th>
+                        <th className="actions">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {profiles.map((profile) => (
+                        <tr key={profile.id} className="clickable-row" onDoubleClick={() => edit(profile)}>
+                          <td><b>{profile.name}</b><br /><span className="muted">{profile.description || "No description"}</span></td>
+                          <td>{profile.partner?.name ?? <span className="muted">Internal</span>}</td>
+                          <td><ModelSummary {...speechModelSummary(profile)} /></td>
+                          <td><ModelSummary {...formatterModelSummary(profile)} /></td>
+                          <td><ModelSummary {...privacyReviewModelSummary(profile)} /></td>
+                          <td className="row actions">
+                            <IconAction label="Edit profile" onClick={() => edit(profile)}><Settings size={14} /></IconAction>
+                            <IconAction label="Clone profile" onClick={() => cloneProfile(profile)} disabled={cloningId === profile.id}><CopyPlus size={14} /></IconAction>
+                            <IconAction label="Delete profile" tone="danger" onClick={() => deleteProfile(profile)}><Trash2 size={14} /></IconAction>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
@@ -1175,6 +1201,78 @@ function formatterProfilesFromProfile(profile: any, providerProfiles: any): Form
       privacyEmphasis: providerProfiles?.formatter?.privacyEmphasis ?? provider.privacyEmphasis
     };
   });
+}
+
+type ModelSummaryProps = {
+  title: string;
+  detail: string;
+  empty?: boolean;
+};
+
+function ModelSummary({ title, detail, empty = false }: ModelSummaryProps) {
+  return (
+    <div className={`model-summary${empty ? " empty" : ""}`}>
+      <strong>{title}</strong>
+      <span>{detail}</span>
+    </div>
+  );
+}
+
+function speechModelSummary(profile: any): ModelSummaryProps {
+  const providerType = profile.speechProviderType || "local";
+  const provider = speechProviders.find((item) => item.value === providerType);
+  if (!provider?.model) {
+    return {
+      title: "No separate model",
+      detail: provider?.label ?? providerType,
+      empty: true
+    };
+  }
+  return {
+    title: profile.speechModelName || "No model selected",
+    detail: provider.label,
+    empty: !profile.speechModelName
+  };
+}
+
+function formatterModelSummary(profile: any): ModelSummaryProps {
+  const providerProfiles = profile.providerProfiles ?? {};
+  const providerType = normalizeFormatterProviderType(profile.documentGenerationProviderType ?? providerProfiles?.formatter?.selected);
+  if (!providerType) return { title: "Not managed", detail: "Local app setting", empty: true };
+  if (providerType === "apple_intelligence") return { title: "Apple Intelligence", detail: "No remote model", empty: true };
+
+  const selectedProvider = selectedFormatterProfileFromProfile(profile, providerProfiles);
+  const modelName = profile.documentGenerationModel || selectedProvider?.modelName || "";
+  return {
+    title: modelName || "No model selected",
+    detail: selectedProvider?.name ?? formatterProviderDefinition(providerType)?.label ?? providerType,
+    empty: !modelName
+  };
+}
+
+function privacyReviewModelSummary(profile: any): ModelSummaryProps {
+  if (!profile.privacyControlEnabled) return { title: "Privacy disabled", detail: "No review model", empty: true };
+  const providerType = normalizeReviewProviderType(profile.privacyReviewProviderType);
+  if (!providerType) return { title: "Not managed", detail: "Local app setting", empty: true };
+  const provider = privacyReviewProviders.find((item) => item.value === providerType);
+  if (providerType === "local_heuristic") return { title: "Local heuristic", detail: "No remote model", empty: true };
+
+  return {
+    title: profile.privacyReviewModel || "No model selected",
+    detail: provider?.label ?? providerType,
+    empty: !profile.privacyReviewModel
+  };
+}
+
+function selectedFormatterProfileFromProfile(profile: any, providerProfiles: any) {
+  const profiles = formatterProfilesFromProfile(profile, providerProfiles);
+  const selectedProviderId = providerProfiles?.formatter?.selectedProviderId;
+  const selectedType = normalizeFormatterProviderType(profile.documentGenerationProviderType ?? providerProfiles?.formatter?.selected);
+  return profiles.find((provider) => provider.id === selectedProviderId)
+    ?? profiles.find((provider) => provider.enabled && provider.type === selectedType)
+    ?? profiles.find((provider) => provider.type === selectedType)
+    ?? profiles.find((provider) => provider.enabled)
+    ?? profiles[0];
 }
 
 function ProviderHint({ provider }: { provider?: { privacy?: string; ready?: boolean } }) {
