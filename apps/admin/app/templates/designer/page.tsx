@@ -281,6 +281,8 @@ export default function TemplateDesignerRoute() {
   const [previewTab, setPreviewTab] = useState<"document" | "yaml" | "sample">("document");
   const [previewProviderStatus, setPreviewProviderStatus] = useState<PreviewProviderStatus | null>(null);
   const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [versionMenuOpen, setVersionMenuOpen] = useState(false);
+  const [pendingRestoreVersion, setPendingRestoreVersion] = useState<PublishedVersion | null>(null);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -358,6 +360,7 @@ export default function TemplateDesignerRoute() {
   const baseSectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
   const sectionPresets = localizeTemplateSectionPresets(baseSectionPresets, variantForm.language);
   const selectedSection = selectedSectionIndex === null ? null : templateSections[selectedSectionIndex] ?? null;
+  const publishedVersions = variant?.publishedVersions ?? [];
   const latestVersion = publishedVersion(variant);
   const nextPublishVersion = latestVersion
     ? previewBumpedVersion(latestVersion.version, variantForm.bump)
@@ -625,6 +628,54 @@ export default function TemplateDesignerRoute() {
     }
   }
 
+  async function restorePublishedVersion() {
+    const target = pendingRestoreVersion;
+    if (!target || !variantForm.variantId) return;
+
+    let nextLanguage = variantForm.language;
+    try {
+      const doc = ensureTemplateDoc(target.yamlContent);
+      nextLanguage = doc.identity?.language ?? nextLanguage;
+    } catch (err) {
+      notify({ title: "Version cannot be restored", message: getErrorMessage(err), tone: "danger" });
+      setPendingRestoreVersion(null);
+      return;
+    }
+
+    setSaveState("saving");
+    try {
+      const draft = await api(`/admin/template-variants/${variantForm.variantId}/draft`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          language: nextLanguage,
+          yamlContent: target.yamlContent,
+          sampleTranscript: variantForm.sampleTranscript
+        })
+      });
+      setVariantForm((current) => ({
+        ...current,
+        draftId: draft.id ?? current.draftId,
+        language: nextLanguage,
+        yamlContent: target.yamlContent,
+        preview: null
+      }));
+      setVariant((current) => current ? { ...current, language: nextLanguage, draft } : current);
+      setSelectedSectionIndex(null);
+      setDirty(false);
+      setSaveState("saved");
+      setLastSavedAt(new Date());
+      setPendingRestoreVersion(null);
+      notify({
+        title: `Draft restored to v${target.version}`,
+        message: "Review the draft, then publish it if this should become the mobile version.",
+        tone: "success"
+      });
+    } catch (err) {
+      notify({ title: "Restore failed", message: getErrorMessage(err), tone: "danger" });
+      setSaveState("error");
+    }
+  }
+
   const saveLabel = saveState === "saving"
     ? "Saving changes..."
     : saveState === "dirty"
@@ -669,7 +720,44 @@ export default function TemplateDesignerRoute() {
               </div>
               <h1>{templateIdentity?.title ?? family.title}</h1>
               <div className="template-published-line">
-                Current published version: <strong>{latestVersion ? `v${latestVersion.version}` : "none yet"}</strong>
+                <span>Current published version</span>
+                <div className="version-picker">
+                  <button
+                    type="button"
+                    className="version-picker-trigger"
+                    onClick={() => setVersionMenuOpen((open) => !open)}
+                    disabled={!publishedVersions.length}
+                    aria-expanded={versionMenuOpen}
+                  >
+                    <strong>{latestVersion ? `v${latestVersion.version}` : "none yet"}</strong>
+                    {!!publishedVersions.length && <ChevronDown size={13} />}
+                  </button>
+                  {versionMenuOpen && !!publishedVersions.length && (
+                    <div className="version-picker-menu" role="menu" aria-label="Published versions">
+                      <div className="version-picker-menu-header">
+                        <strong>Published versions</strong>
+                        <span>Select one to restore it to the current draft.</span>
+                      </div>
+                      {publishedVersions.map((published) => (
+                        <button
+                          key={published.id}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setPendingRestoreVersion(published);
+                            setVersionMenuOpen(false);
+                          }}
+                        >
+                          <span>
+                            <strong>v{published.version}</strong>
+                            {published.id === latestVersion?.id && <em>Current</em>}
+                          </span>
+                          <small>{formatTime(published.publishedAt)}</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="template-title-tools">
                 <button className="button secondary" type="button" onClick={() => setAiDialogOpen(true)}>
@@ -731,6 +819,28 @@ export default function TemplateDesignerRoute() {
               placeholder="Example: A Norwegian template for follow-up conversations after municipal health meetings. It should produce a short summary, decisions, next steps, and responsible people."
             />
             <p>Nothing is published automatically. Review and edit the suggestion before publishing changes.</p>
+          </div>
+        </Modal>
+
+        <Modal
+          open={Boolean(pendingRestoreVersion)}
+          title={pendingRestoreVersion ? `Restore v${pendingRestoreVersion.version}?` : "Restore version"}
+          description="This replaces the current draft YAML with the selected published snapshot. It does not change what the mobile app sees until you publish the restored draft."
+          onClose={() => setPendingRestoreVersion(null)}
+          footer={(
+            <>
+              <button className="button secondary" type="button" onClick={() => setPendingRestoreVersion(null)}>Cancel</button>
+              <button className="button" type="button" onClick={restorePublishedVersion} disabled={saveState === "saving"}>
+                Restore to draft
+              </button>
+            </>
+          )}
+        >
+          <div className="version-restore-dialog">
+            <p>
+              The current draft will be overwritten with <strong>v{pendingRestoreVersion?.version}</strong>.
+              Sample transcript text is kept, and any generated preview is cleared because it may no longer match the restored YAML.
+            </p>
           </div>
         </Modal>
 
