@@ -127,7 +127,7 @@ export class TemplatesService {
     if (template?.state === "published") {
       const version = template.versions.find((item) => item.id === template.publishedVersionId) ?? template.versions.find((item) => item.state === "published");
       if (!version) throw new NotFoundException("Published template version not found");
-      return version.yamlContent;
+      return this.toAppCompatibleYaml(version.yamlContent);
     }
 
     const variant = await this.prisma.templateVariant.findFirst({
@@ -136,7 +136,7 @@ export class TemplatesService {
     });
     const latest = variant?.publishedVersions[0];
     if (!latest) throw new NotFoundException("Template not found");
-    return latest.yamlContent;
+    return this.toAppCompatibleYaml(latest.yamlContent);
   }
 
   async downloadYamlForEnterpriseActivation(id: string, activationToken: string) {
@@ -153,7 +153,7 @@ export class TemplatesService {
     });
     const latest = variant?.publishedVersions[0];
     if (!latest) throw new NotFoundException(mobileError("template_not_found", "Template not found or not assigned to this tenant"));
-    return latest.yamlContent;
+    return this.toAppCompatibleYaml(latest.yamlContent);
   }
 
   async downloadYamlForInternalApiKey(id: string, apiKey: string) {
@@ -190,7 +190,11 @@ export class TemplatesService {
   yamlWithVersion(yamlContent: string, version: string) {
     const parsed = this.validateYamlContent(yamlContent) as AppTemplateYaml;
     parsed.identity.version = version;
-    return yaml.dump(parsed, { lineWidth: -1, noRefs: true, sortKeys: false });
+    return renderAppCompatibleYaml(parsed);
+  }
+
+  toAppCompatibleYaml(yamlContent: string) {
+    return renderAppCompatibleYaml(this.validateYamlContent(yamlContent));
   }
 
   buildAssistedDraft(input: { useCase: string; language?: string; category?: string; title?: string; icon?: string }) {
@@ -518,7 +522,7 @@ export class TemplatesService {
     purpose: string;
     sections: Array<{ title: string; purpose: string; format: string; required: boolean }>;
   }) {
-    return yaml.dump({
+    return renderAppCompatibleYaml({
       identity: {
         id: input.id,
         title: input.title,
@@ -557,10 +561,98 @@ export class TemplatesService {
         fallback_behavior: "If a required section has no support in the transcript, write that it was not covered.",
         post_processing: { extract_action_items: true }
       }
-    }, { lineWidth: -1, noRefs: true, sortKeys: false });
+    });
   }
 }
 
 function TemplateSlug(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "template";
+}
+
+function renderAppCompatibleYaml(value: unknown) {
+  return `${renderYamlValue(value, 0).join("\n")}\n`;
+}
+
+function renderYamlValue(value: unknown, indent: number): string[] {
+  if (Array.isArray(value)) return renderYamlArray(value, indent);
+  if (isPlainObject(value)) return renderYamlDictionary(value, indent);
+  return [`${spaces(indent)}${renderYamlScalar(value)}`];
+}
+
+function renderYamlDictionary(dictionary: Record<string, unknown>, indent: number): string[] {
+  const entries = Object.entries(dictionary).filter(([, value]) => value !== undefined);
+  if (!entries.length) return [`${spaces(indent)}{}`];
+
+  const lines: string[] = [];
+  for (const [key, value] of entries) {
+    if (isInlineYamlScalar(value)) {
+      lines.push(`${spaces(indent)}${key}: ${renderYamlScalar(value)}`);
+    } else {
+      lines.push(`${spaces(indent)}${key}:`);
+      lines.push(...renderYamlValue(value, indent + 2));
+    }
+  }
+  return lines;
+}
+
+function renderYamlArray(array: unknown[], indent: number): string[] {
+  if (!array.length) return [`${spaces(indent)}[]`];
+
+  const lines: string[] = [];
+  for (const item of array) {
+    if (isInlineYamlScalar(item)) {
+      lines.push(`${spaces(indent)}- ${renderYamlScalar(item)}`);
+    } else if (isPlainObject(item)) {
+      lines.push(...renderYamlArrayDictionaryItem(item, indent));
+    } else {
+      lines.push(`${spaces(indent)}-`);
+      lines.push(...renderYamlValue(item, indent + 2));
+    }
+  }
+  return lines;
+}
+
+function renderYamlArrayDictionaryItem(dictionary: Record<string, unknown>, indent: number): string[] {
+  const entries = Object.entries(dictionary).filter(([, value]) => value !== undefined);
+  if (!entries.length) return [`${spaces(indent)}- {}`];
+
+  const lines: string[] = [];
+  let first = true;
+  for (const [key, value] of entries) {
+    const prefix = first ? `${spaces(indent)}- ` : spaces(indent + 2);
+    if (isInlineYamlScalar(value)) {
+      lines.push(`${prefix}${key}: ${renderYamlScalar(value)}`);
+    } else {
+      lines.push(`${prefix}${key}:`);
+      lines.push(...renderYamlValue(value, indent + 4));
+    }
+    first = false;
+  }
+  return lines;
+}
+
+function renderYamlScalar(value: unknown) {
+  if (value === null) return "null";
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "null";
+  if (Array.isArray(value) && value.length === 0) return "[]";
+  if (isPlainObject(value) && Object.keys(value).length === 0) return "{}";
+  return JSON.stringify(value ?? null);
+}
+
+function isInlineYamlScalar(value: unknown) {
+  if (value === null) return true;
+  if (["string", "boolean", "number"].includes(typeof value)) return true;
+  if (Array.isArray(value) && value.length === 0) return true;
+  if (isPlainObject(value) && Object.keys(value).length === 0) return true;
+  return false;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function spaces(count: number) {
+  return " ".repeat(count);
 }

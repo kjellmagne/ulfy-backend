@@ -60,6 +60,26 @@ describe("TemplatesService", () => {
     expect(() => service.validateYamlContent(`${validYaml}\nrepository_metadata:\n  tenant: acme\n`)).toThrow();
   });
 
+  it("publishes YAML in the app-compatible subset without block scalar chomp indicators", () => {
+    const service = new TemplatesService({} as any, {} as any);
+    const multilineYaml = validYaml.replace(
+      "      purpose: Summarize the transcript.",
+      [
+        "      purpose: |-",
+        "        Role: Clean up the raw speech-to-text transcript.",
+        "",
+        "        Task: Keep the speaker voice and format turns clearly."
+      ].join("\n")
+    );
+
+    const normalized = service.yamlWithVersion(multilineYaml, "1.0.1");
+
+    expect(normalized).not.toContain("|-");
+    expect(normalized).toContain("\\n\\nTask:");
+    expect(normalized).toContain("version: \"1.0.1\"");
+    expect(service.validateYamlContent(normalized).structure.sections[0].purpose).toContain("Task: Keep");
+  });
+
   it("returns tenant-filtered manifest entries for enterprise activations", async () => {
     const prisma = {
       deviceActivation: {
