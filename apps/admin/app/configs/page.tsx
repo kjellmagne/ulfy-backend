@@ -1213,7 +1213,7 @@ function ModelSummary({ title, detail, empty = false }: ModelSummaryProps) {
   return (
     <div className={`model-summary${empty ? " empty" : ""}`}>
       <strong>{title}</strong>
-      <span>{detail}</span>
+      {detail && <span>{detail}</span>}
     </div>
   );
 }
@@ -1223,9 +1223,9 @@ function speechModelSummary(profile: any): ModelSummaryProps {
   const provider = speechProviders.find((item) => item.value === providerType);
   if (!provider?.model) {
     return {
-      title: "No separate model",
-      detail: provider?.label ?? providerType,
-      empty: true
+      title: provider?.label ?? providerType,
+      detail: "",
+      empty: false
     };
   }
   return {
@@ -1238,15 +1238,14 @@ function speechModelSummary(profile: any): ModelSummaryProps {
 function formatterModelSummary(profile: any): ModelSummaryProps {
   const providerProfiles = profile.providerProfiles ?? {};
   const providerType = normalizeFormatterProviderType(profile.documentGenerationProviderType ?? providerProfiles?.formatter?.selected);
-  if (!providerType) return { title: "Not managed", detail: "Local app setting", empty: true };
-  if (providerType === "apple_intelligence") return { title: "Apple Intelligence", detail: "No remote model", empty: true };
+  if (!providerType) return { title: "Not managed", detail: "", empty: true };
+  if (providerType === "apple_intelligence") return { title: "Apple Intelligence", detail: "", empty: false };
 
   const selectedProvider = selectedFormatterProfileFromProfile(profile, providerProfiles);
-  const modelName = profile.documentGenerationModel || selectedProvider?.modelName || "";
   return {
-    title: modelName || "No model selected",
-    detail: selectedProvider?.name ?? formatterProviderDefinition(providerType)?.label ?? providerType,
-    empty: !modelName
+    title: selectedProvider?.name ?? formatterProviderDefinition(providerType)?.label ?? providerType,
+    detail: "",
+    empty: false
   };
 }
 
@@ -1258,8 +1257,8 @@ function privacyReviewModelSummary(profile: any): ModelSummaryProps {
   if (providerType === "local_heuristic") return { title: "Local heuristic", detail: "No remote model", empty: true };
 
   return {
-    title: profile.privacyReviewModel || "No model selected",
-    detail: provider?.label ?? providerType,
+    title: provider?.label ?? providerType,
+    detail: profile.privacyReviewModel || "No model selected",
     empty: !profile.privacyReviewModel
   };
 }
