@@ -90,8 +90,12 @@ function FloatingTooltip({ text, anchorRef, open }: { text: string; anchorRef: R
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
       const hasRoomAbove = rect.top > 72;
+      const tooltipWidth = Math.min(440, window.innerWidth - 32);
+      const minLeft = 16 + tooltipWidth / 2;
+      const maxLeft = window.innerWidth - 16 - tooltipWidth / 2;
+      const centeredLeft = rect.left + rect.width / 2;
       setPosition({
-        left: rect.left + rect.width / 2,
+        left: Math.min(Math.max(centeredLeft, minLeft), maxLeft),
         top: hasRoomAbove ? rect.top - 8 : rect.bottom + 8,
         placement: hasRoomAbove ? "top" : "bottom"
       });
