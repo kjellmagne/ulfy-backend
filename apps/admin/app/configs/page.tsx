@@ -1316,9 +1316,14 @@ function ModelField({
     setActiveIndex(0);
   }, [value, options.length]);
 
-  function openMenu() {
+  function showMenu() {
     if (disabled) return;
     setOpen(true);
+  }
+
+  function openMenu() {
+    if (disabled) return;
+    showMenu();
     onOpen();
   }
 
@@ -1369,7 +1374,7 @@ function ModelField({
             onClick={openMenu}
             onChange={(event) => {
               onChange(event.target.value);
-              openMenu();
+              showMenu();
             }}
             onKeyDown={handleKeyDown}
             disabled={disabled}
