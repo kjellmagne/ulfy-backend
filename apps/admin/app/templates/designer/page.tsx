@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import * as yaml from "js-yaml";
 import { ArrowLeft, Bot, ChevronDown, CopyPlus, FileCode2, FileText, GripVertical, Loader2, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Alert, EmptyState, FieldLabel, IconAction, InfoTip, LoadingPanel, Modal } from "../../../components/AdminUI";
-import { IconPicker, LanguageCombobox, TagEditor, localizeTemplateSectionPresets, presetToTemplateSection } from "../../../components/TemplateControls";
+import { IconPicker, LanguageCombobox, TagEditor, TemplateIcon, localizeTemplateSectionPresets, presetToTemplateSection } from "../../../components/TemplateControls";
 import type { TemplateCategoryOption, TemplateSectionPresetOption, TemplateTagOption } from "../../../components/TemplateControls";
 import { RequireAuth } from "../../../components/RequireAuth";
 import { getErrorMessage, useToast } from "../../../components/ToastProvider";
@@ -46,6 +46,50 @@ type TemplateSection = {
   extraction_hints?: string[];
 };
 
+type TemplateParticipant = {
+  role?: string;
+  name?: string | null;
+};
+
+type TemplateContext = {
+  purpose?: string;
+  typical_setting?: string | null;
+  typical_participants?: TemplateParticipant[];
+  goals?: string[];
+  related_processes?: string[];
+  [key: string]: unknown;
+};
+
+type TemplatePerspective = {
+  voice?: string;
+  audience?: string;
+  tone?: string;
+  style_rules?: string[];
+  preserve_original_voice?: boolean;
+  [key: string]: unknown;
+};
+
+type TemplateContentRules = {
+  required_elements?: string[];
+  exclusions?: string[];
+  uncertainty_handling?: string | null;
+  action_item_format?: string | null;
+  decision_marker?: string | null;
+  speaker_attribution?: string | null;
+  [key: string]: unknown;
+};
+
+type TemplatePrompting = {
+  system_prompt_additions?: string | null;
+  fallback_behavior?: string | null;
+  post_processing?: {
+    extract_action_items?: boolean;
+    structured_output?: unknown;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
 type TemplateYamlDoc = {
   identity?: {
     id?: string;
@@ -57,13 +101,15 @@ type TemplateYamlDoc = {
     language?: string;
     version?: string;
   };
-  context?: Record<string, unknown>;
-  perspective?: Record<string, unknown>;
+  context?: TemplateContext;
+  perspective?: TemplatePerspective;
   structure?: { sections?: TemplateSection[] };
-  content_rules?: Record<string, unknown>;
-  llm_prompting?: Record<string, unknown>;
+  content_rules?: TemplateContentRules;
+  llm_prompting?: TemplatePrompting;
   [key: string]: unknown;
 };
+
+type TemplatePanelKey = "template" | "context" | "perspective" | "structure" | "content_rules" | "prompting";
 
 type SectionPreset = {
   title: string;
@@ -132,6 +178,55 @@ const fallbackSectionPresets: SectionPreset[] = [
     required: false,
     extraction_hints: ["risk", "blocker", "dependency"]
   }
+];
+
+const templatePanels: Array<{ key: TemplatePanelKey; title: string; detail: string }> = [
+  { key: "template", title: "Template", detail: "Title, icon, category and language" },
+  { key: "context", title: "Context", detail: "Purpose, setting, participants and goals" },
+  { key: "perspective", title: "Perspective", detail: "Voice, audience, tone and style" },
+  { key: "structure", title: "Output structure", detail: "Sections, order, format and required state" },
+  { key: "content_rules", title: "Content rules", detail: "Required facts, exclusions and uncertainty" },
+  { key: "prompting", title: "Prompting", detail: "Template prompt additions and post-processing" }
+];
+
+const templateVoiceOptions = [
+  { value: "first_person_singular", label: "First person singular" },
+  { value: "first_person_plural", label: "First person plural" },
+  { value: "third_person", label: "Third person" },
+  { value: "dual", label: "Dual" }
+];
+
+const templateAudienceOptions = [
+  { value: "self", label: "Self" },
+  { value: "colleagues", label: "Colleagues" },
+  { value: "hr", label: "HR" },
+  { value: "bruker", label: "Bruker" },
+  { value: "arkiv", label: "Arkiv" },
+  { value: "ledelse", label: "Ledelse" },
+  { value: "blandet", label: "Blandet" }
+];
+
+const templateToneOptions = [
+  { value: "formell", label: "Formal" },
+  { value: "semi_formell", label: "Semi-formal" },
+  { value: "samtalepreget", label: "Conversational" }
+];
+
+const sectionFormatOptions = [
+  { value: "prose", label: "Prose" },
+  { value: "bullet_list", label: "Bullet list" },
+  { value: "numbered_list", label: "Numbered list" },
+  { value: "table", label: "Table" },
+  { value: "fill_in", label: "Fill in" },
+  { value: "quote_block", label: "Quote block" }
+];
+
+const speakerAttributionOptions = [
+  { value: "none", label: "None" },
+  { value: "full_name", label: "Full name" },
+  { value: "role_only", label: "Role only" },
+  { value: "initials", label: "Initials" },
+  { value: "anonymized", label: "Anonymized" }
 ];
 
 const blankVariantForm: VariantForm = {
@@ -234,8 +329,32 @@ function ensureTemplateDoc(content: string): TemplateYamlDoc {
   doc.identity.tags ??= [];
   doc.identity.language ??= "nb-NO";
   doc.identity.version ??= "0.1.0";
+  doc.context ??= {};
+  doc.context.purpose ??= "";
+  doc.context.typical_setting ??= "";
+  doc.context.typical_participants ??= [];
+  doc.context.goals ??= [];
+  doc.context.related_processes ??= [];
+  doc.perspective ??= {};
+  doc.perspective.voice ??= "third_person";
+  doc.perspective.audience ??= "self";
+  doc.perspective.tone ??= "semi_formell";
+  doc.perspective.style_rules ??= [];
+  doc.perspective.preserve_original_voice ??= false;
   doc.structure ??= {};
   doc.structure.sections ??= [];
+  doc.content_rules ??= {};
+  doc.content_rules.required_elements ??= [];
+  doc.content_rules.exclusions ??= [];
+  doc.content_rules.uncertainty_handling ??= "";
+  doc.content_rules.action_item_format ??= "";
+  doc.content_rules.decision_marker ??= "";
+  doc.content_rules.speaker_attribution ??= "none";
+  doc.llm_prompting ??= {};
+  doc.llm_prompting.system_prompt_additions ??= "";
+  doc.llm_prompting.fallback_behavior ??= "";
+  doc.llm_prompting.post_processing ??= {};
+  doc.llm_prompting.post_processing.extract_action_items ??= false;
   return doc;
 }
 
@@ -249,6 +368,44 @@ function textToList(value: string) {
 
 function listToText(value?: string[]) {
   return (value ?? []).join("\n");
+}
+
+function valueToText(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function participantsToText(value?: TemplateParticipant[]) {
+  return (value ?? []).map((participant) => {
+    const role = participant.role?.trim() ?? "";
+    const name = participant.name?.trim() ?? "";
+    return name ? `${role}: ${name}` : role;
+  }).filter(Boolean).join("\n");
+}
+
+function textToParticipants(value: string): TemplateParticipant[] {
+  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map((line) => {
+    const [role, ...nameParts] = line.split(":");
+    return {
+      role: role.trim(),
+      name: nameParts.join(":").trim() || null
+    };
+  });
+}
+
+function structuredOutputToText(value: unknown) {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return "";
+  }
+}
+
+function textToStructuredOutput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return JSON.parse(trimmed);
 }
 
 function publishedVersion(variant?: Variant | null) {
@@ -288,6 +445,7 @@ export default function TemplateDesignerRoute() {
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved" | "error">("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [activePanel, setActivePanel] = useState<TemplatePanelKey>("template");
   const [selectedSectionIndex, setSelectedSectionIndex] = useState<number | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [previewTab, setPreviewTab] = useState<"document" | "yaml" | "sample">("document");
@@ -349,6 +507,7 @@ export default function TemplateDesignerRoute() {
         aiUseCase: nextFamily.shortDescription || nextFamily.title,
         preview: previewFromDraft(draft)
       });
+      setActivePanel("template");
       setSelectedSectionIndex(null);
       setDirty(false);
       setSaveState("idle");
@@ -368,10 +527,14 @@ export default function TemplateDesignerRoute() {
 
   const templateDoc = useMemo(() => parseTemplateYaml(variantForm.yamlContent), [variantForm.yamlContent]);
   const templateIdentity = templateDoc?.identity;
+  const templateContext = templateDoc?.context ?? {};
+  const templatePerspective = templateDoc?.perspective ?? {};
   const templateSections = templateDoc?.structure?.sections ?? [];
+  const templateContentRules = templateDoc?.content_rules ?? {};
+  const templatePrompting = templateDoc?.llm_prompting ?? {};
+  const templatePostProcessing = templatePrompting.post_processing ?? {};
   const baseSectionPresets = sectionPresetRows.length ? sectionPresetRows.map(presetToTemplateSection) : fallbackSectionPresets;
   const sectionPresets = localizeTemplateSectionPresets(baseSectionPresets, variantForm.language);
-  const selectedSection = selectedSectionIndex === null ? null : templateSections[selectedSectionIndex] ?? null;
   const publishedVersions = variant?.publishedVersions ?? [];
   const latestVersion = publishedVersion(variant);
   const nextPublishVersion = latestVersion
@@ -390,6 +553,12 @@ export default function TemplateDesignerRoute() {
       : previewProviderStatus?.missingFields?.length
         ? `Missing ${previewProviderStatus.missingFields.join(", ")}`
         : "Not generated";
+  const contextParticipants = Array.isArray(templateContext.typical_participants) ? templateContext.typical_participants : [];
+  const contextGoals = Array.isArray(templateContext.goals) ? templateContext.goals : [];
+  const contextRelatedProcesses = Array.isArray(templateContext.related_processes) ? templateContext.related_processes : [];
+  const perspectiveStyleRules = Array.isArray(templatePerspective.style_rules) ? templatePerspective.style_rules : [];
+  const requiredElements = Array.isArray(templateContentRules.required_elements) ? templateContentRules.required_elements : [];
+  const exclusions = Array.isArray(templateContentRules.exclusions) ? templateContentRules.exclusions : [];
 
   useEffect(() => {
     if (selectedSectionIndex !== null && selectedSectionIndex >= templateSections.length) {
@@ -439,6 +608,44 @@ export default function TemplateDesignerRoute() {
     });
   }
 
+  function updateContext(field: keyof TemplateContext, value: unknown) {
+    updateTemplate((doc) => {
+      doc.context ??= {};
+      (doc.context as Record<string, unknown>)[field] = value;
+    });
+  }
+
+  function updatePerspective(field: keyof TemplatePerspective, value: unknown) {
+    updateTemplate((doc) => {
+      doc.perspective ??= {};
+      (doc.perspective as Record<string, unknown>)[field] = value;
+    });
+  }
+
+  function updateContentRules(field: keyof TemplateContentRules, value: unknown) {
+    updateTemplate((doc) => {
+      doc.content_rules ??= {};
+      (doc.content_rules as Record<string, unknown>)[field] = value;
+    });
+  }
+
+  function updatePrompting(field: keyof TemplatePrompting, value: unknown) {
+    updateTemplate((doc) => {
+      doc.llm_prompting ??= {};
+      (doc.llm_prompting as Record<string, unknown>)[field] = value;
+    });
+  }
+
+  function updatePostProcessing(field: string, value: unknown) {
+    updateTemplate((doc) => {
+      doc.llm_prompting ??= {};
+      doc.llm_prompting.post_processing ??= {};
+      const postProcessing = doc.llm_prompting.post_processing as Record<string, unknown>;
+      if (value === undefined) delete postProcessing[field];
+      else postProcessing[field] = value;
+    });
+  }
+
   function updateLanguage(value: string) {
     updateVariantForm((current) => ({ ...current, language: value }));
     updateIdentity("language", value);
@@ -470,6 +677,7 @@ export default function TemplateDesignerRoute() {
       const sections = doc.structure?.sections ?? [];
       doc.structure = { ...doc.structure, sections: [...sections, { ...preset }] };
     });
+    setActivePanel("structure");
     setSelectedSectionIndex(nextIndex);
   }
 
@@ -498,6 +706,7 @@ export default function TemplateDesignerRoute() {
       const sections = doc.structure?.sections ?? [];
       doc.structure = { ...doc.structure, sections: [...sections, ...sectionPresets.slice(0, 3).map((preset) => ({ ...preset }))] };
     });
+    setActivePanel("structure");
     setSelectedSectionIndex(0);
   }
 
@@ -510,18 +719,6 @@ export default function TemplateDesignerRoute() {
       doc.structure = { ...doc.structure, sections };
     });
     setSelectedSectionIndex(to);
-  }
-
-  function handleOutlineKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (!(event.metaKey || event.ctrlKey)) return;
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      moveSection(index, index - 1);
-    }
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      moveSection(index, index + 1);
-    }
   }
 
   async function saveDraft(options: { silent?: boolean } = {}) {
@@ -607,6 +804,7 @@ export default function TemplateDesignerRoute() {
         })
       });
       updateVariantForm((current) => ({ ...current, yamlContent: result.yamlContent, sampleTranscript: result.sampleTranscript }));
+      setActivePanel("structure");
       setSelectedSectionIndex(0);
       setAiDialogOpen(false);
       notify({ title: "AI suggestion added", message: "Review and edit it before publishing.", tone: "success" });
@@ -670,6 +868,7 @@ export default function TemplateDesignerRoute() {
         preview: null
       }));
       setVariant((current) => current ? { ...current, language: nextLanguage, draft } : current);
+      setActivePanel("template");
       setSelectedSectionIndex(null);
       setDirty(false);
       setSaveState("saved");
@@ -857,61 +1056,34 @@ export default function TemplateDesignerRoute() {
         <div className="template-workbench" aria-label="Template designer">
           <aside className="template-outline">
             <div className="pane-title">
-              <span>Outline</span>
-              <strong>{templateSections.length}</strong>
+              <span>Template model</span>
+              <strong>{templatePanels.length}</strong>
             </div>
-            <button
-              type="button"
-              className={`outline-row identity-row${selectedSectionIndex === null ? " selected" : ""}`}
-              onClick={() => setSelectedSectionIndex(null)}
-            >
-              <FileText size={15} />
-              <span>
-                <strong>Identity</strong>
-                <small>Title, language and metadata</small>
-              </span>
-            </button>
 
             <div className="outline-list">
-              {templateSections.map((section, index) => (
+              {templatePanels.map((panel) => (
                 <button
-                  key={`${section.title}-${index}`}
+                  key={panel.key}
                   type="button"
-                  className={`outline-row${selectedSectionIndex === index ? " selected" : ""}${dragIndex === index ? " dragging" : ""}`}
-                  draggable
-                  onClick={() => setSelectedSectionIndex(index)}
-                  onKeyDown={(event) => handleOutlineKeyDown(event, index)}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    setDragIndex(index);
-                  }}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    if (dragIndex !== null) moveSection(dragIndex, index);
-                    setDragIndex(null);
-                  }}
-                  onDragEnd={() => setDragIndex(null)}
+                  className={`outline-row concept-row${activePanel === panel.key ? " selected" : ""}`}
+                  onClick={() => setActivePanel(panel.key)}
                 >
-                  <GripVertical size={14} className="outline-grip" />
-                  <span className={`outline-number${section.required ? " required" : ""}`}>{index + 1}</span>
+                  <FileText size={15} />
                   <span>
-                    <strong>{section.title || "Untitled section"}</strong>
-                    <small>{section.format || "prose"}</small>
+                    <strong>{panel.title}</strong>
+                    <small>{panel.detail}</small>
                   </span>
                 </button>
               ))}
             </div>
 
-            {!templateSections.length && (
-              <div className="outline-skeleton">
-                <span>Start with a common structure</span>
-                <button type="button" onClick={addStarterSkeleton}>{sectionPresets.slice(0, 3).map((preset) => preset.title).join(" · ")}</button>
-              </div>
-            )}
+            <div className="template-outline-summary">
+              <span>{templateSections.length} output sections</span>
+              <strong>{requiredCount} required</strong>
+            </div>
 
             <details className="outline-add">
-              <summary><Plus size={15} /> Add section <ChevronDown size={14} /></summary>
+              <summary><Plus size={15} /> Add output section <ChevronDown size={14} /></summary>
               <div>
                 {sectionPresets.map((preset) => (
                   <button key={preset.title} type="button" onClick={() => addSection(preset)}>
@@ -924,58 +1096,26 @@ export default function TemplateDesignerRoute() {
           </aside>
 
           <main className="template-editor-pane">
-            {selectedSection ? (
-              <section className="editor-card">
-                <div className="editor-heading">
-                  <div>
-                    <span className="eyebrow">Section {selectedSectionIndex! + 1}</span>
-                    <h2>{selectedSection.title || "Untitled section"}</h2>
-                  </div>
-                  <div className="row actions">
-                    <IconAction label="Duplicate section" onClick={() => duplicateSection(selectedSectionIndex!)}><CopyPlus size={15} /></IconAction>
-                    <IconAction label="Delete section" tone="danger" onClick={() => removeSection(selectedSectionIndex!)}><Trash2 size={15} /></IconAction>
-                  </div>
+            <div className="template-summary-card">
+              <span className="template-summary-icon"><TemplateIcon symbol={templateIdentity?.icon ?? "doc.text"} size={24} /></span>
+              <div>
+                <h2>{templateIdentity?.title ?? family.title}</h2>
+                <p>{templateIdentity?.short_description || family.shortDescription || "No short description yet."}</p>
+                <div className="template-summary-meta">
+                  <span>{templateIdentity?.category || "general"}</span>
+                  <span>{variantForm.language}</span>
+                  <span>v{templateIdentity?.version ?? "0.1.0"}</span>
+                  <span>{templateSections.length} sections</span>
                 </div>
+              </div>
+            </div>
 
-                <div className="section-editor-grid">
-                  <div className="field wide">
-                    <FieldLabel>Section title</FieldLabel>
-                    <input className="input section-title-large" value={selectedSection.title ?? ""} onChange={(event) => updateSection(selectedSectionIndex!, { title: event.target.value })} />
-                  </div>
-                  <div className="field">
-                    <FieldLabel>Format</FieldLabel>
-                    <select value={selectedSection.format ?? "prose"} onChange={(event) => updateSection(selectedSectionIndex!, { format: event.target.value })}>
-                      <option value="prose">Prose</option>
-                      <option value="bullet_list">Bullet list</option>
-                      <option value="numbered_list">Numbered list</option>
-                      <option value="table">Table</option>
-                      <option value="fill_in">Fill in</option>
-                      <option value="quote_block">Quote block</option>
-                    </select>
-                  </div>
-                  <label className="required-switch">
-                    <input type="checkbox" checked={Boolean(selectedSection.required)} onChange={(event) => updateSection(selectedSectionIndex!, { required: event.target.checked })} />
-                    <span>
-                      <strong>Required section</strong>
-                      <small>Always include this in the output.</small>
-                    </span>
-                  </label>
-                  <div className="field wide">
-                    <FieldLabel>Purpose</FieldLabel>
-                    <textarea value={selectedSection.purpose ?? ""} onChange={(event) => updateSection(selectedSectionIndex!, { purpose: event.target.value })} />
-                  </div>
-                  <div className="field wide">
-                    <FieldLabel>Extraction hints</FieldLabel>
-                    <textarea value={listToText(selectedSection.extraction_hints)} onChange={(event) => updateSection(selectedSectionIndex!, { extraction_hints: textToList(event.target.value) })} />
-                  </div>
-                </div>
-              </section>
-            ) : (
+            {activePanel === "template" && (
               <section className="editor-card">
                 <div className="editor-heading">
                   <div>
-                    <span className="eyebrow">Template identity</span>
-                    <h2>Metadata and language</h2>
+                    <span className="eyebrow">Template</span>
+                    <h2>Catalog identity</h2>
                   </div>
                   <span className="badge">{requiredCount} required sections</span>
                 </div>
@@ -1013,6 +1153,259 @@ export default function TemplateDesignerRoute() {
                   <div className="field wide">
                     <FieldLabel>Tags</FieldLabel>
                     <TagEditor value={templateIdentity?.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} onCreateTag={createTemplateTag} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {activePanel === "context" && (
+              <section className="editor-card">
+                <div className="editor-heading">
+                  <div>
+                    <span className="eyebrow">Context</span>
+                    <h2>Use case and meeting setting</h2>
+                  </div>
+                </div>
+                <div className="identity-editor-grid">
+                  <div className="field wide">
+                    <FieldLabel>Purpose</FieldLabel>
+                    <textarea value={valueToText(templateContext.purpose)} onChange={(event) => updateContext("purpose", event.target.value)} />
+                  </div>
+                  <div className="field wide">
+                    <FieldLabel>Typical setting</FieldLabel>
+                    <textarea value={valueToText(templateContext.typical_setting)} onChange={(event) => updateContext("typical_setting", event.target.value)} />
+                  </div>
+                  <div className="field wide">
+                    <FieldLabel>Typical participants</FieldLabel>
+                    <textarea value={participantsToText(contextParticipants)} onChange={(event) => updateContext("typical_participants", textToParticipants(event.target.value))} placeholder="One participant per line. Use Role: Name when needed." />
+                  </div>
+                  <div className="field wide">
+                    <FieldLabel>Goals</FieldLabel>
+                    <textarea value={listToText(contextGoals)} onChange={(event) => updateContext("goals", textToList(event.target.value))} />
+                  </div>
+                  <div className="field wide">
+                    <FieldLabel>Related processes</FieldLabel>
+                    <textarea value={listToText(contextRelatedProcesses)} onChange={(event) => updateContext("related_processes", textToList(event.target.value))} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {activePanel === "perspective" && (
+              <section className="editor-card">
+                <div className="editor-heading">
+                  <div>
+                    <span className="eyebrow">Perspective</span>
+                    <h2>Voice, audience and style</h2>
+                  </div>
+                </div>
+                <div className="identity-editor-grid">
+                  <div className="field">
+                    <FieldLabel>Voice</FieldLabel>
+                    <select value={templatePerspective.voice ?? "third_person"} onChange={(event) => updatePerspective("voice", event.target.value)}>
+                      {templateVoiceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <FieldLabel>Audience</FieldLabel>
+                    <select value={templatePerspective.audience ?? "self"} onChange={(event) => updatePerspective("audience", event.target.value)}>
+                      {templateAudienceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="field">
+                    <FieldLabel>Tone</FieldLabel>
+                    <select value={templatePerspective.tone ?? "semi_formell"} onChange={(event) => updatePerspective("tone", event.target.value)}>
+                      {templateToneOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <label className="required-switch">
+                    <input type="checkbox" checked={Boolean(templatePerspective.preserve_original_voice)} onChange={(event) => updatePerspective("preserve_original_voice", event.target.checked)} />
+                    <span>
+                      <strong>Preserve original voice</strong>
+                      <small>Keep first-person phrasing when the transcript supports it.</small>
+                    </span>
+                  </label>
+                  <div className="field wide">
+                    <FieldLabel>Style rules</FieldLabel>
+                    <textarea value={listToText(perspectiveStyleRules)} onChange={(event) => updatePerspective("style_rules", textToList(event.target.value))} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {activePanel === "structure" && (
+              <section className="editor-card structure-editor-card">
+                <div className="editor-heading">
+                  <div>
+                    <span className="eyebrow">Output structure</span>
+                    <h2>Sections shown in generated notes</h2>
+                  </div>
+                  <button type="button" className="button secondary" onClick={addStarterSkeleton}><Plus size={15} /> Add common structure</button>
+                </div>
+
+                {!templateSections.length && (
+                  <div className="outline-skeleton">
+                    <span>Start with a common structure</span>
+                    <button type="button" onClick={addStarterSkeleton}>{sectionPresets.slice(0, 3).map((preset) => preset.title).join(" · ")}</button>
+                  </div>
+                )}
+
+                <div className="structure-section-list">
+                  {templateSections.map((section, index) => (
+                    <article
+                      key={`${section.title}-${index}`}
+                      className={`template-section-card${selectedSectionIndex === index ? " selected" : ""}${dragIndex === index ? " dragging" : ""}`}
+                      draggable
+                      onClick={() => setSelectedSectionIndex(index)}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        setDragIndex(index);
+                      }}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (dragIndex !== null) moveSection(dragIndex, index);
+                        setDragIndex(null);
+                      }}
+                      onDragEnd={() => setDragIndex(null)}
+                    >
+                      <div className="template-section-card-header">
+                        <GripVertical size={15} className="outline-grip" />
+                        <span className={`outline-number${section.required ? " required" : ""}`}>{index + 1}</span>
+                        <div>
+                          <strong>{section.title || "Untitled section"}</strong>
+                          <small>{section.required ? "Required" : "Optional"} · {section.format || "prose"}</small>
+                        </div>
+                        <div className="row actions">
+                          <IconAction label="Move section up" onClick={() => moveSection(index, index - 1)}><ChevronDown className="rotate-180" size={15} /></IconAction>
+                          <IconAction label="Move section down" onClick={() => moveSection(index, index + 1)}><ChevronDown size={15} /></IconAction>
+                          <IconAction label="Duplicate section" onClick={() => duplicateSection(index)}><CopyPlus size={15} /></IconAction>
+                          <IconAction label="Delete section" tone="danger" onClick={() => removeSection(index)}><Trash2 size={15} /></IconAction>
+                        </div>
+                      </div>
+                      <div className="section-editor-grid">
+                        <div className="field wide">
+                          <FieldLabel>Section title</FieldLabel>
+                          <input className="input section-title-large" value={section.title ?? ""} onChange={(event) => updateSection(index, { title: event.target.value })} />
+                        </div>
+                        <div className="field">
+                          <FieldLabel>Format</FieldLabel>
+                          <select value={section.format ?? "prose"} onChange={(event) => updateSection(index, { format: event.target.value })}>
+                            {sectionFormatOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                          </select>
+                        </div>
+                        <label className="required-switch">
+                          <input type="checkbox" checked={Boolean(section.required)} onChange={(event) => updateSection(index, { required: event.target.checked })} />
+                          <span>
+                            <strong>Required</strong>
+                            <small>Always include this section.</small>
+                          </span>
+                        </label>
+                        <div className="field wide">
+                          <FieldLabel>Purpose</FieldLabel>
+                          <textarea value={section.purpose ?? ""} onChange={(event) => updateSection(index, { purpose: event.target.value })} />
+                        </div>
+                        <div className="field wide">
+                          <FieldLabel>Extraction hints</FieldLabel>
+                          <textarea value={listToText(section.extraction_hints)} onChange={(event) => updateSection(index, { extraction_hints: textToList(event.target.value) })} />
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+
+                <details className="section-preset-drawer">
+                  <summary><Plus size={15} /> Add section preset <ChevronDown size={14} /></summary>
+                  <div>
+                    {sectionPresets.map((preset) => (
+                      <button key={preset.title} type="button" onClick={() => addSection(preset)}>
+                        <strong>{preset.title}</strong>
+                        <span>{preset.format}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              </section>
+            )}
+
+            {activePanel === "content_rules" && (
+              <section className="editor-card">
+                <div className="editor-heading">
+                  <div>
+                    <span className="eyebrow">Content rules</span>
+                    <h2>Factual boundaries and formatting rules</h2>
+                  </div>
+                </div>
+                <div className="identity-editor-grid">
+                  <div className="field wide">
+                    <FieldLabel>Required elements</FieldLabel>
+                    <textarea value={listToText(requiredElements)} onChange={(event) => updateContentRules("required_elements", textToList(event.target.value))} />
+                  </div>
+                  <div className="field wide">
+                    <FieldLabel>Exclusions</FieldLabel>
+                    <textarea value={listToText(exclusions)} onChange={(event) => updateContentRules("exclusions", textToList(event.target.value))} />
+                  </div>
+                  <div className="field wide">
+                    <FieldLabel>Uncertainty handling</FieldLabel>
+                    <textarea value={valueToText(templateContentRules.uncertainty_handling)} onChange={(event) => updateContentRules("uncertainty_handling", event.target.value)} />
+                  </div>
+                  <div className="field">
+                    <FieldLabel>Action item format</FieldLabel>
+                    <input className="input" value={valueToText(templateContentRules.action_item_format)} onChange={(event) => updateContentRules("action_item_format", event.target.value)} />
+                  </div>
+                  <div className="field">
+                    <FieldLabel>Decision marker</FieldLabel>
+                    <input className="input" value={valueToText(templateContentRules.decision_marker)} onChange={(event) => updateContentRules("decision_marker", event.target.value)} />
+                  </div>
+                  <div className="field">
+                    <FieldLabel>Speaker attribution</FieldLabel>
+                    <select value={templateContentRules.speaker_attribution ?? "none"} onChange={(event) => updateContentRules("speaker_attribution", event.target.value)}>
+                      {speakerAttributionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {activePanel === "prompting" && (
+              <section className="editor-card">
+                <div className="editor-heading">
+                  <div>
+                    <span className="eyebrow">Prompting</span>
+                    <h2>LLM additions and post-processing</h2>
+                  </div>
+                </div>
+                <div className="identity-editor-grid">
+                  <div className="field wide">
+                    <FieldLabel>System prompt additions</FieldLabel>
+                    <textarea value={valueToText(templatePrompting.system_prompt_additions)} onChange={(event) => updatePrompting("system_prompt_additions", event.target.value)} />
+                  </div>
+                  <div className="field wide">
+                    <FieldLabel>Fallback behavior</FieldLabel>
+                    <textarea value={valueToText(templatePrompting.fallback_behavior)} onChange={(event) => updatePrompting("fallback_behavior", event.target.value)} />
+                  </div>
+                  <label className="required-switch">
+                    <input type="checkbox" checked={Boolean(templatePostProcessing.extract_action_items)} onChange={(event) => updatePostProcessing("extract_action_items", event.target.checked)} />
+                    <span>
+                      <strong>Extract action items</strong>
+                      <small>Populate the mobile actionItems array when tasks are explicit.</small>
+                    </span>
+                  </label>
+                  <div className="field wide">
+                    <FieldLabel>Structured output JSON schema</FieldLabel>
+                    <textarea
+                      key={structuredOutputToText(templatePostProcessing.structured_output)}
+                      defaultValue={structuredOutputToText(templatePostProcessing.structured_output)}
+                      onBlur={(event) => {
+                        try {
+                          updatePostProcessing("structured_output", textToStructuredOutput(event.target.value));
+                          setError("");
+                        } catch {
+                          setError("Structured output must be valid JSON.");
+                          notify({ title: "Structured output was not updated", message: "Enter valid JSON or leave the field blank.", tone: "danger" });
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               </section>

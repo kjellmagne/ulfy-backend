@@ -33,9 +33,24 @@ const blankCategory = { id: "", slug: "", title: "", icon: "folder", sortOrder: 
 const blankSection = { id: "", slug: "", title: "", purpose: "", format: "prose", required: false, extractionHintsText: "", sortOrder: 0 };
 const blankTag = { id: "", name: "", color: "#0d9488", description: "" };
 const blankPreviewProvider = { providerType: "openai-compatible", endpointUrl: "", model: "", apiKey: "" };
+const sectionFormatOptions = [
+  { value: "prose", label: "Prose" },
+  { value: "bullet_list", label: "Bullet list" },
+  { value: "numbered_list", label: "Numbered list" },
+  { value: "table", label: "Table" },
+  { value: "fill_in", label: "Fill in" },
+  { value: "quote_block", label: "Quote block" }
+];
 const previewProviderDefaults: Record<string, { endpointUrl?: string; model?: string }> = {
   openai: { endpointUrl: "https://api.openai.com/v1/chat/completions", model: "gpt-5-mini" }
 };
+
+function normalizeSectionFormat(format: string) {
+  if (format === "bullets") return "bullet_list";
+  if (format === "checklist") return "bullet_list";
+  if (format === "fields") return "fill_in";
+  return format || "prose";
+}
 
 export default function SettingsPage() {
   const [me, setMe] = useState<any>(null);
@@ -128,7 +143,7 @@ export default function SettingsPage() {
       slug: section.slug,
       title: section.title,
       purpose: section.purpose,
-      format: section.format,
+      format: normalizeSectionFormat(section.format),
       required: section.required,
       extractionHintsText: (section.extractionHints ?? []).join("\n"),
       sortOrder: section.sortOrder ?? 0
@@ -198,7 +213,7 @@ export default function SettingsPage() {
         slug: sectionForm.slug,
         title: sectionForm.title,
         purpose: sectionForm.purpose,
-        format: sectionForm.format,
+        format: normalizeSectionFormat(sectionForm.format),
         required: sectionForm.required,
         extractionHints: textToList(sectionForm.extractionHintsText),
         sortOrder: Number(sectionForm.sortOrder) || 0
@@ -449,7 +464,7 @@ export default function SettingsPage() {
                     <tbody>{sections.map((section) => (
                       <tr key={section.id}>
                         <td><b>{section.title}</b><br /><span className="muted">{section.purpose}</span></td>
-                        <td><span className="badge">{section.format}</span> {section.required && <span className="badge status-active">Required</span>}</td>
+                        <td><span className="badge">{normalizeSectionFormat(section.format)}</span> {section.required && <span className="badge status-active">Required</span>}</td>
                         <td>{section.sortOrder}</td>
                         <td className="actions">
                           <IconAction label="Edit section preset" onClick={() => openSection(section)} disabled={!canManageSettings}><Edit3 size={14} /></IconAction>
@@ -527,7 +542,7 @@ export default function SettingsPage() {
           </div>
           <div className="field"><FieldLabel>Purpose</FieldLabel><textarea value={sectionForm.purpose} onChange={(event) => setSectionForm({ ...sectionForm, purpose: event.target.value })} /></div>
           <div className="grid three">
-            <div className="field"><FieldLabel>Format</FieldLabel><select value={sectionForm.format} onChange={(event) => setSectionForm({ ...sectionForm, format: event.target.value })}><option value="prose">Prose</option><option value="bullets">Bullets</option><option value="numbered_list">Numbered list</option><option value="table">Table</option><option value="checklist">Checklist</option><option value="fields">Fields</option></select></div>
+            <div className="field"><FieldLabel>Format</FieldLabel><select value={sectionForm.format} onChange={(event) => setSectionForm({ ...sectionForm, format: event.target.value })}>{sectionFormatOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div>
             <div className="field"><FieldLabel>Sort order</FieldLabel><input className="input" type="number" value={sectionForm.sortOrder} onChange={(event) => setSectionForm({ ...sectionForm, sortOrder: Number(event.target.value) })} /></div>
             <label className="checkbox-row"><input type="checkbox" checked={sectionForm.required} onChange={(event) => setSectionForm({ ...sectionForm, required: event.target.checked })} /> Required by default</label>
           </div>
