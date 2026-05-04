@@ -842,10 +842,10 @@ export default function TemplateDesignerRoute() {
         })
       });
       updateVariantForm((current) => ({ ...current, yamlContent: result.yamlContent, sampleTranscript: result.sampleTranscript }));
-      setActivePanel("structure");
+      setActivePanel("context");
       setSelectedSectionIndex(0);
       setAiDialogOpen(false);
-      notify({ title: "AI suggestion added", message: "Review and edit it before publishing.", tone: "success" });
+      notify({ title: "AI suggestion added", message: "Context, perspective, sections, rules, prompting, and sample transcript were filled for review.", tone: "success" });
     } catch (err) {
       notify({ title: "AI suggestion failed", message: getErrorMessage(err), tone: "danger" });
       setSaveState("error");
@@ -1047,7 +1047,7 @@ export default function TemplateDesignerRoute() {
         <Modal
           open={aiDialogOpen}
           title="AI template helper"
-          description="Describe the intended use. AI will generate a starting suggestion for the editable template and sample transcript."
+          description="Describe the situation this template should handle. AI will fill the editable context, perspective, sections, content rules, prompting, and sample transcript for review."
           onClose={() => setAiDialogOpen(false)}
           footer={(
             <>
@@ -1063,7 +1063,7 @@ export default function TemplateDesignerRoute() {
             <textarea
               value={variantForm.aiUseCase}
               onChange={(event) => setVariantForm((current) => ({ ...current, aiUseCase: event.target.value }))}
-              placeholder="Example: A Norwegian template for follow-up conversations after municipal health meetings. It should produce a short summary, decisions, next steps, and responsible people."
+              placeholder="Example: A Norwegian template for follow-up conversations after municipal health meetings. Include a short summary, decisions, next steps, responsible people, deadlines, and any unclear points."
             />
             <p>Nothing is published automatically. Review and edit the suggestion before publishing changes.</p>
           </div>
