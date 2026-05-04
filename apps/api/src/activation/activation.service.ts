@@ -343,7 +343,7 @@ export class ActivationService {
       telemetryEndpointUrl: profile.telemetryEndpointUrl,
       featureFlags: profile.featureFlags,
       allowedProviderRestrictions: profile.allowedProviderRestrictions,
-      providerProfiles: profile.providerProfiles,
+      providerProfiles: mobileProviderProfiles(profile.providerProfiles),
       templateCategories,
       managedPolicy: this.mapManagedPolicy(profile.managedPolicy),
       defaultTemplateId: profile.defaultTemplateId
@@ -404,6 +404,73 @@ function compactObject(input: Record<string, unknown>) {
 function normalizeOpenAiCompatibleProvider(providerType?: string | null) {
   if (providerType === "openai" || providerType === "vllm") return "openai_compatible";
   return providerType;
+}
+
+function mobileProviderProfiles(value: unknown) {
+  if (!isRecord(value)) return undefined;
+
+  return compactObject({
+    ...value,
+    speech: mobileSpeechProviderProfiles(value.speech),
+    formatter: mobileFormatterProviderProfiles(value.formatter)
+  });
+}
+
+function mobileSpeechProviderProfiles(value: unknown) {
+  if (!isRecord(value)) return undefined;
+
+  const providers = isRecord(value.providers) ? value.providers : {};
+  const selected = stringValue(value.selected);
+  const explicitAvailable = stringArray(value.available);
+  const available = explicitAvailable.length
+    ? explicitAvailable
+    : Object.entries(providers)
+      .filter(([, provider]) => !isRecord(provider) || provider.enabled !== false)
+      .map(([key]) => key);
+  const allowed = new Set([...available, selected].filter(Boolean));
+  const filteredProviders = Object.fromEntries(Object.entries(providers).filter(([key, provider]) => {
+    if (!allowed.has(key)) return false;
+    return !isRecord(provider) || provider.enabled !== false;
+  }));
+
+  return compactObject({
+    ...value,
+    selected,
+    available: Array.from(allowed),
+    providers: filteredProviders
+  });
+}
+
+function mobileFormatterProviderProfiles(value: unknown) {
+  if (!isRecord(value)) return undefined;
+
+  const providers = Array.isArray(value.providers) ? value.providers.filter(isRecord) : [];
+  const selectedProviderId = stringValue(value.selectedProviderId);
+  const explicitAvailable = stringArray(value.available);
+  const availableIds = explicitAvailable.length
+    ? explicitAvailable
+    : providers.filter((provider) => provider.enabled !== false).map((provider) => stringValue(provider.id)).filter((id): id is string => Boolean(id));
+  const allowed = new Set([...availableIds, selectedProviderId].filter(Boolean));
+  const filteredProviders = providers.filter((provider) => {
+    const id = stringValue(provider.id);
+    if (!id || !allowed.has(id)) return false;
+    return provider.enabled !== false;
+  });
+
+  return compactObject({
+    ...value,
+    selectedProviderId,
+    available: filteredProviders.map((provider) => stringValue(provider.id)).filter((id): id is string => Boolean(id)),
+    providers: filteredProviders
+  });
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

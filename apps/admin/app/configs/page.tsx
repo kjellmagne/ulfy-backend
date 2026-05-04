@@ -183,6 +183,7 @@ export default function ConfigsPage() {
   const selectedFormatterProvider = configuredFormatterProviders.find((provider) => provider.id === form.selectedFormatterProviderId) ?? configuredFormatterProviders[0];
   const enabledSpeechProviders = normalizedSpeechAvailable(form);
   const enabledFormatterProviders = configuredFormatterProviders.filter((provider) => provider.enabled);
+  const externalProviderAccessRequired = requiresExternalProviderAccess(form);
   const selectedPartnerName = partners.find((partner) => partner.id === form.partnerId)?.name ?? "Internal";
   const selectedSpeechProviderLabel = speechProviders.find((provider) => provider.value === form.speechProviderType)?.label ?? "Not managed";
   const selectedFormatterProviderLabel = selectedFormatterProvider?.name ?? "Not managed";
@@ -486,10 +487,11 @@ export default function ConfigsPage() {
         ...enabledFormatterProfiles.map((provider) => provider.type),
         form.privacyReviewProviderType
       ].filter(Boolean)));
+      const allowExternalProviders = Boolean(form.allowExternalProviders || requiresExternalProviderAccess({ speechAvailableProviders }));
       const featureFlags = {
         enterpriseTemplates: true,
         developerMode: Boolean(form.developerMode),
-        allowExternalProviders: Boolean(form.allowExternalProviders)
+        allowExternalProviders
       };
       const providerProfiles = {
         speech: {
@@ -1080,7 +1082,7 @@ export default function ConfigsPage() {
                     <div className="policy-card-body">
                       <div className="policy-toggle-grid compact">
                         <label className="policy-toggle"><input type="checkbox" checked={form.developerMode} onChange={(e) => setForm({ ...form, developerMode: e.target.checked })} /><span><FieldLabel help={helpText.developerMode}>Developer mode</FieldLabel><small>Shows testing and validation tools in the app.</small></span></label>
-                        <label className="policy-toggle"><input type="checkbox" checked={form.allowExternalProviders} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /><span><FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel><small>Decoded by the app, with stronger enforcement planned later.</small></span></label>
+                        <label className="policy-toggle"><input type="checkbox" checked={form.allowExternalProviders || externalProviderAccessRequired} disabled={externalProviderAccessRequired} onChange={(e) => setForm({ ...form, allowExternalProviders: e.target.checked })} /><span><FieldLabel help={helpText.allowExternalProviders}>Allow external providers</FieldLabel><small>{externalProviderAccessRequired ? "Required because OpenAI/Gemini speech is available to the app." : "Decoded by the app, with stronger enforcement planned later."}</small></span></label>
                         <label className="policy-toggle"><input type="checkbox" checked={form.externalFormattersAllowed} onChange={(e) => setForm({ ...form, externalFormattersAllowed: e.target.checked })} /><span><strong>External formatters allowed</strong><small>Backend policy metadata for document-generation controls.</small></span></label>
                       </div>
                       <div className="provider-restriction-preview">
@@ -1105,6 +1107,10 @@ function normalizedSpeechAvailable(source: any) {
   const values = Array.isArray(source.speechAvailableProviders) ? source.speechAvailableProviders : [];
   const providerValues = new Set(speechProviders.map((provider) => provider.value));
   return values.filter((value: unknown): value is string => typeof value === "string" && providerValues.has(value));
+}
+
+function requiresExternalProviderAccess(source: any) {
+  return normalizedSpeechAvailable(source).some((value: string) => ["openai", "gemini"].includes(value));
 }
 
 function speechProviderConfig(source: any, providerValue: string): SpeechProviderConfig {

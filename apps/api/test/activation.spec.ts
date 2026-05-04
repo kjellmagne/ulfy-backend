@@ -153,6 +153,26 @@ describe("ActivationService", () => {
           documentGenerationApiKey: "docgen-key",
           featureFlags: { enterpriseTemplates: true },
           allowedProviderRestrictions: [],
+          providerProfiles: {
+            speech: {
+              selected: "azure",
+              available: ["azure", "openai"],
+              providers: {
+                azure: { type: "azure", enabled: true, endpointUrl: "https://kvasetech.com/stt", apiKey: "azure-key" },
+                openai: { type: "openai", enabled: true, endpointUrl: "https://api.openai.com/v1", modelName: "gpt-4o-transcribe", apiKey: "openai-speech-key" },
+                gemini: { type: "gemini", enabled: false, endpointUrl: "https://generativelanguage.googleapis.com", apiKey: "disabled-gemini-key" }
+              }
+            },
+            formatter: {
+              selected: "openai_compatible",
+              selectedProviderId: "docgen-provider",
+              available: ["docgen-provider", "disabled-provider"],
+              providers: [
+                { id: "docgen-provider", name: "Docgen", type: "openai_compatible", enabled: true, endpointUrl: "https://llm.example.internal/v1", modelName: "ulfy-docgen", apiKey: "docgen-profile-key" },
+                { id: "disabled-provider", name: "Disabled", type: "openai_compatible", enabled: false, endpointUrl: "https://disabled.example/v1", modelName: "disabled", apiKey: "disabled-docgen-key" }
+              ]
+            }
+          },
           managedPolicy: {
             allowPolicyOverride: false,
             hideSettings: true,
@@ -206,5 +226,22 @@ describe("ActivationService", () => {
         userMayChangePrivacyReviewProvider: true
       }
     });
+    expect(result.config.providerProfiles).toMatchObject({
+      speech: {
+        selected: "azure",
+        available: ["azure", "openai"],
+        providers: {
+          azure: { apiKey: "azure-key" },
+          openai: { apiKey: "openai-speech-key", modelName: "gpt-4o-transcribe" }
+        }
+      },
+      formatter: {
+        selectedProviderId: "docgen-provider",
+        available: ["docgen-provider"],
+        providers: [{ id: "docgen-provider", apiKey: "docgen-profile-key" }]
+      }
+    });
+    expect(result.config.providerProfiles.speech.providers.gemini).toBeUndefined();
+    expect(result.config.providerProfiles.formatter.providers).toHaveLength(1);
   });
 });
