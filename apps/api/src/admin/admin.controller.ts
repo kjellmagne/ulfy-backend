@@ -3,6 +3,7 @@ import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptiona
 import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import * as bcrypt from "bcryptjs";
 import * as yaml from "js-yaml";
+import { TemplateSectionFormatValues } from "@ulfy/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdminGuard } from "../auth/admin.guard";
 import { createActivationKey, sha256 } from "../common/crypto";
@@ -573,6 +574,7 @@ class TemplateSectionPresetDto {
   @ApiProperty({ required: false, example: "table" })
   @IsOptional()
   @IsString()
+  @IsIn([...TemplateSectionFormatValues])
   format?: string;
 
   @ApiProperty({ required: false, example: false })

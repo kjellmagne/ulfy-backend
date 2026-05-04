@@ -114,7 +114,7 @@ const fallbackSectionPresets: SectionPreset[] = [
   {
     title: "Decisions",
     purpose: "List clear decisions that were made during the conversation.",
-    format: "bullets",
+    format: "bullet_list",
     required: false,
     extraction_hints: ["decision", "owner", "reason"]
   },
@@ -128,7 +128,7 @@ const fallbackSectionPresets: SectionPreset[] = [
   {
     title: "Risks",
     purpose: "Capture blockers, uncertainty, or sensitive issues mentioned.",
-    format: "bullets",
+    format: "bullet_list",
     required: false,
     extraction_hints: ["risk", "blocker", "dependency"]
   }
@@ -176,24 +176,36 @@ function starterYaml(family: Family, presets: SectionPreset[] = fallbackSectionP
       version: "0.1.0"
     },
     context: {
-      use_case: family.title || "New template",
-      output_language: language
+      purpose: `Create a clear, structured document for ${family.title || "this recording"}.`,
+      typical_setting: "Recording, dictation, meeting, or conversation captured in Ulfy.",
+      typical_participants: [{ role: "speaker" }],
+      goals: ["Create a useful structured note from the transcript."],
+      related_processes: []
     },
     perspective: {
-      voice: "professional",
-      audience: "internal"
+      voice: "third_person",
+      audience: "self",
+      tone: "semi_formell",
+      style_rules: ["Write clearly and concisely.", "Use only information supported by the transcript."],
+      preserve_original_voice: false
     },
     structure: {
       sections: presets.slice(0, 3)
     },
     content_rules: {
-      preserve_facts: true,
-      avoid_hallucinations: true,
-      flag_uncertainty: true
+      required_elements: ["Include only information supported by the transcript."],
+      exclusions: ["Do not include unsupported personal details."],
+      uncertainty_handling: "Mark unclear or missing information instead of guessing.",
+      action_item_format: "Action — Owner — Deadline",
+      decision_marker: "Mark clear decisions explicitly.",
+      speaker_attribution: "none"
     },
     llm_prompting: {
-      system: "You create a structured note from the transcript using the template sections.",
-      user: "Transform the transcript into the requested document."
+      system_prompt_additions: "Create a structured note from the transcript using the template sections.",
+      fallback_behavior: "If a required section has no support in the transcript, write that it was not covered.",
+      post_processing: {
+        extract_action_items: true
+      }
     }
   };
   return dumpTemplateYaml(doc);
@@ -423,8 +435,6 @@ export default function TemplateDesignerRoute() {
       doc.identity ??= {};
       (doc.identity as Record<string, unknown>)[field] = value;
       if (field === "language" && typeof value === "string") {
-        doc.context ??= {};
-        doc.context.output_language = value;
       }
     });
   }
@@ -936,10 +946,11 @@ export default function TemplateDesignerRoute() {
                     <FieldLabel>Format</FieldLabel>
                     <select value={selectedSection.format ?? "prose"} onChange={(event) => updateSection(selectedSectionIndex!, { format: event.target.value })}>
                       <option value="prose">Prose</option>
-                      <option value="bullets">Bullets</option>
+                      <option value="bullet_list">Bullet list</option>
+                      <option value="numbered_list">Numbered list</option>
                       <option value="table">Table</option>
-                      <option value="checklist">Checklist</option>
-                      <option value="fields">Fields</option>
+                      <option value="fill_in">Fill in</option>
+                      <option value="quote_block">Quote block</option>
                     </select>
                   </div>
                   <label className="required-switch">

@@ -84,22 +84,7 @@ export type TemplateTagOption = {
 export const languageOptions = [
   { code: "nb-NO", name: "Norwegian Bokmal" },
   { code: "nn-NO", name: "Norwegian Nynorsk" },
-  { code: "en-US", name: "English (United States)" },
-  { code: "en-GB", name: "English (United Kingdom)" },
-  { code: "sv-SE", name: "Swedish" },
-  { code: "da-DK", name: "Danish" },
-  { code: "fi-FI", name: "Finnish" },
-  { code: "de-DE", name: "German" },
-  { code: "fr-FR", name: "French" },
-  { code: "es-ES", name: "Spanish" },
-  { code: "it-IT", name: "Italian" },
-  { code: "nl-NL", name: "Dutch" },
-  { code: "pt-PT", name: "Portuguese" },
-  { code: "pt-BR", name: "Portuguese (Brazil)" },
-  { code: "pl-PL", name: "Polish" },
-  { code: "lt-LT", name: "Lithuanian" },
-  { code: "uk-UA", name: "Ukrainian" },
-  { code: "ja-JP", name: "Japanese" }
+  { code: "en-US", name: "English (United States)" }
 ];
 
 export const sfSymbolOptions = [
@@ -552,10 +537,17 @@ export function presetToTemplateSection(preset: TemplateSectionPresetOption) {
   return {
     title: preset.title,
     purpose: preset.purpose,
-    format: preset.format,
+    format: mobileSectionFormat(preset.format),
     required: preset.required,
     extraction_hints: preset.extraction_hints ?? preset.extractionHints ?? []
   };
+}
+
+function mobileSectionFormat(format: string) {
+  if (format === "bullets") return "bullet_list";
+  if (format === "fields") return "fill_in";
+  if (format === "checklist") return "bullet_list";
+  return format;
 }
 
 type TemplateSectionLike = {

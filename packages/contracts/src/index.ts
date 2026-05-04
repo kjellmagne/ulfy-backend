@@ -124,6 +124,13 @@ export const TemplateMetadata = z.object({
   tenantId: z.string().uuid().optional().nullable()
 });
 
+export const TemplateLanguageValues = ["nb-NO", "nn-NO", "en-US"] as const;
+export const TemplateVoiceValues = ["first_person_singular", "first_person_plural", "third_person", "dual"] as const;
+export const TemplateAudienceValues = ["self", "colleagues", "hr", "bruker", "arkiv", "ledelse", "blandet"] as const;
+export const TemplateToneValues = ["formell", "semi_formell", "samtalepreget"] as const;
+export const TemplateSectionFormatValues = ["prose", "bullet_list", "numbered_list", "table", "fill_in", "quote_block"] as const;
+export const TemplateSpeakerAttributionValues = ["full_name", "role_only", "initials", "anonymized", "none"] as const;
+
 export const TemplateYamlSchema = z.object({
   identity: z.object({
     id: z.string().uuid(),
@@ -132,7 +139,7 @@ export const TemplateYamlSchema = z.object({
     short_description: z.string().max(200).optional().nullable(),
     category: z.string().min(1),
     tags: z.array(z.string()).default([]),
-    language: z.string().min(2),
+    language: z.enum(TemplateLanguageValues),
     version: z.string().regex(/^\d+\.\d+\.\d+$/)
   }).strict(),
   context: z.object({
@@ -146,9 +153,9 @@ export const TemplateYamlSchema = z.object({
     related_processes: z.array(z.string()).default([]).optional()
   }).strict(),
   perspective: z.object({
-    voice: z.string(),
-    audience: z.string(),
-    tone: z.string(),
+    voice: z.enum(TemplateVoiceValues),
+    audience: z.enum(TemplateAudienceValues),
+    tone: z.enum(TemplateToneValues),
     style_rules: z.array(z.string()).default([]).optional(),
     preserve_original_voice: z.boolean().optional()
   }).strict(),
@@ -156,7 +163,7 @@ export const TemplateYamlSchema = z.object({
     sections: z.array(z.object({
       title: z.string().min(1),
       purpose: z.string().min(1),
-      format: z.string(),
+      format: z.enum(TemplateSectionFormatValues),
       required: z.boolean(),
       extraction_hints: z.array(z.string()).default([]).optional()
     }).strict()).min(1)
@@ -167,7 +174,7 @@ export const TemplateYamlSchema = z.object({
     uncertainty_handling: z.string().optional().nullable(),
     action_item_format: z.string().optional().nullable(),
     decision_marker: z.string().optional().nullable(),
-    speaker_attribution: z.string().optional().nullable()
+    speaker_attribution: z.enum(TemplateSpeakerAttributionValues).optional().nullable()
   }).strict(),
   llm_prompting: z.object({
     system_prompt_additions: z.string().optional().nullable(),
@@ -187,3 +194,4 @@ export type LicenseDetails = z.infer<typeof LicenseDetails>;
 export type DeviceDetails = z.infer<typeof DeviceDetails>;
 export type MobileErrorPayload = z.infer<typeof MobileErrorPayload>;
 export type TemplateMetadata = z.infer<typeof TemplateMetadata>;
+export type TemplateYaml = z.infer<typeof TemplateYamlSchema>;

@@ -1,71 +1,17 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import * as yaml from "js-yaml";
 import { randomUUID } from "crypto";
-import { z } from "zod";
+import { TemplateYamlSchema } from "@ulfy/contracts";
+import type { TemplateYaml } from "@ulfy/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../common/audit.service";
 import { mobileError } from "../activation/activation.service";
 import { tokenHash } from "../common/crypto";
 
-const SemverSchema = z.string().regex(/^\d+\.\d+\.\d+$/, "identity.version must use semver x.y.z, such as 1.0.0.");
 const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
 
-export const AppTemplateYamlSchema = z.object({
-  identity: z.object({
-    id: z.string().uuid(),
-    title: z.string().trim().min(1).max(80),
-    icon: z.string().trim().min(1).optional().nullable(),
-    short_description: z.string().max(200).optional().nullable(),
-    category: z.string().trim().min(1),
-    tags: z.array(z.string()).default([]),
-    language: z.string().trim().min(2),
-    version: SemverSchema
-  }).strict(),
-  context: z.object({
-    purpose: z.string().trim().min(1),
-    typical_setting: z.string().optional().nullable(),
-    typical_participants: z.array(z.object({
-      role: z.string().trim().min(1),
-      name: z.string().optional().nullable()
-    }).strict()).default([]).optional(),
-    goals: z.array(z.string()).default([]).optional(),
-    related_processes: z.array(z.string()).default([]).optional()
-  }).strict(),
-  perspective: z.object({
-    voice: z.string().optional().nullable(),
-    audience: z.string().optional().nullable(),
-    tone: z.string().optional().nullable(),
-    style_rules: z.array(z.string()).default([]).optional(),
-    preserve_original_voice: z.boolean().optional()
-  }).strict(),
-  structure: z.object({
-    sections: z.array(z.object({
-      title: z.string().trim().min(1),
-      purpose: z.string().trim().min(1),
-      format: z.string().optional().nullable(),
-      required: z.boolean().optional(),
-      extraction_hints: z.array(z.string()).default([]).optional()
-    }).strict()).min(1)
-  }).strict(),
-  content_rules: z.object({
-    required_elements: z.array(z.string()).default([]).optional(),
-    exclusions: z.array(z.string()).default([]).optional(),
-    uncertainty_handling: z.string().optional().nullable(),
-    action_item_format: z.string().optional().nullable(),
-    decision_marker: z.string().optional().nullable(),
-    speaker_attribution: z.string().optional().nullable()
-  }).strict(),
-  llm_prompting: z.object({
-    system_prompt_additions: z.string().optional().nullable(),
-    fallback_behavior: z.string().optional().nullable(),
-    post_processing: z.object({
-      extract_action_items: z.boolean().optional(),
-      structured_output: z.record(z.any()).optional()
-    }).strict().default({}).optional()
-  }).strict()
-}).strict();
-
-type AppTemplateYaml = z.infer<typeof AppTemplateYamlSchema>;
+export const AppTemplateYamlSchema = TemplateYamlSchema;
+type AppTemplateYaml = TemplateYaml;
 type PublishBump = "patch" | "minor" | "major";
 
 @Injectable()
@@ -237,7 +183,7 @@ export class TemplatesService {
 
     const current = this.validateYamlContent(variant.draft.yamlContent);
     const version = input.version?.trim() || (variant.publishedVersions[0] ? this.bumpVersion(variant.publishedVersions[0].version, input.bump ?? "patch") : current.identity.version);
-    if (!SemverSchema.safeParse(version).success) throw new BadRequestException("Publish version must use semver x.y.z.");
+    if (!isSemver(version)) throw new BadRequestException("Publish version must use semver x.y.z.");
     const yamlContent = this.yamlWithVersion(variant.draft.yamlContent, version);
     const metadata = this.metadataFromYaml(yamlContent);
 
@@ -296,46 +242,57 @@ export class TemplatesService {
     }
 
     try {
-      const response = await fetch(endpoint, {
+      const messages = formatterPreviewMessages(parsed, draft.sampleTranscript || "No sample transcript was provided.");
+      const requestBody = {
+        model,
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages
+      };
+      let response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          model,
-          temperature: 0.2,
-          messages: [
-            {
-              role: "system",
-              content: "You generate concise markdown previews for an admin reviewing a Ulfy meeting template draft. Use only the provided sample transcript and template instructions. Do not claim the result is published."
-            },
-            {
-              role: "user",
-              content: [
-                "Template draft YAML:",
-                draft.yamlContent,
-                "",
-                "Sample transcript:",
-                draft.sampleTranscript || "No sample transcript was provided.",
-                "",
-                "Return only markdown for the generated document preview."
-              ].join("\n")
-            }
-          ]
-        })
+        body: JSON.stringify(requestBody)
       });
+      if (response.status === 400) {
+        const { response_format: _responseFormat, ...fallbackRequestBody } = requestBody;
+        response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(fallbackRequestBody)
+        });
+      }
 
       if (!response.ok) throw new Error(`Preview provider returned ${response.status}`);
       const payload = await response.json() as any;
-      const markdown = payload?.choices?.[0]?.message?.content?.trim();
-      if (!markdown) throw new Error("Preview provider response did not contain generated markdown.");
+      const content = previewTextFromProviderPayload(payload);
+      if (!content) throw new Error("Preview provider response did not contain generated content.");
+      const formatterPayload = parseFormatterPreviewPayload(content);
+      const markdown = previewDocumentMarkdown(formatterPayload, parsed);
+      const previewSections = formatterPayload.sections ?? previewSectionsFromMarkdown(markdown, parsed);
 
       const updated = await this.prisma.templateDraft.update({
         where: { id: draftId },
         data: {
           previewMarkdown: markdown,
-          previewStructured: { title: parsed.identity.title, sections: parsed.structure.sections.map((section) => section.title) },
+          previewStructured: {
+            outputContract: "mobile-json-v1",
+            title: parsed.identity.title,
+            summary: formatterPayload.summary ?? null,
+            decisions: formatterPayload.decisions ?? [],
+            actions: formatterPayload.actions ?? [],
+            blockers: formatterPayload.blockers ?? [],
+            nextSteps: formatterPayload.nextSteps ?? [],
+            actionItems: formatterPayload.actionItems ?? [],
+            structuredOutputJSON: formatterPayload.structuredOutputJSON ?? null,
+            sections: previewSections
+          },
           previewProviderType: providerType,
           previewProviderModel: model,
           previewGeneratedAt: new Date(),
@@ -567,6 +524,350 @@ export class TemplatesService {
 
 function TemplateSlug(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "template";
+}
+
+function isSemver(value: string) {
+  return /^\d+\.\d+\.\d+$/.test(value);
+}
+
+type PreviewMessage = { role: "system" | "user"; content: string };
+type PreviewOutputSection = { id: string; title: string; markdown: string };
+type FormatterPreviewPayload = {
+  documentMarkdown?: string | null;
+  summary?: string | null;
+  decisions?: string[];
+  actions?: string[];
+  blockers?: string[];
+  nextSteps?: string[];
+  actionItems?: string[];
+  structuredOutputJSON?: string | null;
+  sections?: PreviewOutputSection[];
+};
+
+function formatterPreviewMessages(template: AppTemplateYaml, sampleTranscript: string): PreviewMessage[] {
+  return [
+    { role: "system", content: formatterPreviewSystemPrompt() },
+    { role: "user", content: formatterPreviewUserPrompt(template, sampleTranscript) }
+  ];
+}
+
+function formatterPreviewSystemPrompt() {
+  return [
+    "You turn transcripts from recordings, meetings, dictations, and reports into template-based structured documents.",
+    "Return only valid JSON with exactly these keys:",
+    "- documentMarkdown: string",
+    "- sections: array of objects with id, title, markdown",
+    "- summary: string",
+    "- decisions: array of strings",
+    "- actions: array of strings",
+    "- blockers: array of strings",
+    "- nextSteps: array of strings",
+    "- actionItems: array of strings",
+    "- structuredOutputJSON: string or null",
+    "",
+    "Every array item outside sections must be a plain string.",
+    "Each sections item must match one template section exactly, in the same order, using the provided section id and title.",
+    "documentMarkdown must be the complete user-facing document and must follow the selected template sections, order, tone, perspective, content rules, and fallback behavior.",
+    "Keep the output factual and faithful to the transcript.",
+    "Do not invent people, dates, decisions, action owners, diagnoses, or consent.",
+    "If the transcript does not support a section, include one short fallback sentence for that section instead of leaving it empty.",
+    "",
+    "Language rule:",
+    "- Keep the JSON keys in English exactly as specified above.",
+    "- Write all user-visible values in the same language as the transcript.",
+    "- If the transcript language is unclear, use the template language.",
+    "- Keep template section titles exactly as provided."
+  ].join("\n");
+}
+
+function formatterPreviewUserPrompt(template: AppTemplateYaml, sampleTranscript: string) {
+  const sectionPlan = template.structure.sections.map((section) => {
+    const hints = bulletList(section.extraction_hints ?? [], "No extraction hints.");
+    return [
+      `## ${section.title}`,
+      `- ID: ${templateSectionId(section)}`,
+      `- Purpose: ${section.purpose}`,
+      `- Format: ${section.format}`,
+      `- Required: ${section.required ? "yes" : "no"}`,
+      "- Extraction hints:",
+      hints
+    ].join("\n");
+  }).join("\n\n");
+  const postProcessing = template.llm_prompting.post_processing;
+  const structuredOutput = postProcessing?.structured_output
+    ? JSON.stringify(postProcessing.structured_output, null, 2)
+    : null;
+
+  return [
+    `Template title: ${template.identity.title}`,
+    `Template id: ${template.identity.id}`,
+    `Template version: ${template.identity.version}`,
+    `Template language: ${template.identity.language}`,
+    `Category: ${template.identity.category}`,
+    "",
+    "Voice, audience, and tone:",
+    `- Voice: ${template.perspective.voice}`,
+    `- Audience: ${template.perspective.audience}`,
+    `- Tone: ${template.perspective.tone}`,
+    `- Preserve original voice: ${template.perspective.preserve_original_voice ? "yes" : "no"}`,
+    "",
+    "Style rules:",
+    bulletList(template.perspective.style_rules ?? [], "Use clear, precise, neutral language."),
+    "",
+    "Template purpose:",
+    template.context.purpose,
+    "",
+    "Typical setting:",
+    template.context.typical_setting || "Not specified.",
+    "",
+    "Participants:",
+    bulletList((template.context.typical_participants ?? []).map((participant) => participant.name ? `${participant.role}: ${participant.name}` : participant.role), "Not specified."),
+    "",
+    "Goals:",
+    bulletList(template.context.goals ?? [], "No explicit goals defined."),
+    "",
+    "Required content:",
+    bulletList(template.content_rules.required_elements ?? [], "Use only information supported by the transcript."),
+    "",
+    "Exclusions:",
+    bulletList(template.content_rules.exclusions ?? [], "Do not include irrelevant, unsupported, or unnecessary personal details."),
+    "",
+    "Uncertainty handling:",
+    `- ${template.content_rules.uncertainty_handling || "If the transcript is unclear or incomplete, explicitly mark missing or unclear information instead of inventing content."}`,
+    "",
+    "Action and decision formatting:",
+    `- Action item format: ${template.content_rules.action_item_format || "not specified"}`,
+    `- Decision marker: ${template.content_rules.decision_marker || "not specified"}`,
+    "",
+    "Template-specific system additions:",
+    template.llm_prompting.system_prompt_additions || "- No extra template-specific additions.",
+    "",
+    "Fallback behavior:",
+    `- ${template.llm_prompting.fallback_behavior || "If a required section has no support in the transcript, write that it was not covered instead of generating unsupported content."}`,
+    "",
+    "Output structure:",
+    "Use this exact section plan. Include all required sections and keep section titles unchanged.",
+    "",
+    sectionPlan,
+    "",
+    "Post-processing:",
+    postProcessing?.extract_action_items
+      ? "Extract actionItems only when the transcript contains clear, explicit follow-up tasks or commitments. Otherwise return an empty actionItems array."
+      : "Return an empty actionItems array for this template.",
+    structuredOutput
+      ? `If structured side-output is requested, put a JSON string matching this schema in structuredOutputJSON:\n${structuredOutput}`
+      : "Return null for structuredOutputJSON.",
+    "",
+    "Sample transcript:",
+    sampleTranscript
+  ].join("\n");
+}
+
+function previewTextFromProviderPayload(payload: unknown): string | null {
+  return textValue(payload)?.trim() || null;
+}
+
+function textValue(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map(textValue).filter(Boolean).join("\n").trim() || null;
+  }
+  if (!isPlainObject(value)) return null;
+
+  const directKeys = ["content", "text", "output_text", "message"];
+  for (const key of directKeys) {
+    const text = textValue(value[key]);
+    if (text) return text;
+  }
+
+  if (Array.isArray(value.choices)) {
+    for (const choice of value.choices) {
+      const text = textValue(choice);
+      if (text) return text;
+    }
+  }
+
+  if (Array.isArray(value.output)) {
+    for (const item of value.output) {
+      const text = textValue(item);
+      if (text) return text;
+    }
+  }
+
+  return null;
+}
+
+function parseFormatterPreviewPayload(content: string): FormatterPreviewPayload {
+  const candidates = [content, extractJSONObject(content)].filter((value): value is string => Boolean(value?.trim()));
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      const payload = normalizeFormatterPreviewPayload(parsed);
+      if (payload.documentMarkdown || payload.sections?.length) return payload;
+    } catch {
+      // Try the next candidate below.
+    }
+  }
+
+  throw new Error("Preview provider response did not contain the mobile JSON output contract.");
+}
+
+function normalizeFormatterPreviewPayload(value: unknown): FormatterPreviewPayload {
+  if (!isPlainObject(value)) return {};
+
+  const structuredOutput = value.structuredOutputJSON ?? value.structured_output_json ?? value.structuredoutputjson ?? value.structured_output;
+  return {
+    documentMarkdown: stringValue(value.documentMarkdown ?? value.document_markdown ?? value.document ?? value.markdown ?? value.note),
+    summary: stringValue(value.summary),
+    decisions: stringArray(value.decisions),
+    actions: stringArray(value.actions),
+    blockers: stringArray(value.blockers),
+    nextSteps: stringArray(value.nextSteps ?? value.next_steps ?? value.nextsteps),
+    actionItems: stringArray(value.actionItems ?? value.action_items ?? value.actionitems),
+    structuredOutputJSON: typeof structuredOutput === "string" ? structuredOutput : isPlainObject(structuredOutput) || Array.isArray(structuredOutput) ? JSON.stringify(structuredOutput, null, 2) : null,
+    sections: outputSections(value.sections)
+  };
+}
+
+function previewDocumentMarkdown(payload: FormatterPreviewPayload, template: AppTemplateYaml) {
+  const markdown = payload.documentMarkdown?.trim();
+  if (markdown && documentMarkdownMatchesRequiredSections(markdown, template)) return markdown;
+
+  if (payload.sections?.length) {
+    return payload.sections.map((section) => `## ${section.title}\n${section.markdown}`).join("\n\n");
+  }
+
+  if (markdown) {
+    throw new Error("Preview documentMarkdown did not include the required template section headings.");
+  }
+
+  throw new Error("Preview provider response did not include documentMarkdown or sections.");
+}
+
+function documentMarkdownMatchesRequiredSections(markdown: string, template: AppTemplateYaml) {
+  const headings = markdown
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^#{1,6}\s+\S/.test(line))
+    .map((line) => normalizeHeading(line.replace(/^#{1,6}\s+/, "")));
+  if (!headings.length) return false;
+
+  const headingSet = new Set(headings);
+  return template.structure.sections
+    .filter((section) => section.required)
+    .every((section) => headingSet.has(normalizeHeading(section.title)));
+}
+
+function outputSections(value: unknown): PreviewOutputSection[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const sections = value
+    .map((item) => {
+      if (!isPlainObject(item)) return null;
+      const title = stringValue(item.title);
+      const markdown = stringValue(item.markdown ?? item.contentMarkdown ?? item.content ?? item.text);
+      if (!title || !markdown) return null;
+      return {
+        id: stringValue(item.id) || templateSlug(title),
+        title,
+        markdown
+      };
+    })
+    .filter((item): item is PreviewOutputSection => Boolean(item));
+  return sections.length ? sections : undefined;
+}
+
+function previewSectionsFromMarkdown(markdown: string, template: AppTemplateYaml): PreviewOutputSection[] {
+  const markdownByHeading = markdownSections(markdown);
+  return template.structure.sections.map((section) => ({
+    id: templateSectionId(section),
+    title: section.title,
+    markdown: markdownByHeading.get(normalizeHeading(section.title)) ?? "Not covered in the sample transcript."
+  }));
+}
+
+function markdownSections(markdown: string) {
+  const sections = new Map<string, string>();
+  let currentHeading: string | null = null;
+  let currentBody: string[] = [];
+
+  const commit = () => {
+    if (!currentHeading) return;
+    const body = currentBody.join("\n").trim();
+    if (body) sections.set(currentHeading, body);
+  };
+
+  for (const line of markdown.split(/\r?\n/)) {
+    const heading = /^#{1,6}\s+(.+?)\s*$/.exec(line);
+    if (heading) {
+      commit();
+      currentHeading = normalizeHeading(heading[1]);
+      currentBody = [];
+      continue;
+    }
+    if (currentHeading) currentBody.push(line);
+  }
+
+  commit();
+  return sections;
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (Array.isArray(value)) {
+    const items = value.map(stringValue).filter((item): item is string => Boolean(item));
+    return items.length ? items : undefined;
+  }
+  const string = stringValue(value);
+  return string ? [string] : undefined;
+}
+
+function stringValue(value: unknown): string | null {
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (isPlainObject(value)) {
+    const preferred = ["text", "title", "summary", "name", "decision", "action", "blocker", "nextStep", "next_step", "item", "markdown", "content"];
+    for (const key of preferred) {
+      const text = stringValue(value[key]);
+      if (text) return text;
+    }
+  }
+  return null;
+}
+
+function extractJSONObject(content: string) {
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(content);
+  if (fenced?.[1]?.trim()) return fenced[1].trim();
+
+  const start = content.indexOf("{");
+  const end = content.lastIndexOf("}");
+  if (start >= 0 && end > start) return content.slice(start, end + 1);
+  return null;
+}
+
+function templateSectionId(section: AppTemplateYaml["structure"]["sections"][number]) {
+  return templateSlug(`${section.title}-${section.purpose}`);
+}
+
+function normalizeHeading(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/:/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function templateSlug(value: string) {
+  const folded = value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+  const pieces = folded.match(/[\p{L}\p{N}]+/gu) ?? [];
+  return pieces.join("_") || randomUUID().toLowerCase();
+}
+
+function bulletList(values: string[], fallback: string) {
+  const trimmed = values.map((value) => value.trim()).filter(Boolean);
+  return trimmed.length ? trimmed.map((value) => `- ${value}`).join("\n") : `- ${fallback}`;
 }
 
 function renderAppCompatibleYaml(value: unknown) {

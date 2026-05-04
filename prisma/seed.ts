@@ -14,7 +14,7 @@ function createActivationKey(prefix: "ULFY-S" | "ULFY-E") {
   return `${prefix}-${body.slice(0, 6)}-${body.slice(6, 12)}-${body.slice(12, 18)}-${body.slice(18, 24)}`;
 }
 
-type SeedTemplate = {
+export type SeedTemplate = {
   familyId: string;
   variantId: string;
   draftId: string;
@@ -30,7 +30,7 @@ type SeedTemplate = {
   sections: Array<{ title: string; purpose: string; format: "prose" | "bullet_list" | "numbered_list"; required: boolean }>;
 };
 
-function templateYaml(template: SeedTemplate) {
+export function templateYaml(template: SeedTemplate) {
   return `identity:
   id: ${template.templateId}
   title: ${template.title}
@@ -81,7 +81,7 @@ llm_prompting:
 `;
 }
 
-const seedTemplates: SeedTemplate[] = [
+export const seedTemplates: SeedTemplate[] = [
   {
     familyId: "00000000-0000-4000-8000-000000000301",
     variantId: "00000000-0000-4000-8000-000000000401",
@@ -193,7 +193,7 @@ const templateSectionPresets = [
     slug: "decisions",
     title: "Decisions",
     purpose: "List clear decisions that were made during the conversation.",
-    format: "bullets",
+    format: "bullet_list",
     required: false,
     extractionHints: ["decision", "owner", "reason"],
     sortOrder: 20
@@ -211,7 +211,7 @@ const templateSectionPresets = [
     slug: "risks",
     title: "Risks",
     purpose: "Capture blockers, uncertainty, or sensitive issues mentioned.",
-    format: "bullets",
+    format: "bullet_list",
     required: false,
     extractionHints: ["risk", "blocker", "dependency"],
     sortOrder: 40
@@ -562,4 +562,6 @@ async function main() {
   console.log("Seed enterprise key:", enterpriseKey);
 }
 
-main().finally(async () => prisma.$disconnect());
+if (require.main === module) {
+  main().finally(async () => prisma.$disconnect());
+}

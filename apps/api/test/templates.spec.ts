@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readdirSync, readFileSync } from "fs";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { TemplatesService } from "../src/templates/templates.service";
+import { seedTemplates, templateYaml } from "../../../prisma/seed";
 
 const validYaml = `identity:
   id: 00000000-0000-4000-8000-000000000201
@@ -138,9 +142,45 @@ describe("TemplatesService", () => {
     await expect(service.manifestForEnterpriseActivation("token-token-token-token")).rejects.toThrow();
   });
 
-  it("normalizes OpenAI preview base URLs to chat completions", async () => {
+  it("validates every backend seed template against the mobile schema", () => {
+    const service = new TemplatesService({} as any, {} as any);
+
+    for (const template of seedTemplates) {
+      expect(() => service.validateYamlContent(templateYaml(template)), template.title).not.toThrow();
+    }
+  });
+
+  it("validates every bundled iOS template against the backend mobile schema", () => {
+    const service = new TemplatesService({} as any, {} as any);
+    const currentFile = fileURLToPath(import.meta.url);
+    const templateDirectory = resolve(
+      dirname(currentFile),
+      "../../../../ios-app/MeetingTranscribeIOS/Resources/Templates"
+    );
+    const templateFiles = readdirSync(templateDirectory)
+      .filter((fileName) => fileName.endsWith(".yaml"))
+      .sort();
+
+    expect(templateFiles.length).toBeGreaterThan(0);
+    for (const fileName of templateFiles) {
+      const yamlContent = readFileSync(resolve(templateDirectory, fileName), "utf8");
+      expect(() => service.validateYamlContent(yamlContent), fileName).not.toThrow();
+    }
+  });
+
+  it("normalizes OpenAI preview base URLs to chat completions and uses the mobile JSON output contract", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      choices: [{ message: { content: "# Preview\n\nGenerated note." } }]
+      choices: [{ message: { content: JSON.stringify({
+        documentMarkdown: "## Summary\nGenerated note.",
+        sections: [{ id: "summary_summarize_the_transcript", title: "Summary", markdown: "Generated note." }],
+        summary: "Generated note.",
+        decisions: [],
+        actions: [],
+        blockers: [],
+        nextSteps: [],
+        actionItems: [],
+        structuredOutputJSON: null
+      }) } }]
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     const update = vi.fn().mockImplementation(({ data }) => ({
@@ -179,8 +219,16 @@ describe("TemplatesService", () => {
       method: "POST",
       headers: expect.objectContaining({ Authorization: "Bearer sk-preview" })
     }));
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(requestBody.response_format).toEqual({ type: "json_object" });
+    expect(requestBody.messages[0].content).toContain("documentMarkdown");
+    expect(requestBody.messages[0].content).toContain("sections");
     expect(preview).toMatchObject({
-      markdown: "# Preview\n\nGenerated note.",
+      markdown: "## Summary\nGenerated note.",
+      extractedFields: expect.objectContaining({
+        outputContract: "mobile-json-v1",
+        sections: [{ id: "summary_summarize_the_transcript", title: "Summary", markdown: "Generated note." }]
+      }),
       provider: { type: "openai", model: "gpt-5-mini" },
       error: null
     });
