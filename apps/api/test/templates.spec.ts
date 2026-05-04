@@ -168,6 +168,66 @@ describe("TemplatesService", () => {
     }
   });
 
+  it("fills relevant assisted draft fields for a municipal health follow-up case", () => {
+    const service = new TemplatesService({} as any, {} as any);
+    const result = service.buildAssistedDraft({
+      useCase: "A Norwegian template for follow-up conversations after municipal health meetings. It should produce a short summary, decisions, next steps, and responsible people.",
+      language: "nb-NO",
+      category: "helse",
+      title: "Oppfølgingssamtale",
+      icon: "person.2.wave.2"
+    });
+
+    const parsed = service.validateYamlContent(result.yamlContent);
+    expect(parsed.identity).toMatchObject({
+      title: "Oppfølgingssamtale",
+      category: "helse",
+      language: "nb-NO",
+      icon: "person.2.wave.2"
+    });
+    expect(parsed.context.typical_participants?.map((participant) => participant.role)).toEqual(expect.arrayContaining(["saksbehandler", "bruker"]));
+    expect(parsed.context.goals?.join(" ")).toContain("ansvar");
+    expect(parsed.perspective).toMatchObject({ audience: "arkiv", tone: "formell" });
+    expect(parsed.structure.sections.map((section) => section.title)).toEqual(expect.arrayContaining(["Behov og observasjoner", "Beslutninger", "Oppfølging"]));
+    expect(parsed.structure.sections.find((section) => section.title === "Oppfølging")).toMatchObject({ format: "table", required: true });
+    expect(parsed.content_rules.required_elements?.join(" ")).toContain("frister");
+    expect(parsed.llm_prompting.system_prompt_additions).toContain("oppfølgingsbehov");
+    expect(result.sampleTranscript).toContain("Bruker:");
+  });
+
+  it("fills relevant assisted draft fields for an HR employee check-in case", () => {
+    const service = new TemplatesService({} as any, {} as any);
+    const result = service.buildAssistedDraft({
+      useCase: "Employee check-in between manager, employee, and HR. Capture workload, agreements, next meeting, and responsibilities.",
+      language: "en-US"
+    });
+
+    const parsed = service.validateYamlContent(result.yamlContent);
+    expect(parsed.identity.language).toBe("en-US");
+    expect(parsed.identity.tags).toEqual(expect.arrayContaining(["hr", "employee", "follow_up", "manager"]));
+    expect(parsed.context.typical_participants?.map((participant) => participant.role)).toEqual(expect.arrayContaining(["manager", "employee", "HR"]));
+    expect(parsed.perspective).toMatchObject({ audience: "hr", preserve_original_voice: true });
+    expect(parsed.structure.sections.map((section) => section.title)).toEqual(expect.arrayContaining(["Employee perspective", "Agreements", "Follow-up"]));
+    expect(parsed.content_rules.decision_marker).toBe("Agreement:");
+    expect(result.sampleTranscript).toContain("Employee:");
+  });
+
+  it("fills relevant assisted draft fields for an incident case", () => {
+    const service = new TemplatesService({} as any, {} as any);
+    const result = service.buildAssistedDraft({
+      useCase: "Incident report after a security deviation. Capture timeline, impact, immediate actions, risk, and further follow-up.",
+      language: "en-US"
+    });
+
+    const parsed = service.validateYamlContent(result.yamlContent);
+    expect(parsed.identity.category).toBe("avvik_og_hendelser");
+    expect(parsed.perspective).toMatchObject({ audience: "ledelse", tone: "formell" });
+    expect(parsed.structure.sections.map((section) => section.title)).toEqual(expect.arrayContaining(["Facts and timeline", "Impact and risk", "Actions taken"]));
+    expect(parsed.content_rules.speaker_attribution).toBe("role_only");
+    expect(parsed.content_rules.exclusions?.join(" ")).toContain("blame");
+    expect(result.sampleTranscript).toContain("incident happened");
+  });
+
   it("normalizes OpenAI preview base URLs to chat completions and uses the mobile JSON output contract", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       choices: [{ message: { content: JSON.stringify({

@@ -13,6 +13,19 @@ const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
 export const AppTemplateYamlSchema = TemplateYamlSchema;
 type AppTemplateYaml = TemplateYaml;
 type PublishBump = "patch" | "minor" | "major";
+type TemplateSectionInput = AppTemplateYaml["structure"]["sections"][number];
+type AssistedDraftProfile = {
+  category: string;
+  icon: string;
+  shortDescription: string;
+  tags: string[];
+  context: AppTemplateYaml["context"];
+  perspective: AppTemplateYaml["perspective"];
+  sections: TemplateSectionInput[];
+  contentRules: AppTemplateYaml["content_rules"];
+  llmPrompting: AppTemplateYaml["llm_prompting"];
+  sampleTranscript: string;
+};
 
 @Injectable()
 export class TemplatesService {
@@ -144,30 +157,30 @@ export class TemplatesService {
   }
 
   buildAssistedDraft(input: { useCase: string; language?: string; category?: string; title?: string; icon?: string }) {
-    const title = input.title?.trim() || this.titleFromUseCase(input.useCase);
-    const category = input.category?.trim() || "annet";
-    const language = input.language?.trim() || "nb-NO";
-    const sampleTranscript = [
-      "Deltaker 1: Vi starter med kort bakgrunn og hovedpunkter.",
-      "Deltaker 2: Det viktigste er at tiltakene blir tydelige og fulgt opp.",
-      "Deltaker 1: Ansvarlig person og frist bør fremkomme i notatet."
-    ].join("\n");
+    const language = normalizeTemplateLanguage(input.language);
+    const profile = assistedDraftProfile(input.useCase, language);
+    const title = limitTemplateTitle(input.title?.trim() || this.titleFromUseCase(input.useCase));
+    const category = input.category?.trim() || profile.category;
+    const icon = input.icon?.trim() || profile.icon;
+    const tags = uniqueStrings(["ai-assist", TemplateSlug(category), ...profile.tags]);
     const yamlContent = this.createYaml({
       id: randomUUID(),
       title,
-      shortDescription: `AI-assistert utkast for ${title}.`,
+      shortDescription: profile.shortDescription,
       category,
       language,
-      icon: input.icon || "doc.text",
-      tags: ["ai-assist", TemplateSlug(category)],
-      purpose: `Create a clear, structured document for: ${input.useCase}`,
-      sections: [
-        { title: "Sammendrag", purpose: "Summarize the most important context and conclusions.", format: "prose", required: true },
-        { title: "Viktige punkter", purpose: "List important observations, decisions, or facts from the transcript.", format: "bullet_list", required: true },
-        { title: "Oppfølging", purpose: "List concrete follow-up items with owner and deadline when available.", format: "bullet_list", required: false }
-      ]
+      icon,
+      tags,
+      context: {
+        ...profile.context,
+        purpose: profile.context.purpose || `Create a clear, structured document for: ${input.useCase}`
+      },
+      perspective: profile.perspective,
+      sections: profile.sections,
+      contentRules: profile.contentRules,
+      llmPrompting: profile.llmPrompting
     });
-    return { yamlContent, sampleTranscript, metadata: this.metadataFromYaml(yamlContent) };
+    return { yamlContent, sampleTranscript: profile.sampleTranscript, metadata: this.metadataFromYaml(yamlContent) };
   }
 
   async publishVariantDraft(variantId: string, input: { bump?: PublishBump; version?: string }, actor?: { id?: string; email?: string }) {
@@ -476,8 +489,11 @@ export class TemplatesService {
     language: string;
     icon: string;
     tags: string[];
-    purpose: string;
-    sections: Array<{ title: string; purpose: string; format: string; required: boolean }>;
+    context: AppTemplateYaml["context"];
+    perspective: AppTemplateYaml["perspective"];
+    sections: TemplateSectionInput[];
+    contentRules: AppTemplateYaml["content_rules"];
+    llmPrompting: AppTemplateYaml["llm_prompting"];
   }) {
     return renderAppCompatibleYaml({
       identity: {
@@ -490,36 +506,424 @@ export class TemplatesService {
         language: input.language,
         version: "1.0.0"
       },
-      context: {
-        purpose: input.purpose,
-        typical_setting: "",
-        typical_participants: [{ role: "speaker" }],
-        goals: ["Create a useful structured note from the transcript."],
-        related_processes: []
-      },
-      perspective: {
-        voice: "third_person",
-        audience: "self",
-        tone: "semi_formell",
-        style_rules: ["Write clearly and concisely.", "Do not invent facts not present in the transcript."],
-        preserve_original_voice: false
-      },
+      context: input.context,
+      perspective: input.perspective,
       structure: { sections: input.sections },
-      content_rules: {
-        required_elements: ["Include only information supported by the transcript."],
-        exclusions: ["Do not include unsupported personal details."],
-        uncertainty_handling: "Mark unclear or missing information instead of guessing.",
-        action_item_format: "Use owner, action, and due date when available.",
-        decision_marker: "Mark clear decisions explicitly.",
-        speaker_attribution: "none"
-      },
-      llm_prompting: {
-        system_prompt_additions: "",
-        fallback_behavior: "If a required section has no support in the transcript, write that it was not covered.",
-        post_processing: { extract_action_items: true }
-      }
+      content_rules: input.contentRules,
+      llm_prompting: input.llmPrompting
     });
   }
+}
+
+function assistedDraftProfile(useCase: string, language: string): AssistedDraftProfile {
+  const normalized = normalizeText(useCase);
+  if (hasAny(normalized, ["incident", "accident", "deviation", "avvik", "hendelse", "skade", "risk", "risiko", "security", "sikkerhet", "privacy", "personvern"])) {
+    return incidentProfile(language);
+  }
+  if (hasAny(normalized, ["health", "care", "patient", "resident", "municipal", "kommune", "bruker", "helse", "omsorg", "saksbehandler", "home visit", "hjemmebesok", "pårørende", "parorende"])) {
+    return healthFollowUpProfile(language);
+  }
+  if (hasAny(normalized, ["employee", "medarbeider", "ansatt", "hr", "manager", "leder", "performance", "check in", "check-in", "utviklingssamtale", "oppfolgingssamtale"])) {
+    return hrProfile(language);
+  }
+  if (hasAny(normalized, ["inspection", "audit", "field", "site visit", "tilsyn", "befaring", "kontroll", "observasjon", "avvikskontroll"])) {
+    return inspectionProfile(language);
+  }
+  if (hasAny(normalized, ["customer", "client", "project", "onboarding", "sales", "kunde", "prosjekt", "leveranse", "stakeholder"])) {
+    return projectProfile(language);
+  }
+  return genericProfile(language);
+}
+
+function healthFollowUpProfile(language: string): AssistedDraftProfile {
+  const nb = isNorwegian(language);
+  return {
+    category: "helse_og_oppfolging",
+    icon: "person.2.wave.2",
+    shortDescription: nb
+      ? "Lager et klart oppfølgingsnotat med behov, beslutninger, ansvar og neste steg."
+      : "Creates a clear follow-up note with needs, decisions, responsibilities, and next steps.",
+    tags: ["health", "follow-up", "municipal", "case-work"],
+    context: {
+      purpose: nb
+        ? "Gjør en helse-, omsorgs- eller tjenestesamtale om til et kort oppfølgingsnotat som viser hva som ble avklart, hva som gjenstår, og hvem som følger opp."
+        : "Turn a health, care, or service conversation into a short follow-up note showing what was clarified, what remains open, and who follows up.",
+      typical_setting: nb
+        ? "Kommunal oppfølgingssamtale, helsemøte, hjemmebesøk eller telefonsamtale med bruker, pårørende eller tjenesteyter."
+        : "Municipal follow-up conversation, care meeting, home visit, or phone call with a resident, next of kin, or service provider.",
+      typical_participants: nb
+        ? [{ role: "saksbehandler" }, { role: "bruker" }, { role: "pårørende", name: null }, { role: "tjenesteyter", name: null }]
+        : [{ role: "case worker" }, { role: "resident" }, { role: "next of kin", name: null }, { role: "service provider", name: null }],
+      goals: nb
+        ? ["Få frem hovedbehov og viktig kontekst.", "Skille tydelige beslutninger fra åpne spørsmål.", "Synliggjøre ansvar, frister og neste kontakt."]
+        : ["Capture main needs and important context.", "Separate clear decisions from open questions.", "Show responsibilities, deadlines, and next contact."],
+      related_processes: nb ? ["Tjenesteoppfølging", "Journalnotat", "Saksbehandling"] : ["Service follow-up", "Case documentation", "Care coordination"]
+    },
+    perspective: {
+      voice: "third_person",
+      audience: "arkiv",
+      tone: "formell",
+      style_rules: nb
+        ? ["Skriv nøkternt og respektfullt.", "Skill fakta fra vurderinger.", "Bruk bare informasjon som støttes av samtalen.", "Hold notatet kort nok til praktisk oppfølging."]
+        : ["Write neutrally and respectfully.", "Separate facts from assessments.", "Use only information supported by the conversation.", "Keep the note short enough for practical follow-up."],
+      preserve_original_voice: false
+    },
+    sections: [
+      section(nb ? "Sammendrag" : "Summary", nb ? "Gi en kort oversikt over tema, bakgrunn og viktigste avklaringer." : "Give a short overview of the topic, background, and most important clarifications.", "prose", true, nb ? ["tema", "bakgrunn", "hovedbehov", "avklart"] : ["topic", "background", "main need", "clarified"]),
+      section(nb ? "Behov og observasjoner" : "Needs and observations", nb ? "List konkrete behov, observasjoner og forhold som påvirker videre oppfølging." : "List concrete needs, observations, and circumstances that affect follow-up.", "bullet_list", true, nb ? ["behov", "observasjon", "utfordring", "støtte", "endring"] : ["need", "observation", "challenge", "support", "change"]),
+      section(nb ? "Beslutninger" : "Decisions", nb ? "Ta bare med beslutninger som ble tydelig avklart i samtalen." : "Include only decisions that were clearly agreed in the conversation.", "bullet_list", false, nb ? ["besluttet", "avtalt", "konkludert", "skal"] : ["decided", "agreed", "concluded", "will"]),
+      section(nb ? "Oppfølging" : "Follow-up", nb ? "Vis oppgaver, ansvarlige og frister når dette kommer frem." : "Show tasks, owners, and deadlines when they are mentioned.", "table", true, nb ? ["følge opp", "ansvarlig", "frist", "neste kontakt", "ringe"] : ["follow up", "owner", "deadline", "next contact", "call"]),
+      section(nb ? "Uavklart" : "Open questions", nb ? "Fang opp manglende informasjon, usikkerhet og spørsmål som må avklares senere." : "Capture missing information, uncertainty, and questions that need later clarification.", "bullet_list", false, nb ? ["uavklart", "usikkert", "mangler", "må sjekkes"] : ["unclear", "uncertain", "missing", "must check"])
+    ],
+    contentRules: {
+      required_elements: nb
+        ? ["Ta med behov, beslutninger, ansvarlige og frister når samtalen støtter det.", "Marker tydelig hva som er uavklart.", "Bruk bare informasjon som er relevant for oppfølging."]
+        : ["Include needs, decisions, owners, and deadlines when supported by the conversation.", "Clearly mark what remains open.", "Use only information relevant to follow-up."],
+      exclusions: nb
+        ? ["Ikke ta med småprat.", "Ikke ta med sensitive detaljer som ikke er nødvendige for oppfølging.", "Ikke gjett diagnose, motivasjon eller ansvar."]
+        : ["Do not include small talk.", "Do not include sensitive details that are not needed for follow-up.", "Do not guess diagnosis, motivation, or responsibility."],
+      uncertainty_handling: nb ? "Skriv Uavklart eller Ikke oppgitt når samtalen ikke gir nok grunnlag." : "Write Open or Not specified when the conversation does not provide enough support.",
+      action_item_format: nb ? "Tiltak - ansvarlig - frist" : "Action - owner - deadline",
+      decision_marker: nb ? "Beslutning:" : "Decision:",
+      speaker_attribution: "role_only"
+    },
+    llmPrompting: prompting(
+      nb ? "Prioriter konkrete oppfølgingsbehov, ansvar og frister fremfor en lang kronologisk gjenfortelling." : "Prioritize concrete follow-up needs, responsibilities, and deadlines over a long chronological recap.",
+      nb ? "Hvis et felt mangler grunnlag i samtalen, skriv Ikke oppgitt eller Uavklart i stedet for å fylle inn selv." : "If a field has no support in the conversation, write Not specified or Open instead of filling it in yourself."
+    ),
+    sampleTranscript: nb
+      ? [
+          "Saksbehandler: Vi følger opp møtet om hjemmesituasjonen og behovet for praktisk bistand.",
+          "Bruker: Det viktigste nå er hjelp om morgenen og en tydelig plan for medisiner.",
+          "Pårørende: Jeg kan sende oppdatert medisinliste i morgen.",
+          "Saksbehandler: Da avtaler vi at jeg kontakter hjemmetjenesten innen fredag og ringer tilbake mandag."
+        ].join("\n")
+      : [
+          "Case worker: We are following up on the home situation and the need for practical support.",
+          "Resident: The most important thing now is morning help and a clear medication plan.",
+          "Next of kin: I can send the updated medication list tomorrow.",
+          "Case worker: I will contact the home care service by Friday and call back on Monday."
+        ].join("\n")
+  };
+}
+
+function hrProfile(language: string): AssistedDraftProfile {
+  const nb = isNorwegian(language);
+  return {
+    category: "hr",
+    icon: "person.crop.circle.badge.checkmark",
+    shortDescription: nb ? "Lager et balansert HR-notat med tema, medarbeiderperspektiv, avtaler og oppfølging." : "Creates a balanced HR note with topics, employee perspective, agreements, and follow-up.",
+    tags: ["hr", "employee", "follow-up", "manager"],
+    context: {
+      purpose: nb ? "Dokumenter en medarbeider- eller ledersamtale på en tydelig, respektfull og handlingsrettet måte." : "Document an employee or manager conversation clearly, respectfully, and actionably.",
+      typical_setting: nb ? "Samtale mellom leder og medarbeider, eventuelt med HR til stede." : "Conversation between a manager and employee, possibly with HR present.",
+      typical_participants: nb ? [{ role: "leder" }, { role: "medarbeider" }, { role: "HR", name: null }] : [{ role: "manager" }, { role: "employee" }, { role: "HR", name: null }],
+      goals: nb ? ["Oppsummere tema og medarbeiderens perspektiv.", "Dokumentere avtaler uten å overtolke.", "Synliggjøre neste steg og ansvar."] : ["Summarize topics and the employee perspective.", "Document agreements without over-interpreting.", "Show next steps and ownership."],
+      related_processes: nb ? ["HR-oppfølging", "Medarbeiderutvikling", "Lederoppfølging"] : ["HR follow-up", "Employee development", "Manager follow-up"]
+    },
+    perspective: {
+      voice: "third_person",
+      audience: "hr",
+      tone: "semi_formell",
+      style_rules: nb ? ["Skriv respektfullt og saklig.", "Unngå diagnose, skyld eller spekulasjon.", "Skill medarbeiderens utsagn fra avtalte tiltak."] : ["Write respectfully and factually.", "Avoid diagnosis, blame, or speculation.", "Separate employee statements from agreed actions."],
+      preserve_original_voice: true
+    },
+    sections: [
+      section(nb ? "Sammendrag" : "Summary", nb ? "Oppsummer hovedtema og kontekst kort." : "Briefly summarize the main topics and context.", "prose", true, nb ? ["tema", "bakgrunn", "status"] : ["topic", "background", "status"]),
+      section(nb ? "Medarbeiderens perspektiv" : "Employee perspective", nb ? "Gjengi viktige punkter fra medarbeideren uten å overtolke." : "Capture important points from the employee without over-interpreting.", "bullet_list", true, nb ? ["opplever", "ønsker", "bekymret", "trenger"] : ["experiences", "wants", "concerned", "needs"]),
+      section(nb ? "Avtaler" : "Agreements", nb ? "List konkrete avtaler og beslutninger som partene bekreftet." : "List concrete agreements and decisions confirmed by the parties.", "bullet_list", true, nb ? ["avtalt", "besluttet", "enig", "skal"] : ["agreed", "decided", "confirmed", "will"]),
+      section(nb ? "Oppfølging" : "Follow-up", nb ? "Vis tiltak, ansvarlig person og frist når dette er sagt." : "Show actions, owner, and deadline when stated.", "table", true, nb ? ["ansvarlig", "frist", "følge opp", "neste møte"] : ["owner", "deadline", "follow up", "next meeting"])
+    ],
+    contentRules: {
+      required_elements: nb ? ["Ta med avtaler, ansvar og frister når de er tydelige.", "Bevar viktige direkte formuleringer fra medarbeideren når de betyr noe."] : ["Include agreements, owners, and deadlines when clear.", "Preserve important direct employee wording when it matters."],
+      exclusions: nb ? ["Ikke legg til vurderinger som ikke ble sagt.", "Ikke inkluder private detaljer som ikke er relevante for HR-oppfølging."] : ["Do not add assessments that were not stated.", "Do not include private details that are not relevant for HR follow-up."],
+      uncertainty_handling: nb ? "Marker uklare punkter som Må avklares." : "Mark unclear points as Needs clarification.",
+      action_item_format: nb ? "Tiltak - ansvarlig - frist" : "Action - owner - deadline",
+      decision_marker: nb ? "Avtale:" : "Agreement:",
+      speaker_attribution: "role_only"
+    },
+    llmPrompting: prompting(
+      nb ? "Skriv balansert, presist og uten juridiske konklusjoner. Fokuser på det som faktisk ble sagt og avtalt." : "Write in a balanced, precise way without legal conclusions. Focus on what was actually said and agreed.",
+      nb ? "Hvis samtalen ikke bekrefter en avtale, plasser punktet under Må avklares i stedet." : "If the conversation does not confirm an agreement, place it under Needs clarification instead."
+    ),
+    sampleTranscript: nb
+      ? [
+          "Leder: Målet er å følge opp arbeidsbelastning og avtale konkrete tiltak.",
+          "Medarbeider: Jeg opplever at fristene kommer tett, og jeg trenger tydeligere prioritering.",
+          "HR: Vi bør skille mellom midlertidige tiltak og det som skal vurderes videre.",
+          "Leder: Jeg tar ansvar for prioriteringslisten innen onsdag, og vi setter nytt møte om to uker."
+        ].join("\n")
+      : [
+          "Manager: The goal is to follow up on workload and agree concrete actions.",
+          "Employee: I feel the deadlines are close together, and I need clearer priorities.",
+          "HR: We should separate temporary actions from what needs further review.",
+          "Manager: I will own the priority list by Wednesday, and we will meet again in two weeks."
+        ].join("\n")
+  };
+}
+
+function incidentProfile(language: string): AssistedDraftProfile {
+  const nb = isNorwegian(language);
+  return {
+    category: "avvik_og_hendelser",
+    icon: "exclamationmark.triangle",
+    shortDescription: nb ? "Lager et faktabasert hendelsesnotat med tidslinje, konsekvens, tiltak og oppfølging." : "Creates a factual incident note with timeline, impact, actions, and follow-up.",
+    tags: ["incident", "deviation", "risk", "follow-up"],
+    context: {
+      purpose: nb ? "Dokumenter en hendelse eller et avvik på en ryddig måte som støtter videre håndtering." : "Document an incident or deviation clearly so it can be handled further.",
+      typical_setting: nb ? "Melding, debrief eller oppfølgingssamtale etter en hendelse, feil, skade eller risiko." : "Report, debrief, or follow-up conversation after an incident, error, harm, or risk.",
+      typical_participants: nb ? [{ role: "melder" }, { role: "leder" }, { role: "ansvarlig fagperson", name: null }] : [{ role: "reporter" }, { role: "manager" }, { role: "responsible specialist", name: null }],
+      goals: nb ? ["Få frem hva som skjedde.", "Skille fakta, konsekvens og antatt årsak.", "Synliggjøre strakstiltak og videre ansvar."] : ["Capture what happened.", "Separate facts, impact, and assumed cause.", "Show immediate actions and further ownership."],
+      related_processes: nb ? ["Avvikshåndtering", "Risikostyring", "Kvalitetsarbeid"] : ["Deviation handling", "Risk management", "Quality work"]
+    },
+    perspective: {
+      voice: "third_person",
+      audience: "ledelse",
+      tone: "formell",
+      style_rules: nb ? ["Skriv nøkternt og faktabasert.", "Ikke fordel skyld.", "Marker antakelser tydelig.", "Bruk kronologi når det hjelper forståelsen."] : ["Write neutrally and factually.", "Do not assign blame.", "Clearly mark assumptions.", "Use chronology when it aids understanding."],
+      preserve_original_voice: false
+    },
+    sections: [
+      section(nb ? "Hendelse" : "Incident", nb ? "Beskriv kort hva som skjedde, hvor og når." : "Briefly describe what happened, where, and when.", "prose", true, nb ? ["hva skjedde", "tidspunkt", "sted", "involvert"] : ["what happened", "time", "place", "involved"]),
+      section(nb ? "Fakta og tidslinje" : "Facts and timeline", nb ? "List kjente fakta i rekkefølge uten å tolke mer enn samtalen støtter." : "List known facts in order without interpreting beyond the conversation.", "numbered_list", true, nb ? ["først", "deretter", "etterpå", "klokken"] : ["first", "then", "afterwards", "time"]),
+      section(nb ? "Konsekvens og risiko" : "Impact and risk", nb ? "Fang opp konsekvenser, risiko og hvem eller hva som ble berørt." : "Capture impact, risk, and who or what was affected.", "bullet_list", true, nb ? ["konsekvens", "risiko", "berørt", "skade"] : ["impact", "risk", "affected", "harm"]),
+      section(nb ? "Tiltak" : "Actions taken", nb ? "List strakstiltak og planlagte tiltak med ansvarlig når mulig." : "List immediate and planned actions with owner when possible.", "table", true, nb ? ["tiltak", "ansvarlig", "frist", "gjort"] : ["action", "owner", "deadline", "done"]),
+      section(nb ? "Videre oppfølging" : "Further follow-up", nb ? "Vis spørsmål, undersøkelser eller beslutninger som må følges opp." : "Show questions, investigations, or decisions that need follow-up.", "bullet_list", false, nb ? ["må undersøkes", "uavklart", "neste steg"] : ["must investigate", "unclear", "next step"])
+    ],
+    contentRules: {
+      required_elements: nb ? ["Ta med tidspunkt, sted, berørte parter, konsekvens og tiltak når oppgitt.", "Skill bekreftede fakta fra antakelser."] : ["Include time, place, affected parties, impact, and actions when stated.", "Separate confirmed facts from assumptions."],
+      exclusions: nb ? ["Ikke fordel skyld.", "Ikke ta med rykter eller usikre personopplysninger.", "Ikke konkluder med årsak hvis den ikke er avklart."] : ["Do not assign blame.", "Do not include rumors or uncertain personal data.", "Do not conclude cause if it is not clarified."],
+      uncertainty_handling: nb ? "Merk usikker informasjon som Foreløpig eller Uavklart." : "Mark uncertain information as Preliminary or Unclear.",
+      action_item_format: nb ? "Tiltak - ansvarlig - frist - status" : "Action - owner - deadline - status",
+      decision_marker: nb ? "Beslutning/tiltak:" : "Decision/action:",
+      speaker_attribution: "role_only"
+    },
+    llmPrompting: prompting(
+      nb ? "Prioriter etterprøvbare fakta, konsekvens og tiltak. Ikke skriv en fortelling som fyller hullene." : "Prioritize verifiable facts, impact, and actions. Do not write a story that fills the gaps.",
+      nb ? "Hvis årsak, ansvar eller konsekvens ikke er tydelig, skriv at det må avklares." : "If cause, responsibility, or impact is not clear, write that it needs clarification."
+    ),
+    sampleTranscript: nb
+      ? [
+          "Melder: Hendelsen skjedde rundt klokken 09.30 ved inngangen.",
+          "Leder: Hva vet vi sikkert, og hva er fortsatt uklart?",
+          "Melder: En bruker falt, men årsaken er ikke bekreftet. Førstehjelp ble gitt med en gang.",
+          "Leder: Jeg varsler kvalitetsteamet i dag, og Per sjekker kamera og rutine innen fredag."
+        ].join("\n")
+      : [
+          "Reporter: The incident happened around 09:30 by the entrance.",
+          "Manager: What do we know for certain, and what is still unclear?",
+          "Reporter: A resident fell, but the cause is not confirmed. First aid was given immediately.",
+          "Manager: I will notify the quality team today, and Pat will check camera footage and procedure by Friday."
+        ].join("\n")
+  };
+}
+
+function inspectionProfile(language: string): AssistedDraftProfile {
+  const nb = isNorwegian(language);
+  return {
+    category: "tilsyn_og_befaring",
+    icon: "checklist",
+    shortDescription: nb ? "Lager et befaringsnotat med observasjoner, avvik, tiltak og neste steg." : "Creates an inspection note with observations, deviations, actions, and next steps.",
+    tags: ["inspection", "field-work", "quality", "follow-up"],
+    context: {
+      purpose: nb ? "Gjør observasjoner fra befaring, tilsyn eller kontroll om til et notat som kan følges opp." : "Turn observations from an inspection, audit, or site visit into a note that can be followed up.",
+      typical_setting: nb ? "Befaring, tilsyn, internkontroll eller feltbesøk." : "Inspection, audit, internal control, or field visit.",
+      typical_participants: nb ? [{ role: "inspektør" }, { role: "kontaktperson" }, { role: "ansvarlig utfører", name: null }] : [{ role: "inspector" }, { role: "contact person" }, { role: "responsible operator", name: null }],
+      goals: nb ? ["Dokumentere observasjoner.", "Skille avvik fra anbefalinger.", "Få frem tiltak, ansvar og frist."] : ["Document observations.", "Separate deviations from recommendations.", "Capture actions, owner, and deadline."],
+      related_processes: nb ? ["Tilsyn", "Internkontroll", "Kvalitetsoppfølging"] : ["Inspection", "Internal control", "Quality follow-up"]
+    },
+    perspective: {
+      voice: "third_person",
+      audience: "colleagues",
+      tone: "semi_formell",
+      style_rules: nb ? ["Skriv konkret og observerbart.", "Skill avvik, risiko og anbefaling.", "Ikke legg til funn som ikke ble nevnt."] : ["Write concretely and observably.", "Separate deviation, risk, and recommendation.", "Do not add findings that were not mentioned."],
+      preserve_original_voice: false
+    },
+    sections: [
+      section(nb ? "Sammendrag" : "Summary", nb ? "Oppsummer sted, formål og hovedinntrykk." : "Summarize place, purpose, and main impression.", "prose", true, nb ? ["sted", "formål", "hovedinntrykk"] : ["place", "purpose", "main impression"]),
+      section(nb ? "Observasjoner" : "Observations", nb ? "List konkrete observasjoner fra befaringen." : "List concrete observations from the inspection.", "bullet_list", true, nb ? ["observerte", "så", "målt", "registrert"] : ["observed", "saw", "measured", "registered"]),
+      section(nb ? "Avvik og risiko" : "Deviations and risk", nb ? "Fang opp avvik, mangler og risiko som ble nevnt." : "Capture deviations, gaps, and risks that were mentioned.", "bullet_list", false, nb ? ["avvik", "mangel", "risiko", "brudd"] : ["deviation", "gap", "risk", "breach"]),
+      section(nb ? "Tiltak" : "Actions", nb ? "List tiltak med ansvarlig og frist når mulig." : "List actions with owner and deadline when possible.", "table", true, nb ? ["tiltak", "ansvar", "frist", "utbedre"] : ["action", "owner", "deadline", "fix"]),
+      section(nb ? "Neste steg" : "Next steps", nb ? "Beskriv videre kontroll, dokumentasjon eller avklaringer." : "Describe further checks, documentation, or clarifications.", "bullet_list", false, nb ? ["neste steg", "dokumentasjon", "kontroll"] : ["next step", "documentation", "check"])
+    ],
+    contentRules: {
+      required_elements: nb ? ["Ta med observasjon, avvik, tiltak, ansvar og frist når dette er sagt."] : ["Include observation, deviation, action, owner, and deadline when stated."],
+      exclusions: nb ? ["Ikke legg til tekniske vurderinger som ikke ble sagt.", "Ikke bland anbefalinger inn i faktiske funn."] : ["Do not add technical assessments that were not stated.", "Do not mix recommendations into factual findings."],
+      uncertainty_handling: nb ? "Skriv Må kontrolleres hvis funnet ikke er bekreftet." : "Write Needs checking if the finding is not confirmed.",
+      action_item_format: nb ? "Tiltak - ansvarlig - frist" : "Action - owner - deadline",
+      decision_marker: nb ? "Avtalt tiltak:" : "Agreed action:",
+      speaker_attribution: "role_only"
+    },
+    llmPrompting: prompting(
+      nb ? "Hold funn konkrete og etterprøvbare. Ikke gjør observasjoner mer alvorlige enn samtalen støtter." : "Keep findings concrete and verifiable. Do not make observations more severe than the conversation supports.",
+      nb ? "Hvis ansvar eller frist mangler, skriv Ikke oppgitt." : "If owner or deadline is missing, write Not specified."
+    ),
+    sampleTranscript: nb
+      ? [
+          "Inspektør: Vi starter med observasjonen ved inngangspartiet.",
+          "Kontaktperson: Rekkverket er løst, men området er ikke sperret av ennå.",
+          "Inspektør: Det bør registreres som avvik, og midlertidig sikring må på plass.",
+          "Kontaktperson: Drift tar ansvar for sikring i dag og sender dokumentasjon innen fredag."
+        ].join("\n")
+      : [
+          "Inspector: We start with the observation by the entrance.",
+          "Contact person: The railing is loose, but the area is not blocked off yet.",
+          "Inspector: That should be registered as a deviation, and temporary securing is needed.",
+          "Contact person: Operations will secure it today and send documentation by Friday."
+        ].join("\n")
+  };
+}
+
+function projectProfile(language: string): AssistedDraftProfile {
+  const nb = isNorwegian(language);
+  return {
+    category: "prosjekt_og_kunde",
+    icon: "person.2",
+    shortDescription: nb ? "Lager et møte- eller kundereferat med behov, beslutninger, åpne spørsmål og oppgaver." : "Creates a meeting or customer note with needs, decisions, open questions, and tasks.",
+    tags: ["customer", "project", "meeting", "follow-up"],
+    context: {
+      purpose: nb ? "Gjør en kunde-, prosjekt- eller leveransesamtale om til et nyttig referat for videre arbeid." : "Turn a customer, project, or delivery conversation into a useful note for continued work.",
+      typical_setting: nb ? "Kundemøte, prosjektmøte, avklaringsmøte eller onboarding-samtale." : "Customer meeting, project meeting, clarification meeting, or onboarding conversation.",
+      typical_participants: nb ? [{ role: "kunde" }, { role: "prosjektleder" }, { role: "fagansvarlig", name: null }] : [{ role: "customer" }, { role: "project lead" }, { role: "subject matter expert", name: null }],
+      goals: nb ? ["Oppsummere behov og beslutninger.", "Fange åpne spørsmål.", "Synliggjøre oppgaver, ansvar og frister."] : ["Summarize needs and decisions.", "Capture open questions.", "Show tasks, ownership, and deadlines."],
+      related_processes: nb ? ["Prosjektoppfølging", "Kundeoppfølging", "Leveranse"] : ["Project follow-up", "Customer follow-up", "Delivery"]
+    },
+    perspective: {
+      voice: "third_person",
+      audience: "colleagues",
+      tone: "semi_formell",
+      style_rules: nb ? ["Skriv kort og handlingsrettet.", "Skill kundebehov fra interne vurderinger.", "Fremhev beslutninger og åpne punkter."] : ["Write briefly and actionably.", "Separate customer needs from internal assessments.", "Highlight decisions and open points."],
+      preserve_original_voice: false
+    },
+    sections: [
+      section(nb ? "Sammendrag" : "Summary", nb ? "Oppsummer formål, status og hovedpunkter." : "Summarize purpose, status, and main points.", "prose", true, nb ? ["formål", "status", "hovedpunkt"] : ["purpose", "status", "main point"]),
+      section(nb ? "Behov og krav" : "Needs and requirements", nb ? "List kundens behov, krav eller forventninger." : "List customer needs, requirements, or expectations.", "bullet_list", true, nb ? ["behov", "krav", "forventer", "ønsker"] : ["need", "requirement", "expects", "wants"]),
+      section(nb ? "Beslutninger" : "Decisions", nb ? "List beslutninger som ble tydelig avklart." : "List decisions that were clearly agreed.", "bullet_list", false, nb ? ["besluttet", "avtalt", "godkjent"] : ["decided", "agreed", "approved"]),
+      section(nb ? "Oppgaver" : "Tasks", nb ? "Vis oppgaver, ansvarlige og frister." : "Show tasks, owners, and deadlines.", "table", true, nb ? ["oppgave", "ansvarlig", "frist", "leverer"] : ["task", "owner", "deadline", "deliver"]),
+      section(nb ? "Åpne spørsmål" : "Open questions", nb ? "Fang opp det som må avklares før neste steg." : "Capture what must be clarified before the next step.", "bullet_list", false, nb ? ["uavklart", "spørsmål", "må avklares"] : ["unclear", "question", "must clarify"])
+    ],
+    contentRules: {
+      required_elements: nb ? ["Ta med beslutninger, oppgaver, ansvar og frister når de er tydelige."] : ["Include decisions, tasks, owners, and deadlines when clear."],
+      exclusions: nb ? ["Ikke ta med intern spekulasjon.", "Ikke gjør kundens ønske om til en forpliktelse hvis det ikke ble avtalt."] : ["Do not include internal speculation.", "Do not turn a customer wish into a commitment if it was not agreed."],
+      uncertainty_handling: nb ? "Marker uklare forpliktelser som Åpent punkt." : "Mark unclear commitments as Open point.",
+      action_item_format: nb ? "Oppgave - ansvarlig - frist" : "Task - owner - deadline",
+      decision_marker: nb ? "Beslutning:" : "Decision:",
+      speaker_attribution: "none"
+    },
+    llmPrompting: prompting(
+      nb ? "Prioriter beslutninger, avklaringer og neste steg fremfor lange diskusjonsreferater." : "Prioritize decisions, clarifications, and next steps over long discussion minutes.",
+      nb ? "Hvis en forpliktelse ikke er tydelig avtalt, skriv den som åpent spørsmål." : "If a commitment was not clearly agreed, write it as an open question."
+    ),
+    sampleTranscript: nb
+      ? [
+          "Kunde: Vi trenger en første leveranse innen slutten av måneden.",
+          "Prosjektleder: Da foreslår jeg at vi avklarer omfanget før fredag.",
+          "Fagansvarlig: Integrasjonen er mulig, men API-tilgang må bekreftes.",
+          "Kunde: Jeg sender kontaktperson for API i morgen."
+        ].join("\n")
+      : [
+          "Customer: We need a first delivery by the end of the month.",
+          "Project lead: Then I suggest we clarify scope before Friday.",
+          "Subject matter expert: The integration is possible, but API access must be confirmed.",
+          "Customer: I will send the API contact tomorrow."
+        ].join("\n")
+  };
+}
+
+function genericProfile(language: string): AssistedDraftProfile {
+  const nb = isNorwegian(language);
+  return {
+    category: "annet",
+    icon: "doc.text",
+    shortDescription: nb ? "Lager et strukturert notat med sammendrag, viktige punkter og oppfølging." : "Creates a structured note with summary, key points, and follow-up.",
+    tags: ["general", "structured-note"],
+    context: {
+      purpose: nb ? "Gjør en samtale, et møte eller et diktat om til et tydelig og nyttig notat." : "Turn a conversation, meeting, or dictation into a clear and useful note.",
+      typical_setting: nb ? "Opptak, samtale, møte eller muntlig notat fanget i Ulfy." : "Recording, conversation, meeting, or spoken note captured in Ulfy.",
+      typical_participants: nb ? [{ role: "deltaker" }, { role: "ansvarlig", name: null }] : [{ role: "participant" }, { role: "responsible person", name: null }],
+      goals: nb ? ["Oppsummere hovedpoeng.", "Fange beslutninger og åpne spørsmål.", "Synliggjøre neste steg."] : ["Summarize main points.", "Capture decisions and open questions.", "Show next steps."],
+      related_processes: []
+    },
+    perspective: {
+      voice: "third_person",
+      audience: "self",
+      tone: "semi_formell",
+      style_rules: nb ? ["Skriv klart og kort.", "Bruk bare informasjon fra samtalen.", "Ikke fyll inn manglende detaljer selv."] : ["Write clearly and briefly.", "Use only information from the conversation.", "Do not fill in missing details yourself."],
+      preserve_original_voice: false
+    },
+    sections: [
+      section(nb ? "Sammendrag" : "Summary", nb ? "Oppsummer hovedtema og viktigste konklusjoner." : "Summarize the main topic and most important conclusions.", "prose", true, nb ? ["tema", "bakgrunn", "konklusjon"] : ["topic", "background", "conclusion"]),
+      section(nb ? "Viktige punkter" : "Key points", nb ? "List viktige observasjoner, fakta eller avklaringer." : "List important observations, facts, or clarifications.", "bullet_list", true, nb ? ["viktig", "avklart", "poeng", "fakta"] : ["important", "clarified", "point", "fact"]),
+      section(nb ? "Beslutninger" : "Decisions", nb ? "List beslutninger som tydelig ble tatt." : "List decisions that were clearly made.", "bullet_list", false, nb ? ["besluttet", "avtalt", "konkludert"] : ["decided", "agreed", "concluded"]),
+      section(nb ? "Oppfølging" : "Follow-up", nb ? "List oppgaver, ansvarlige og frister når dette finnes." : "List tasks, owners, and deadlines when available.", "table", false, nb ? ["følge opp", "ansvarlig", "frist", "neste steg"] : ["follow up", "owner", "deadline", "next step"])
+    ],
+    contentRules: {
+      required_elements: nb ? ["Ta med bare informasjon som støttes av samtalen.", "Marker manglende ansvar eller frist tydelig."] : ["Include only information supported by the conversation.", "Clearly mark missing owner or deadline."],
+      exclusions: nb ? ["Ikke ta med småprat.", "Ikke gjett manglende detaljer."] : ["Do not include small talk.", "Do not guess missing details."],
+      uncertainty_handling: nb ? "Skriv Ikke oppgitt når informasjon mangler." : "Write Not specified when information is missing.",
+      action_item_format: nb ? "Oppgave - ansvarlig - frist" : "Task - owner - deadline",
+      decision_marker: nb ? "Beslutning:" : "Decision:",
+      speaker_attribution: "none"
+    },
+    llmPrompting: prompting(
+      nb ? "Lag et nyttig notat som kan brukes direkte etter samtalen." : "Create a useful note that can be used directly after the conversation.",
+      nb ? "Hvis en seksjon ikke har støtte i samtalen, skriv at den ikke ble dekket." : "If a section has no support in the conversation, write that it was not covered."
+    ),
+    sampleTranscript: nb
+      ? [
+          "Deltaker 1: Vi starter med kort bakgrunn og hovedpunkter.",
+          "Deltaker 2: Det viktigste er at tiltakene blir tydelige og fulgt opp.",
+          "Deltaker 1: Ansvarlig person og frist bør fremkomme i notatet."
+        ].join("\n")
+      : [
+          "Participant 1: We start with a short background and the main points.",
+          "Participant 2: The most important thing is that the actions are clear and followed up.",
+          "Participant 1: Owner and deadline should appear in the note."
+        ].join("\n")
+  };
+}
+
+function section(title: string, purpose: string, format: TemplateSectionInput["format"], required: boolean, extraction_hints: string[]): TemplateSectionInput {
+  return { title, purpose, format, required, extraction_hints };
+}
+
+function prompting(system_prompt_additions: string, fallback_behavior: string): AppTemplateYaml["llm_prompting"] {
+  return {
+    system_prompt_additions,
+    fallback_behavior,
+    post_processing: {
+      extract_action_items: true
+    }
+  };
+}
+
+function normalizeTemplateLanguage(value?: string | null): AppTemplateYaml["identity"]["language"] {
+  if (value === "nn-NO" || value === "en-US") return value;
+  return "nb-NO";
+}
+
+function limitTemplateTitle(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ") || "New Ulfy template";
+  return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => TemplateSlug(value)).filter(Boolean)));
+}
+
+function isNorwegian(language: string) {
+  return language === "nb-NO" || language === "nn-NO";
+}
+
+function hasAny(source: string, keywords: string[]) {
+  return keywords.some((keyword) => source.includes(normalizeText(keyword)));
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
 }
 
 function TemplateSlug(value: string) {
