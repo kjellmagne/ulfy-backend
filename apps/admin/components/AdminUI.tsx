@@ -66,7 +66,11 @@ export function InfoTip({ text }: { text: string }) {
       onMouseLeave={() => setOpen(false)}
       onFocus={() => setOpen(true)}
       onBlur={() => setOpen(false)}
-      onClick={() => setOpen((current) => !current)}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen((current) => !current);
+      }}
     >
       <Info size={14} />
       <FloatingTooltip text={text} anchorRef={anchorRef} open={open} />

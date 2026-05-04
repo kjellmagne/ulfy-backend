@@ -229,6 +229,44 @@ const speakerAttributionOptions = [
   { value: "anonymized", label: "Anonymized" }
 ];
 
+const designerHelp = {
+  templateIntention: "Describe the note you want and when it will be used. The helper only creates a starting point; you still review and shape it before anything is published.",
+  title: "This is the name people see when they choose a template. Use the words a user would recognize when they need this note.",
+  shortDescription: "A short promise of what the template produces. It helps people quickly choose the right template.",
+  language: "The main language for the finished note. It also nudges labels, dates, and phrasing toward that language.",
+  category: "Where this template lives in the catalog. Pick the place users would naturally look for it.",
+  icon: "The symbol shown with the template in the app. Choose something that reminds people of the task or situation.",
+  version: "A simple label for the template text itself. Publishing still controls the release version people receive in the app.",
+  tags: "Extra labels that make templates easier to find and group. Use themes like HR, follow-up, municipality, or field work.",
+  contextPurpose: "The job this template is meant to do. This keeps the final note focused instead of turning into a generic summary.",
+  typicalSetting: "Where this template is usually used, such as a meeting, care conversation, inspection, or dictation. This gives the note the right common sense.",
+  typicalParticipants: "Who normally takes part. Roles matter more than names, because they help the note understand who is speaking and who the note is about.",
+  goals: "What the finished note should help the reader do next. One goal per line works best.",
+  relatedProcesses: "Any workflow this note belongs to, such as follow-up, archiving, case handling, or reporting.",
+  voice: "Choose who the note sounds like it is written by. This changes phrasing like I observed, we agreed, or the team decided.",
+  audience: "Choose the likely reader. A private note can be lighter; a note for archive, HR, or leadership should be clearer and more complete.",
+  tone: "How formal the writing should feel. Match the place the note will be read, not just personal preference.",
+  preserveOriginalVoice: "Keep the speaker's own wording when it matters, especially for reflections, statements, or sensitive phrasing.",
+  styleRules: "Small writing habits for this template. Use this for rules like keep it concise, avoid judgmental language, or write in Norwegian.",
+  sectionTitle: "The heading shown in the finished note. Make it clear enough that the reader knows what belongs there.",
+  sectionFormat: "The shape of this part of the note: paragraph, bullets, table, and so on. Pick the shape that makes the content easiest to scan.",
+  sectionRequired: "Required sections always appear, even when the transcript has little to say. Use this for parts people expect every time.",
+  sectionPurpose: "What this section is supposed to accomplish. This is often the most important sentence for getting the right content in the right place.",
+  extractionHints: "Clues the note should listen for when filling this section. Add words people actually use in the conversations.",
+  requiredElements: "Things the note should try to include when the transcript supports them. One clear item per line is easiest to maintain.",
+  exclusions: "Things to leave out even if they are mentioned. Use this to protect privacy, avoid noise, or keep the note from drifting.",
+  uncertaintyHandling: "What to do when the recording is unclear or details are missing. Good templates mark uncertainty instead of guessing.",
+  actionItemFormat: "How tasks should be written when they appear. A predictable format makes follow-up easier.",
+  decisionMarker: "How clear decisions should be called out. This helps readers spot what was actually decided, not just discussed.",
+  speakerAttribution: "Whether the note should say who said something. Use attribution only when the speaker matters for responsibility or context.",
+  systemPromptAdditions: "Extra instructions that affect the whole template. Use this sparingly for important behavior that no other field covers.",
+  fallbackBehavior: "What the note should do when a section cannot be filled. This prevents confident-looking guesses.",
+  extractActionItems: "Also save clear tasks in the app's action list. Leave this on when follow-up work is part of the result.",
+  structuredOutput: "An advanced field for teams that need a predictable data shape behind the note. Most templates can leave this empty.",
+  sampleTranscript: "A realistic example used to test the template. The preview is only as good as this sample is close to real recordings.",
+  yaml: "The full template text behind the designer. Use this when you need fine control or want to inspect exactly what will be saved."
+} as const;
+
 const blankVariantForm: VariantForm = {
   familyId: "",
   variantId: "",
@@ -1021,7 +1059,7 @@ export default function TemplateDesignerRoute() {
           )}
         >
           <div className="ai-template-dialog">
-            <FieldLabel>Template intention</FieldLabel>
+            <FieldLabel help={designerHelp.templateIntention}>Template intention</FieldLabel>
             <textarea
               value={variantForm.aiUseCase}
               onChange={(event) => setVariantForm((current) => ({ ...current, aiUseCase: event.target.value }))}
@@ -1122,19 +1160,19 @@ export default function TemplateDesignerRoute() {
 
                 <div className="identity-editor-grid">
                   <div className="field wide">
-                    <FieldLabel>Title</FieldLabel>
+                    <FieldLabel help={designerHelp.title}>Title</FieldLabel>
                     <input className="input template-title-input" value={templateIdentity?.title ?? ""} onChange={(event) => updateIdentity("title", event.target.value)} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Short description</FieldLabel>
+                    <FieldLabel help={designerHelp.shortDescription}>Short description</FieldLabel>
                     <textarea value={templateIdentity?.short_description ?? ""} onChange={(event) => updateIdentity("short_description", event.target.value)} />
                   </div>
                   <div className="field">
-                    <FieldLabel>Language</FieldLabel>
+                    <FieldLabel help={designerHelp.language}>Language</FieldLabel>
                     <LanguageCombobox value={variantForm.language} onChange={updateLanguage} />
                   </div>
                   <div className="field">
-                    <FieldLabel>Category</FieldLabel>
+                    <FieldLabel help={designerHelp.category}>Category</FieldLabel>
                     <select value={templateIdentity?.category ?? ""} onChange={(event) => updateIdentity("category", event.target.value)}>
                       <option value="">Uncategorized</option>
                       {categories.map((category) => (
@@ -1143,15 +1181,15 @@ export default function TemplateDesignerRoute() {
                     </select>
                   </div>
                   <div className="field wide">
-                    <FieldLabel help="SF Symbol name used by the iOS app, for example waveform.and.mic.">Icon</FieldLabel>
+                    <FieldLabel help={designerHelp.icon}>Icon</FieldLabel>
                     <IconPicker value={templateIdentity?.icon ?? "doc.text"} onChange={(icon) => updateIdentity("icon", icon)} />
                   </div>
                   <div className="field">
-                    <FieldLabel>Version in YAML</FieldLabel>
+                    <FieldLabel help={designerHelp.version}>Version in YAML</FieldLabel>
                     <input className="input" value={templateIdentity?.version ?? ""} onChange={(event) => updateIdentity("version", event.target.value)} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Tags</FieldLabel>
+                    <FieldLabel help={designerHelp.tags}>Tags</FieldLabel>
                     <TagEditor value={templateIdentity?.tags ?? []} options={tagOptions} onChange={(tags) => updateIdentity("tags", tags)} onCreateTag={createTemplateTag} />
                   </div>
                 </div>
@@ -1168,23 +1206,23 @@ export default function TemplateDesignerRoute() {
                 </div>
                 <div className="identity-editor-grid">
                   <div className="field wide">
-                    <FieldLabel>Purpose</FieldLabel>
+                    <FieldLabel help={designerHelp.contextPurpose}>Purpose</FieldLabel>
                     <textarea value={valueToText(templateContext.purpose)} onChange={(event) => updateContext("purpose", event.target.value)} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Typical setting</FieldLabel>
+                    <FieldLabel help={designerHelp.typicalSetting}>Typical setting</FieldLabel>
                     <textarea value={valueToText(templateContext.typical_setting)} onChange={(event) => updateContext("typical_setting", event.target.value)} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Typical participants</FieldLabel>
+                    <FieldLabel help={designerHelp.typicalParticipants}>Typical participants</FieldLabel>
                     <textarea value={participantsToText(contextParticipants)} onChange={(event) => updateContext("typical_participants", textToParticipants(event.target.value))} placeholder="One participant per line. Use Role: Name when needed." />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Goals</FieldLabel>
+                    <FieldLabel help={designerHelp.goals}>Goals</FieldLabel>
                     <textarea value={listToText(contextGoals)} onChange={(event) => updateContext("goals", textToList(event.target.value))} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Related processes</FieldLabel>
+                    <FieldLabel help={designerHelp.relatedProcesses}>Related processes</FieldLabel>
                     <textarea value={listToText(contextRelatedProcesses)} onChange={(event) => updateContext("related_processes", textToList(event.target.value))} />
                   </div>
                 </div>
@@ -1201,19 +1239,19 @@ export default function TemplateDesignerRoute() {
                 </div>
                 <div className="identity-editor-grid">
                   <div className="field">
-                    <FieldLabel>Voice</FieldLabel>
+                    <FieldLabel help={designerHelp.voice}>Voice</FieldLabel>
                     <select value={templatePerspective.voice ?? "third_person"} onChange={(event) => updatePerspective("voice", event.target.value)}>
                       {templateVoiceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </div>
                   <div className="field">
-                    <FieldLabel>Audience</FieldLabel>
+                    <FieldLabel help={designerHelp.audience}>Audience</FieldLabel>
                     <select value={templatePerspective.audience ?? "self"} onChange={(event) => updatePerspective("audience", event.target.value)}>
                       {templateAudienceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
                   </div>
                   <div className="field">
-                    <FieldLabel>Tone</FieldLabel>
+                    <FieldLabel help={designerHelp.tone}>Tone</FieldLabel>
                     <select value={templatePerspective.tone ?? "semi_formell"} onChange={(event) => updatePerspective("tone", event.target.value)}>
                       {templateToneOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
@@ -1221,12 +1259,12 @@ export default function TemplateDesignerRoute() {
                   <label className="required-switch">
                     <input type="checkbox" checked={Boolean(templatePerspective.preserve_original_voice)} onChange={(event) => updatePerspective("preserve_original_voice", event.target.checked)} />
                     <span>
-                      <strong>Preserve original voice</strong>
+                      <SwitchTitle help={designerHelp.preserveOriginalVoice}>Preserve original voice</SwitchTitle>
                       <small>Keep first-person phrasing when the transcript supports it.</small>
                     </span>
                   </label>
                   <div className="field wide">
-                    <FieldLabel>Style rules</FieldLabel>
+                    <FieldLabel help={designerHelp.styleRules}>Style rules</FieldLabel>
                     <textarea value={listToText(perspectiveStyleRules)} onChange={(event) => updatePerspective("style_rules", textToList(event.target.value))} />
                   </div>
                 </div>
@@ -1285,11 +1323,11 @@ export default function TemplateDesignerRoute() {
                       </div>
                       <div className="section-editor-grid">
                         <div className="field wide">
-                          <FieldLabel>Section title</FieldLabel>
+                          <FieldLabel help={designerHelp.sectionTitle}>Section title</FieldLabel>
                           <input className="input section-title-large" value={section.title ?? ""} onChange={(event) => updateSection(index, { title: event.target.value })} />
                         </div>
                         <div className="field">
-                          <FieldLabel>Format</FieldLabel>
+                          <FieldLabel help={designerHelp.sectionFormat}>Format</FieldLabel>
                           <select value={section.format ?? "prose"} onChange={(event) => updateSection(index, { format: event.target.value })}>
                             {sectionFormatOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                           </select>
@@ -1297,16 +1335,16 @@ export default function TemplateDesignerRoute() {
                         <label className="required-switch">
                           <input type="checkbox" checked={Boolean(section.required)} onChange={(event) => updateSection(index, { required: event.target.checked })} />
                           <span>
-                            <strong>Required</strong>
+                            <SwitchTitle help={designerHelp.sectionRequired}>Required</SwitchTitle>
                             <small>Always include this section.</small>
                           </span>
                         </label>
                         <div className="field wide">
-                          <FieldLabel>Purpose</FieldLabel>
+                          <FieldLabel help={designerHelp.sectionPurpose}>Purpose</FieldLabel>
                           <textarea value={section.purpose ?? ""} onChange={(event) => updateSection(index, { purpose: event.target.value })} />
                         </div>
                         <div className="field wide">
-                          <FieldLabel>Extraction hints</FieldLabel>
+                          <FieldLabel help={designerHelp.extractionHints}>Extraction hints</FieldLabel>
                           <textarea value={listToText(section.extraction_hints)} onChange={(event) => updateSection(index, { extraction_hints: textToList(event.target.value) })} />
                         </div>
                       </div>
@@ -1338,27 +1376,27 @@ export default function TemplateDesignerRoute() {
                 </div>
                 <div className="identity-editor-grid">
                   <div className="field wide">
-                    <FieldLabel>Required elements</FieldLabel>
+                    <FieldLabel help={designerHelp.requiredElements}>Required elements</FieldLabel>
                     <textarea value={listToText(requiredElements)} onChange={(event) => updateContentRules("required_elements", textToList(event.target.value))} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Exclusions</FieldLabel>
+                    <FieldLabel help={designerHelp.exclusions}>Exclusions</FieldLabel>
                     <textarea value={listToText(exclusions)} onChange={(event) => updateContentRules("exclusions", textToList(event.target.value))} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Uncertainty handling</FieldLabel>
+                    <FieldLabel help={designerHelp.uncertaintyHandling}>Uncertainty handling</FieldLabel>
                     <textarea value={valueToText(templateContentRules.uncertainty_handling)} onChange={(event) => updateContentRules("uncertainty_handling", event.target.value)} />
                   </div>
                   <div className="field">
-                    <FieldLabel>Action item format</FieldLabel>
+                    <FieldLabel help={designerHelp.actionItemFormat}>Action item format</FieldLabel>
                     <input className="input" value={valueToText(templateContentRules.action_item_format)} onChange={(event) => updateContentRules("action_item_format", event.target.value)} />
                   </div>
                   <div className="field">
-                    <FieldLabel>Decision marker</FieldLabel>
+                    <FieldLabel help={designerHelp.decisionMarker}>Decision marker</FieldLabel>
                     <input className="input" value={valueToText(templateContentRules.decision_marker)} onChange={(event) => updateContentRules("decision_marker", event.target.value)} />
                   </div>
                   <div className="field">
-                    <FieldLabel>Speaker attribution</FieldLabel>
+                    <FieldLabel help={designerHelp.speakerAttribution}>Speaker attribution</FieldLabel>
                     <select value={templateContentRules.speaker_attribution ?? "none"} onChange={(event) => updateContentRules("speaker_attribution", event.target.value)}>
                       {speakerAttributionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                     </select>
@@ -1377,22 +1415,22 @@ export default function TemplateDesignerRoute() {
                 </div>
                 <div className="identity-editor-grid">
                   <div className="field wide">
-                    <FieldLabel>System prompt additions</FieldLabel>
+                    <FieldLabel help={designerHelp.systemPromptAdditions}>System prompt additions</FieldLabel>
                     <textarea value={valueToText(templatePrompting.system_prompt_additions)} onChange={(event) => updatePrompting("system_prompt_additions", event.target.value)} />
                   </div>
                   <div className="field wide">
-                    <FieldLabel>Fallback behavior</FieldLabel>
+                    <FieldLabel help={designerHelp.fallbackBehavior}>Fallback behavior</FieldLabel>
                     <textarea value={valueToText(templatePrompting.fallback_behavior)} onChange={(event) => updatePrompting("fallback_behavior", event.target.value)} />
                   </div>
                   <label className="required-switch">
                     <input type="checkbox" checked={Boolean(templatePostProcessing.extract_action_items)} onChange={(event) => updatePostProcessing("extract_action_items", event.target.checked)} />
                     <span>
-                      <strong>Extract action items</strong>
+                      <SwitchTitle help={designerHelp.extractActionItems}>Extract action items</SwitchTitle>
                       <small>Populate the mobile actionItems array when tasks are explicit.</small>
                     </span>
                   </label>
                   <div className="field wide">
-                    <FieldLabel>Structured output JSON schema</FieldLabel>
+                    <FieldLabel help={designerHelp.structuredOutput}>Structured output JSON schema</FieldLabel>
                     <textarea
                       key={structuredOutputToText(templatePostProcessing.structured_output)}
                       defaultValue={structuredOutputToText(templatePostProcessing.structured_output)}
@@ -1428,18 +1466,21 @@ export default function TemplateDesignerRoute() {
                 )
               )}
               {previewTab === "yaml" && (
-                <textarea
-                  className="yaml-route-editor"
-                  value={variantForm.yamlContent}
-                  onChange={(event) => {
-                    updateVariantForm((current) => ({ ...current, yamlContent: event.target.value }));
-                  }}
-                  spellCheck={false}
-                />
+                <div className="sample-editor">
+                  <FieldLabel help={designerHelp.yaml}>Template YAML</FieldLabel>
+                  <textarea
+                    className="yaml-route-editor"
+                    value={variantForm.yamlContent}
+                    onChange={(event) => {
+                      updateVariantForm((current) => ({ ...current, yamlContent: event.target.value }));
+                    }}
+                    spellCheck={false}
+                  />
+                </div>
               )}
               {previewTab === "sample" && (
                 <div className="sample-editor">
-                  <FieldLabel>Sample transcript fixture</FieldLabel>
+                  <FieldLabel help={designerHelp.sampleTranscript}>Sample transcript fixture</FieldLabel>
                   <textarea
                     value={variantForm.sampleTranscript}
                     onChange={(event) => updateVariantForm((current) => ({ ...current, sampleTranscript: event.target.value }))}
@@ -1462,6 +1503,10 @@ export default function TemplateDesignerRoute() {
       </div>
     </RequireAuth>
   );
+}
+
+function SwitchTitle({ children, help }: { children: ReactNode; help: string }) {
+  return <strong className="switch-title">{children}<InfoTip text={help} /></strong>;
 }
 
 function MarkdownDocument({ markdown }: { markdown: string }) {
