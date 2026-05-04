@@ -677,9 +677,13 @@ export default function ConfigsPage() {
 
   function updateSpeechConfig(providerValue: string, patch: Partial<SpeechProviderConfig>) {
     const current = speechProviderConfig(form, providerValue);
+    const normalizedPatch = { ...patch };
+    if (typeof normalizedPatch.modelName === "string" && providerValue === "openai") {
+      normalizedPatch.speakerDiarizationEnabled = normalizedPatch.modelName.toLowerCase().includes("diarize");
+    }
     const nextConfigs = {
       ...(form.speechProviderConfigs ?? {}),
-      [providerValue]: { ...current, ...patch }
+      [providerValue]: { ...current, ...normalizedPatch }
     };
     const next = { ...form, speechProviderConfigs: nextConfigs };
     if (form.speechProviderType === providerValue) {
