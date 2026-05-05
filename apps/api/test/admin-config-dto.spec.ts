@@ -41,7 +41,8 @@ describe("ConfigDto", () => {
       managedPolicy: {
         allowPolicyOverride: false,
         hideSettings: true,
-        visibleSettingsWhenHidden: ["privacy_prompt"],
+        hideRecordingFloatingToolbar: true,
+        visibleSettingsWhenHidden: ["recording_floating_toolbar", "privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         managePrivacyControl: true,
@@ -94,7 +95,8 @@ describe("ConfigDto", () => {
       managedPolicy: {
         allowPolicyOverride: false,
         hideSettings: true,
-        visibleSettingsWhenHidden: ["privacy_prompt"],
+        hideRecordingFloatingToolbar: true,
+        visibleSettingsWhenHidden: ["recording_floating_toolbar", "privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         managePrivacyControl: true,

@@ -369,6 +369,12 @@ export class ActivationService {
     const source = isRecord(policy) ? policy : {};
     const overrideValue = firstBoolean(source.allowPolicyOverride, source.allowLocalOverride, source.userMayOverridePolicy);
     const hideSettingsValue = firstBoolean(source.hideSettings, source.hideAppSettings, source.hideSettingsUI);
+    const hideRecordingFloatingToolbarValue = firstBoolean(
+      source.hideRecordingFloatingToolbar,
+      source.hideRecordingToolbar,
+      source.hideNewRecordingToolbar,
+      source.hideFloatingRecordingToolbar
+    );
     const speechChangeValue = firstBoolean(source.userMayChangeSpeechProvider, source.userMayChangeSpeech, source.allowSpeechProviderChange);
     const formatterChangeValue = firstBoolean(source.userMayChangeFormatter, source.userMayChangeDocumentGenerationProvider, source.allowFormatterChange);
     const privacyControlManagedValue = firstBoolean(source.managePrivacyControl, source.privacyControlManaged);
@@ -384,6 +390,7 @@ export class ActivationService {
       ...source,
       allowPolicyOverride: overrideValue ?? false,
       hideSettings: hideSettingsValue ?? false,
+      hideRecordingFloatingToolbar: hideRecordingFloatingToolbarValue ?? false,
       visibleSettingsWhenHidden,
       userMayChangeSpeechProvider: speechChangeValue ?? false,
       userMayChangeFormatter: formatterChangeValue ?? false,
@@ -536,6 +543,7 @@ const visibleSettingsWhenHiddenValues = new Set([
   "language",
   "privacy_info",
   "dim_screen_during_recording",
+  "recording_floating_toolbar",
   "optimize_openai_recording",
   "privacy_prompt",
   "categories"

@@ -204,7 +204,8 @@ const operationDescriptions: Record<string, string> = {
   "POST /api/v1/admin/config-profiles": [
     "Creates an enterprise config profile used by tenants and enterprise activation keys.",
     "The payload can manage speech providers, document generation, privacy control, Presidio, privacy review, template repository, telemetry and managedPolicy behavior.",
-    "managedPolicy.hideSettings can be paired with visibleSettingsWhenHidden to keep specific app settings such as audio source, app UI language, privacy info, recording dimming, OpenAI recording optimization, privacy prompt, live transcription and categories visible/editable.",
+    "managedPolicy.hideSettings can be paired with visibleSettingsWhenHidden to keep specific app settings such as audio source, app UI language, privacy info, recording dimming, floating recording toolbar, OpenAI recording optimization, privacy prompt, live transcription and categories visible/editable.",
+    "managedPolicy.hideRecordingFloatingToolbar hides the floating quick toolbar on the iOS New Recording screen while keeping recording itself available.",
     "visibleSettingsWhenHidden is only a visibility exception list; it does not centrally manage the setting value.",
     "Use managedPolicy.managePrivacyControl, managePIIControl and managePrivacyReviewProvider to decide whether saved privacy values are actually sent to devices.",
     "Only fields intentionally applied in the profile should be sent to the app as managed policy."
@@ -222,7 +223,7 @@ const operationDescriptions: Record<string, string> = {
   "PATCH /api/v1/admin/config-profiles/{id}": [
     "Updates an existing config/policy profile.",
     "Masked secrets are preserved when the admin does not submit a replacement key; explicit empty values clear a managed secret.",
-    "Use managedPolicy.visibleSettingsWhenHidden as the visibility exception list for settings that should remain visible when hideSettings is enabled. The language exception means app UI language, not speech transcription language or template/transcript output language. Include privacy_prompt when the Personvern prompt UI should remain available.",
+    "Use managedPolicy.visibleSettingsWhenHidden as the visibility exception list for settings that should remain visible when hideSettings is enabled. The language exception means app UI language, not speech transcription language or template/transcript output language. Include recording_floating_toolbar when the toolbar setting should remain visible, and privacy_prompt when the Personvern prompt UI should remain available.",
     "Use managedPolicy.managePrivacyControl, managePIIControl, managePrivacyReviewProvider and managePrivacyPrompt to decide whether saved privacy values and Personvern prompt text are actually sent to devices.",
     "Changes affect future enterprise activation/refresh/effective-config responses for tenants or keys using this profile."
   ].join(" "),

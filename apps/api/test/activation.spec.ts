@@ -176,7 +176,8 @@ describe("ActivationService", () => {
           managedPolicy: {
             allowPolicyOverride: false,
             hideSettings: true,
-            visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "unknown_setting"],
+            hideRecordingFloatingToolbar: true,
+            visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "recording_floating_toolbar", "privacy_prompt", "unknown_setting"],
             userMayChangeSpeechProvider: true,
             userMayChangeFormatter: true,
             userMayChangePrivacyReviewProvider: true,
@@ -222,7 +223,8 @@ describe("ActivationService", () => {
       managedPolicy: {
         allowPolicyOverride: false,
         hideSettings: true,
-        visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt"],
+        hideRecordingFloatingToolbar: true,
+        visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "recording_floating_toolbar", "privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         managePrivacyControl: false,
@@ -323,6 +325,7 @@ describe("ActivationService", () => {
       managePrivacyReviewProvider: false,
       userMayChangePrivacyReviewProvider: false,
       managePrivacyPrompt: false,
+      hideRecordingFloatingToolbar: false,
       manageTemplateCategories: true
     });
     expect(prisma.templateCategory.findMany).toHaveBeenCalled();

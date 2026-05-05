@@ -92,7 +92,8 @@ const singleLicenseExample = {
 const managedPolicyExample = {
   allowPolicyOverride: false,
   hideSettings: true,
-  visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "categories"],
+  hideRecordingFloatingToolbar: false,
+  visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "recording_floating_toolbar", "privacy_prompt", "categories"],
   userMayChangeSpeechProvider: true,
   userMayChangeFormatter: false,
   managePrivacyControl: true,
@@ -249,6 +250,10 @@ const managedPolicySchema = {
     hideSettings: { type: "boolean", default: false, description: "When true, the iOS app should hide or strongly minimize local settings screens for managed areas." },
     hideAppSettings: { type: "boolean", description: "Accepted alias for hideSettings." },
     hideSettingsUI: { type: "boolean", description: "Accepted alias for hideSettings." },
+    hideRecordingFloatingToolbar: { type: "boolean", default: false, description: "When true, the iOS app hides the floating quick toolbar on the New Recording screen. The recording screen still works; users use Settings or managed defaults instead." },
+    hideRecordingToolbar: { type: "boolean", description: "Accepted alias for hideRecordingFloatingToolbar." },
+    hideNewRecordingToolbar: { type: "boolean", description: "Accepted alias for hideRecordingFloatingToolbar." },
+    hideFloatingRecordingToolbar: { type: "boolean", description: "Accepted alias for hideRecordingFloatingToolbar." },
     visibleSettingsWhenHidden: {
       type: "array",
       description: [
@@ -266,12 +271,13 @@ const managedPolicySchema = {
           "language",
           "privacy_info",
           "dim_screen_during_recording",
+          "recording_floating_toolbar",
           "optimize_openai_recording",
           "privacy_prompt",
           "categories"
         ]
       },
-      example: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "categories"]
+      example: ["live_transcription_during_recording", "audio_source", "language", "recording_floating_toolbar", "privacy_prompt", "categories"]
     },
     settingsVisibleWhenHidden: { type: "array", items: { type: "string" }, description: "Accepted alias for visibleSettingsWhenHidden." },
     allowedSettingsWhenHidden: { type: "array", items: { type: "string" }, description: "Accepted alias for visibleSettingsWhenHidden." },

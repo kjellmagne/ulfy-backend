@@ -62,6 +62,7 @@ describe("AdminController config cloning", () => {
       managePrivacyReviewProvider: true,
       userMayChangePrivacyReviewProvider: false,
       managePrivacyPrompt: true,
+      hideRecordingFloatingToolbar: false,
       manageTemplateCategories: true
     };
 

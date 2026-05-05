@@ -288,11 +288,12 @@ export class ConfigDto {
   providerProfiles?: Record<string, unknown>;
   @ApiProperty({
     required: false,
-    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; managePrivacyControl/managePIIControl/managePrivacyReviewProvider decide whether the saved privacy fields are sent as policy at all; granular userMayChange flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas. visibleSettingsWhenHidden lists the specific settings/menu items that may remain visible/editable while hideSettings is true. It is only a visibility exception list and does not centrally manage the setting value. The language exception means app UI language, not speech transcription language or template/transcript output language.",
+    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; managePrivacyControl/managePIIControl/managePrivacyReviewProvider decide whether the saved privacy fields are sent as policy at all; granular userMayChange flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas. hideRecordingFloatingToolbar hides the quick toolbar on the New Recording screen. visibleSettingsWhenHidden lists the specific settings/menu items that may remain visible/editable while hideSettings is true. It is only a visibility exception list and does not centrally manage the setting value. The language exception means app UI language, not speech transcription language or template/transcript output language.",
     example: {
       allowPolicyOverride: false,
       hideSettings: true,
-      visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "categories"],
+      hideRecordingFloatingToolbar: false,
+      visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "recording_floating_toolbar", "privacy_prompt", "categories"],
       userMayChangeSpeechProvider: true,
       userMayChangeFormatter: false,
       managePrivacyControl: true,
@@ -1857,6 +1858,7 @@ export class AdminController {
       managePrivacyReviewProvider: firstBoolean(policy?.managePrivacyReviewProvider, policy?.privacyReviewProviderManaged, policy?.managePrivacyReview) ?? hasManagedPrivacyReviewPolicyFields(profile),
       userMayChangePrivacyReviewProvider: firstBoolean(policy?.userMayChangePrivacyReviewProvider, policy?.userMayChangePrivacyReview, policy?.allowPrivacyReviewProviderChange) ?? false,
       managePrivacyPrompt: firstBoolean(policy?.managePrivacyPrompt, policy?.privacyPromptManaged) ?? profileHasValue(profile, "privacyPrompt"),
+      hideRecordingFloatingToolbar: firstBoolean(policy?.hideRecordingFloatingToolbar, policy?.hideRecordingToolbar, policy?.hideNewRecordingToolbar, policy?.hideFloatingRecordingToolbar) ?? false,
       manageTemplateCategories: firstBoolean(policy?.manageTemplateCategories, policy?.templateCategoriesManaged) ?? true
     };
   }

@@ -149,6 +149,7 @@ Sample enterprise activation payload:
     "featureFlags": { "developerMode": false, "allowExternalProviders": false },
     "allowedProviderRestrictions": ["azure", "openai_compatible", "local_heuristic"],
     "managedPolicy": {
+      "hideRecordingFloatingToolbar": false,
       "managePrivacyControl": true,
       "userMayChangePrivacyControl": false,
       "managePIIControl": true,

@@ -49,12 +49,17 @@ export const ManagedPolicyPayload = z.object({
   hideSettings: z.boolean().default(false),
   hideAppSettings: z.boolean().optional(),
   hideSettingsUI: z.boolean().optional(),
+  hideRecordingFloatingToolbar: z.boolean().default(false),
+  hideRecordingToolbar: z.boolean().optional(),
+  hideNewRecordingToolbar: z.boolean().optional(),
+  hideFloatingRecordingToolbar: z.boolean().optional(),
   visibleSettingsWhenHidden: z.array(z.enum([
     "live_transcription_during_recording",
     "audio_source",
     "language",
     "privacy_info",
     "dim_screen_during_recording",
+    "recording_floating_toolbar",
     "optimize_openai_recording",
     "privacy_prompt",
     "categories"

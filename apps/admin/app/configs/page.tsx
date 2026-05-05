@@ -44,6 +44,7 @@ const helpText = {
   allowPolicyOverride: "When enabled, the user can temporarily ignore centrally managed provider and privacy settings on this device. When disabled, centrally managed settings stay enforced. Locks app UI. Full support.",
   userMayChangeSpeechProvider: "When enabled, the app starts with the default speech provider from this policy, but the user may switch to another speech provider that is checked as available in the list above. When disabled, the default speech provider is enforced and cannot be changed locally.",
   hideSettings: "When enabled, the iOS app should hide most local settings for managed enterprise users and leave only operational screens such as license status, about, support, and diagnostics. Optional items below can be kept visible/editable.",
+  hideRecordingFloatingToolbar: "When enabled, the iOS app removes the floating quick toolbar from the New Recording screen. Use this when users should follow the managed defaults without quick on-screen controls. They can still start recordings and use Settings or policy defaults.",
   visibleSettingsWhenHidden: "Optional visibility exceptions to Hide most app settings. Checked items remain visible in the app even when the rest of Settings is hidden. This does not centrally manage the setting value."
 };
 
@@ -106,6 +107,7 @@ const hiddenSettingsOptions = [
   { value: "language", label: "Språk", description: "App language - Let users choose the app language locally." },
   { value: "privacy_info", label: "Vis personverninfo", description: "Let users show or hide privacy information in the app." },
   { value: "dim_screen_during_recording", label: "Demp skjermen under opptak", description: "Let users control screen dimming while recording." },
+  { value: "recording_floating_toolbar", label: "Flytende opptaksverktøylinje", description: "Let users show or hide the quick toolbar on the New Recording screen." },
   { value: "optimize_openai_recording", label: "Optimalisere OpenAI-opptak", description: "Let users control OpenAI recording optimization options." },
   { value: "privacy_prompt", label: "Personvern prompt", description: "Let users view or adjust the privacy prompt when most settings are hidden." },
   { value: "categories", label: "Kategorier", description: "Let users open category controls. If templateCategories is centrally managed, local editing should still be read-only." }
@@ -157,6 +159,7 @@ const empty = {
   allowExternalProviders: false,
   allowPolicyOverride: false,
   hideSettings: false,
+  hideRecordingFloatingToolbar: false,
   visibleSettingsWhenHidden: [],
   userMayChangeSpeechProvider: false,
   userMayChangeFormatter: false,
@@ -213,6 +216,7 @@ export default function ConfigsPage() {
   const privacyPromptPolicyApplied = privacySubstepsAvailable && Boolean(form.managePrivacyPrompt);
   const activePolicySwitches = [
     form.hideSettings,
+    form.hideRecordingFloatingToolbar,
     form.allowPolicyOverride,
     form.userMayChangeSpeechProvider,
     form.userMayChangeFormatter,
@@ -353,6 +357,7 @@ export default function ConfigsPage() {
       allowExternalProviders: profile.featureFlags?.allowExternalProviders ?? false,
       allowPolicyOverride: managedPolicy?.allowPolicyOverride ?? managedPolicy?.allowLocalOverride ?? managedPolicy?.userMayOverridePolicy ?? false,
       hideSettings: managedPolicy?.hideSettings ?? managedPolicy?.hideAppSettings ?? managedPolicy?.hideSettingsUI ?? false,
+      hideRecordingFloatingToolbar: managedPolicy?.hideRecordingFloatingToolbar ?? managedPolicy?.hideRecordingToolbar ?? managedPolicy?.hideNewRecordingToolbar ?? managedPolicy?.hideFloatingRecordingToolbar ?? false,
       visibleSettingsWhenHidden: normalizeVisibleSettingsWhenHidden(managedPolicy),
       userMayChangeSpeechProvider: managedPolicy?.userMayChangeSpeechProvider ?? false,
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
@@ -573,6 +578,7 @@ export default function ConfigsPage() {
       const managedPolicy = {
         allowPolicyOverride: Boolean(form.allowPolicyOverride),
         hideSettings: Boolean(form.hideSettings),
+        hideRecordingFloatingToolbar: Boolean(form.hideRecordingFloatingToolbar),
         visibleSettingsWhenHidden: normalizeVisibleSettingsWhenHidden(form),
         userMayChangeSpeechProvider: Boolean(form.userMayChangeSpeechProvider),
         userMayChangeFormatter: Boolean(form.userMayChangeFormatter),
@@ -1112,6 +1118,7 @@ export default function ConfigsPage() {
                     <div className="policy-card-body">
                       <div className="policy-toggle-grid">
                         <label className="policy-toggle"><input type="checkbox" checked={form.hideSettings} onChange={(e) => setForm({ ...form, hideSettings: e.target.checked })} /><span><FieldLabel help={helpText.hideSettings}>Hide most app settings</FieldLabel><small>Keeps managed enterprise users focused on status, support, and daily use.</small></span></label>
+                        <label className="policy-toggle"><input type="checkbox" checked={form.hideRecordingFloatingToolbar} onChange={(e) => setForm({ ...form, hideRecordingFloatingToolbar: e.target.checked })} /><span><FieldLabel help={helpText.hideRecordingFloatingToolbar}>Hide floating recording toolbar</FieldLabel><small>Removes the quick setup bubble from New Recording.</small></span></label>
                         <label className="policy-toggle"><input type="checkbox" checked={form.allowPolicyOverride} onChange={(e) => setForm({ ...form, allowPolicyOverride: e.target.checked })} /><span><FieldLabel help={helpText.allowPolicyOverride}>Allow device policy override</FieldLabel><small>Lets users temporarily bypass managed provider and privacy settings.</small></span></label>
                       </div>
                       <div className={`hidden-settings-exceptions${form.hideSettings ? "" : " disabled"}`}>
