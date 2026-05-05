@@ -83,6 +83,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { Modal } from "./AdminUI";
+import { appPath } from "../lib/base-path";
 
 export type TemplateCategoryOption = {
   id: string;
@@ -266,13 +267,13 @@ const extraSfSymbolOptions = [
 export const sfSymbolOptions = Array.from(new Set([...iosTemplateSymbols, ...extraSfSymbolOptions]));
 
 const appIconAssets: Record<string, { src: string; label: string }> = {
-  "appicon:chatgpt": { src: "/provider-icons/chatgpt.svg", label: "ChatGPT" },
-  "appicon:google-gemini": { src: "/provider-icons/google-gemini.svg", label: "Google Gemini" },
-  "appicon:apple": { src: "/provider-icons/apple.svg", label: "Apple" },
-  "appicon:microsoft": { src: "/provider-icons/microsoft.svg", label: "Microsoft" },
-  "appicon:azure": { src: "/provider-icons/azure.svg", label: "Microsoft Azure" },
-  "appicon:ollama": { src: "/provider-icons/ollama.svg", label: "Ollama" },
-  "appicon:vllm": { src: "/provider-icons/vllm.svg", label: "vLLM" }
+  "appicon:chatgpt": { src: appPath("/provider-icons/chatgpt.svg"), label: "ChatGPT" },
+  "appicon:google-gemini": { src: appPath("/provider-icons/google-gemini.svg"), label: "Google Gemini" },
+  "appicon:apple": { src: appPath("/provider-icons/apple.svg"), label: "Apple" },
+  "appicon:microsoft": { src: appPath("/provider-icons/microsoft.svg"), label: "Microsoft" },
+  "appicon:azure": { src: appPath("/provider-icons/azure.svg"), label: "Microsoft Azure" },
+  "appicon:ollama": { src: appPath("/provider-icons/ollama.svg"), label: "Ollama" },
+  "appicon:vllm": { src: appPath("/provider-icons/vllm.svg"), label: "vLLM" }
 };
 
 const sfToLucideIcon: Record<string, LucideIcon> = {
