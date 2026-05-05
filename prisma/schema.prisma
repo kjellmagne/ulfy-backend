@@ -98,8 +98,8 @@ model ConfigProfile {
   speechEndpointUrl                String?
   speechModelName                  String?
   speechApiKey                     String?
-  privacyControlEnabled            Boolean  @default(false)
-  piiControlEnabled                Boolean  @default(false)
+  privacyControlEnabled            Boolean?
+  piiControlEnabled                Boolean?
   presidioEndpointUrl              String?
   presidioSecretRef                String?
   presidioApiKey                   String?

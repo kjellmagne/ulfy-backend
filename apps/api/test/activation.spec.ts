@@ -151,7 +151,7 @@ describe("ActivationService", () => {
           privacyPrompt: "Check for sensitive details before document generation.",
           documentGenerationProviderType: "openai",
           documentGenerationApiKey: "docgen-key",
-          featureFlags: { enterpriseTemplates: true },
+          featureFlags: { developerMode: false, allowExternalProviders: false },
           allowedProviderRestrictions: [],
           providerProfiles: {
             speech: {
@@ -179,7 +179,8 @@ describe("ActivationService", () => {
             visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "unknown_setting"],
             userMayChangeSpeechProvider: true,
             userMayChangeFormatter: true,
-            userMayChangePrivacyReviewProvider: true
+            userMayChangePrivacyReviewProvider: true,
+            manageTemplateCategories: true
           }
         }
       }
@@ -223,7 +224,8 @@ describe("ActivationService", () => {
         visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
-        userMayChangePrivacyReviewProvider: true
+        userMayChangePrivacyReviewProvider: true,
+        manageTemplateCategories: true
       }
     });
     expect(result.config.providerProfiles).toMatchObject({
@@ -243,5 +245,51 @@ describe("ActivationService", () => {
     });
     expect(result.config.providerProfiles.speech.providers.gemini).toBeUndefined();
     expect(result.config.providerProfiles.formatter.providers).toHaveLength(1);
+  });
+
+  it("keeps privacy booleans and category catalog sparse unless explicitly managed", async () => {
+    prisma.templateCategory.findMany.mockResolvedValue([
+      { slug: "personlig_diktat", title: "Personlig diktat", icon: "waveform.and.mic" }
+    ]);
+    prisma.deviceActivation.findUnique.mockResolvedValue({
+      id: "act-3",
+      kind: "enterprise",
+      status: "active",
+      deviceIdentifier: "iphone-3",
+      deviceSerialNumber: null,
+      appVersion: "1.0",
+      enterpriseLicenseKeyId: "enterprise-key-2",
+      activatedAt: new Date("2026-04-29T08:00:00.000Z"),
+      singleLicenseKey: null,
+      enterpriseLicenseKey: {
+        status: "active",
+        expiresAt: null,
+        maintenanceUntil: null,
+        tenant: {
+          id: "tenant-2",
+          name: "Sparse Health",
+          slug: "sparse-health"
+        },
+        configProfile: {
+          id: "profile-2",
+          name: "Sparse policy",
+          privacyControlEnabled: null,
+          piiControlEnabled: null,
+          featureFlags: {},
+          allowedProviderRestrictions: [],
+          providerProfiles: {},
+          managedPolicy: {}
+        }
+      }
+    });
+    prisma.deviceActivation.update.mockResolvedValue({});
+
+    const result = await service.refresh({ activationToken: "token-token-token-token", deviceIdentifier: "iphone-3", appVersion: "1.1" });
+
+    expect(result.config).not.toHaveProperty("privacyControlEnabled");
+    expect(result.config).not.toHaveProperty("piiControlEnabled");
+    expect(result.config).not.toHaveProperty("templateCategories");
+    expect(result.config.managedPolicy).toMatchObject({ manageTemplateCategories: false });
+    expect(prisma.templateCategory.findMany).not.toHaveBeenCalled();
   });
 });

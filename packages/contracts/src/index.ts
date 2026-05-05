@@ -69,7 +69,9 @@ export const ManagedPolicyPayload = z.object({
   allowFormatterChange: z.boolean().optional(),
   userMayChangePrivacyReviewProvider: z.boolean().default(false),
   userMayChangePrivacyReview: z.boolean().optional(),
-  allowPrivacyReviewProviderChange: z.boolean().optional()
+  allowPrivacyReviewProviderChange: z.boolean().optional(),
+  manageTemplateCategories: z.boolean().optional(),
+  templateCategoriesManaged: z.boolean().optional()
 }).passthrough();
 
 export const TemplateCategoryCatalogItem = z.object({
@@ -83,8 +85,8 @@ export const ConfigProfilePayload = z.object({
   speechEndpointUrl: z.string().url().optional().nullable(),
   speechModelName: z.string().optional().nullable(),
   speechApiKey: z.string().optional().nullable(),
-  privacyControlEnabled: z.boolean().default(false),
-  piiControlEnabled: z.boolean().default(false),
+  privacyControlEnabled: z.boolean().optional().nullable(),
+  piiControlEnabled: z.boolean().optional().nullable(),
   presidioEndpointUrl: z.string().url().optional().nullable(),
   presidioSecretRef: z.string().optional().nullable(),
   presidioApiKey: z.string().optional().nullable(),

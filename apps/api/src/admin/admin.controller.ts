@@ -116,19 +116,21 @@ export class ConfigDto {
   @ApiProperty({
     required: false,
     example: true,
-    description: "Master privacy-control toggle. When sent to the app it becomes centrally managed unless policy flags allow local change."
+    nullable: true,
+    description: "Master privacy-control toggle. Omit or send null to leave the app's local setting alone; send true/false only when this should be centrally managed."
   })
   @IsOptional()
   @IsBoolean()
-  privacyControlEnabled?: boolean;
+  privacyControlEnabled?: boolean | null;
   @ApiProperty({
     required: false,
     example: true,
-    description: "Enables the Presidio-based PII step inside privacy control."
+    nullable: true,
+    description: "Enables the Presidio-based PII step inside privacy control. Omit or send null to leave the local PII toggle alone."
   })
   @IsOptional()
   @IsBoolean()
-  piiControlEnabled?: boolean;
+  piiControlEnabled?: boolean | null;
   @ApiProperty({
     required: false,
     example: "https://presidio.example.internal",
@@ -257,8 +259,8 @@ export class ConfigDto {
   telemetryEndpointUrl?: string;
   @ApiProperty({
     required: false,
-    example: { developerMode: false, allowExternalProviders: false, enterpriseTemplates: true, privacyReview: true },
-    description: "Boolean feature flags. The iOS app currently honors developerMode and decodes allowExternalProviders; additional flags are safe to ignore."
+    example: { developerMode: false, allowExternalProviders: false },
+    description: "Boolean feature flags currently honored by the iOS app. Additional flags are passed through but ignored by older clients."
   })
   @IsOptional()
   @IsObject()
@@ -294,9 +296,7 @@ export class ConfigDto {
       userMayChangeSpeechProvider: true,
       userMayChangeFormatter: false,
       userMayChangePrivacyReviewProvider: false,
-      externalFormattersAllowed: false,
-      privacyControlRequired: true,
-      piiRequired: true
+      manageTemplateCategories: true
     }
   })
   @IsOptional()
@@ -1796,8 +1796,8 @@ export class AdminController {
       speechEndpointUrl: this.emptyToNull(dto.speechEndpointUrl),
       speechModelName: this.emptyToNull(dto.speechModelName),
       speechApiKey: this.emptySecretToNull(dto.speechApiKey),
-      privacyControlEnabled: dto.privacyControlEnabled ?? false,
-      piiControlEnabled: dto.piiControlEnabled ?? false,
+      privacyControlEnabled: dto.privacyControlEnabled ?? null,
+      piiControlEnabled: dto.piiControlEnabled ?? null,
       presidioEndpointUrl: this.emptyToNull(dto.presidioEndpointUrl),
       presidioSecretRef: this.emptyToNull(dto.presidioSecretRef),
       presidioApiKey: this.emptySecretToNull(dto.presidioApiKey),

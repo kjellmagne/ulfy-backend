@@ -45,7 +45,7 @@ describe("ConfigDto", () => {
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true,
-        externalFormattersAllowed: true
+        manageTemplateCategories: true
       },
       defaultTemplateId: null,
       shouldBeStripped: "not allowed"
@@ -92,7 +92,7 @@ describe("ConfigDto", () => {
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true,
-        externalFormattersAllowed: true
+        manageTemplateCategories: true
       },
       defaultTemplateId: null
     });

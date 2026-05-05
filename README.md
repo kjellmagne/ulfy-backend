@@ -146,8 +146,9 @@ Sample enterprise activation payload:
     "documentGenerationEndpointUrl": "https://kvasetech.com/ollama",
     "documentGenerationApiKey": "optional-managed-docgen-key",
     "templateRepositoryUrl": "http://localhost:4000/api/v1/templates/manifest",
-    "featureFlags": { "enterpriseTemplates": true, "privacyReview": true, "developerMode": false },
-    "allowedProviderRestrictions": ["azure", "openai_compatible", "local_heuristic"]
+    "featureFlags": { "developerMode": false, "allowExternalProviders": false },
+    "allowedProviderRestrictions": ["azure", "openai_compatible", "local_heuristic"],
+    "managedPolicy": { "manageTemplateCategories": true }
   }
 }
 ```

@@ -310,7 +310,10 @@ export class ActivationService {
   }
 
   private async mapConfig(profile: any) {
-    const templateCategories = await this.templateCategoryCatalog();
+    const managedPolicy = this.mapManagedPolicy(profile.managedPolicy);
+    const templateCategories = managedPolicy.manageTemplateCategories
+      ? await this.templateCategoryCatalog()
+      : undefined;
     return compactObject({
       id: profile.id,
       name: profile.name,
@@ -345,7 +348,7 @@ export class ActivationService {
       allowedProviderRestrictions: profile.allowedProviderRestrictions,
       providerProfiles: mobileProviderProfiles(profile.providerProfiles),
       templateCategories,
-      managedPolicy: this.mapManagedPolicy(profile.managedPolicy),
+      managedPolicy,
       defaultTemplateId: profile.defaultTemplateId
     });
   }
@@ -369,6 +372,7 @@ export class ActivationService {
     const speechChangeValue = firstBoolean(source.userMayChangeSpeechProvider, source.userMayChangeSpeech, source.allowSpeechProviderChange);
     const formatterChangeValue = firstBoolean(source.userMayChangeFormatter, source.userMayChangeDocumentGenerationProvider, source.allowFormatterChange);
     const privacyReviewChangeValue = firstBoolean(source.userMayChangePrivacyReviewProvider, source.userMayChangePrivacyReview, source.allowPrivacyReviewProviderChange);
+    const manageTemplateCategoriesValue = firstBoolean(source.manageTemplateCategories, source.templateCategoriesManaged);
     const visibleSettingsWhenHidden = normalizeVisibleSettingsWhenHidden(source.visibleSettingsWhenHidden, source.settingsVisibleWhenHidden, source.allowedSettingsWhenHidden);
     return {
       ...source,
@@ -377,7 +381,8 @@ export class ActivationService {
       visibleSettingsWhenHidden,
       userMayChangeSpeechProvider: speechChangeValue ?? false,
       userMayChangeFormatter: formatterChangeValue ?? false,
-      userMayChangePrivacyReviewProvider: privacyReviewChangeValue ?? false
+      userMayChangePrivacyReviewProvider: privacyReviewChangeValue ?? false,
+      manageTemplateCategories: manageTemplateCategoriesValue ?? false
     };
   }
 }

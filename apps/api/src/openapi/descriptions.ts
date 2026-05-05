@@ -22,18 +22,18 @@ const operationDescriptions: Record<string, string> = {
     "Mobile-facing endpoint used when an iPhone user manually enters an enterprise activation key.",
     "The backend validates the key, checks tenant/key/device-limit status, registers this device activation, resolves the effective config profile, and returns tenant, license, device and config metadata.",
     "The activation token returned here is also used as the bearer token for enterprise template manifest/download access.",
-    "When template categories exist, config.templateCategories contains the centrally managed category catalog; each item id matches YAML identity.category and manifest category values."
+    "When managedPolicy.manageTemplateCategories is true, config.templateCategories contains the centrally managed category catalog; each item id matches YAML identity.category and manifest category values."
   ].join(" "),
   "POST /api/v1/activation/refresh": [
     "Mobile check-in endpoint for an already activated device.",
     "The app sends the activation token plus current device/app metadata; the backend verifies the token, updates lastSeenAt/lastCheckIn/appVersion/deviceSerialNumber, and returns current license status.",
-    "Enterprise responses include the latest effective config profile so central policy changes are picked up without reactivation, including config.templateCategories when the admin category catalog is available."
+    "Enterprise responses include the latest effective config profile so central policy changes are picked up without reactivation, including config.templateCategories when category management is enabled."
   ].join(" "),
   "GET /api/v1/config/effective": [
     "Returns the current effective enterprise configuration for the supplied activation token without requiring a full refresh body.",
     "The config payload is sparse: fields that are present are intentional managed policy, while omitted fields should leave local app settings unchanged.",
     "For single-user activations this returns no tenant and an empty config object because single licenses do not receive central policy in v1.",
-    "Enterprise config may include templateCategories so the app can use server-side category titles, SF Symbol icons and display order."
+    "Enterprise config may include templateCategories when managedPolicy.manageTemplateCategories is enabled so the app can use server-side category titles, SF Symbol icons and display order."
   ].join(" "),
   "GET /api/v1/license/details": [
     "Returns the canonical mobile Settings license-details payload for an activation token.",

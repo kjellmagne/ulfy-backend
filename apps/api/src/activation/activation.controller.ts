@@ -96,9 +96,7 @@ const managedPolicyExample = {
   userMayChangeSpeechProvider: true,
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
-  externalFormattersAllowed: false,
-  privacyControlRequired: true,
-  piiRequired: true
+  manageTemplateCategories: true
 };
 const templateCategoriesExample = [
   { id: "personlig_diktat", title: "Personlig diktat / logg", icon: "waveform.and.mic" },
@@ -137,7 +135,7 @@ const enterpriseConfigExample = {
   documentGenerationApiKey: "optional-managed-docgen-key",
   templateRepositoryUrl: "https://kvasetech.com/backend/api/v1/templates/manifest",
   telemetryEndpointUrl: "https://telemetry.example.internal/events",
-  featureFlags: { developerMode: false, allowExternalProviders: false, enterpriseTemplates: true, privacyReview: true },
+  featureFlags: { developerMode: false, allowExternalProviders: false },
   allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
   templateCategories: templateCategoriesExample,
   providerProfiles: {
@@ -279,9 +277,8 @@ const managedPolicySchema = {
     userMayChangePrivacyReviewProvider: { type: "boolean", default: false, description: "Allows the user to choose another privacy-review/guardrail provider locally." },
     userMayChangePrivacyReview: { type: "boolean", description: "Accepted alias for userMayChangePrivacyReviewProvider." },
     allowPrivacyReviewProviderChange: { type: "boolean", description: "Accepted alias for userMayChangePrivacyReviewProvider." },
-    externalFormattersAllowed: { type: "boolean", description: "Policy hint for whether external document generation providers may be used." },
-    privacyControlRequired: { type: "boolean", description: "Policy hint that privacy control should remain enabled." },
-    piiRequired: { type: "boolean", description: "Policy hint that Presidio PII checking should remain enabled." }
+    manageTemplateCategories: { type: "boolean", default: false, description: "When true, the backend sends the central template category catalog and the iOS app treats category names/icons/order as organization-managed." },
+    templateCategoriesManaged: { type: "boolean", description: "Accepted alias for manageTemplateCategories." }
   },
   additionalProperties: true,
   example: managedPolicyExample
@@ -302,8 +299,8 @@ const mobileConfigSchema = {
     speechEndpointUrl: { type: "string", nullable: true, example: "https://kvasetech.com/stt", description: "Speech endpoint URL for endpoint-driven providers such as Azure/STT container or internal gateways." },
     speechModelName: { type: "string", nullable: true, example: "gpt-4o-transcribe", description: "Optional speech model. Mainly used by OpenAI speech." },
     speechApiKey: { type: "string", nullable: true, description: "Optional managed speech credential. The app stores it securely and uses it only for the managed speech provider." },
-    privacyControlEnabled: { type: "boolean", description: "Master privacy-control toggle. When present, this manages/locks privacy control in the app unless policy allows local change." },
-    piiControlEnabled: { type: "boolean", description: "Enables the Presidio PII step inside privacy control." },
+    privacyControlEnabled: { type: "boolean", nullable: true, description: "Master privacy-control toggle. When omitted/null, the app keeps the local value. When present, this manages/locks privacy control unless policy allows local change." },
+    piiControlEnabled: { type: "boolean", nullable: true, description: "Enables the Presidio PII step inside privacy control. When omitted/null, the app keeps the local PII toggle." },
     presidioEndpointUrl: { type: "string", nullable: true, example: "https://presidio.example.internal", description: "Base URL for Microsoft Presidio Analyzer. The app appends /health and /analyze." },
     presidioSecretRef: { type: "string", nullable: true, description: "Backend-side secret reference for Presidio. Present for compatibility; the app does not dereference it." },
     presidioApiKey: { type: "string", nullable: true, description: "Optional managed Presidio credential. The app sends it as Authorization: Bearer, X-API-Key and apikey for gateway compatibility." },
@@ -328,7 +325,7 @@ const mobileConfigSchema = {
     featureFlags: {
       type: "object",
       additionalProperties: { type: "boolean" },
-      description: "Boolean feature flags decoded by the app, including developerMode, allowExternalProviders, enterpriseTemplates and privacyReview."
+      description: "Boolean feature flags decoded by the app, including developerMode and allowExternalProviders."
     },
     allowedProviderRestrictions: { type: "array", items: { type: "string" }, description: "Policy hint/list of allowed provider identifiers for clients that support provider filtering." },
     templateCategories: {

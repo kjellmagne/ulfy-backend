@@ -379,29 +379,31 @@ function defaultProviderProfiles() {
   return {
     speech: {
       selected: "azure",
-      azure: { endpointURL: "http://192.168.222.171:5000" },
-      privacyClass: "safe",
-      speakerDiarizationEnabled: false
+      available: ["local", "apple_online", "azure"],
+      providers: {
+        local: { type: "local", name: "Local", enabled: true, privacyClass: "Safe", ready: true },
+        apple_online: { type: "apple_online", name: "Apple Online", enabled: true, privacyClass: "Use with caution", ready: true },
+        azure: { type: "azure", name: "Azure / on-prem speech", enabled: true, endpointUrl: "http://192.168.222.171:5000", modelName: null, privacyClass: "Safe", ready: true }
+      }
     },
     formatter: {
       selected: "openai_compatible",
-      endpointURL: "http://localhost:8000/v1",
-      modelName: "meta-llama/Meta-Llama-3.1-8B-Instruct",
-      privacyEmphasis: "managed"
-    },
-    presidio: {
-      scoreThreshold: 0.7,
-      detectEmail: true,
-      detectPhone: true,
-      detectPerson: true,
-      detectLocation: true,
-      detectIdentifier: true,
-      fullPersonNamesOnly: false
-    },
-    privacyReview: {
-      selected: "local_heuristic",
-      privacyEmphasis: "safe",
-      eligibleForReview: true
+      selectedProviderId: "default-openai-compatible",
+      available: ["default-openai-compatible"],
+      privacyEmphasis: "managed",
+      providers: [
+        {
+          id: "default-openai-compatible",
+          name: "OpenAI-compatible",
+          type: "openai_compatible",
+          enabled: true,
+          builtIn: false,
+          endpointUrl: "http://localhost:8000/v1",
+          modelName: "meta-llama/Meta-Llama-3.1-8B-Instruct",
+          privacyEmphasis: "managed",
+          privacyClass: "Managed by default"
+        }
+      ]
     }
   };
 }
@@ -413,9 +415,7 @@ function defaultManagedPolicy() {
     userMayChangeSpeechProvider: false,
     userMayChangeFormatter: false,
     userMayChangePrivacyReviewProvider: false,
-    externalFormattersAllowed: false,
-    privacyControlRequired: true,
-    piiRequired: true
+    manageTemplateCategories: true
   };
 }
 
@@ -458,7 +458,7 @@ async function main() {
       documentGenerationProviderType: "openai_compatible",
       documentGenerationEndpointUrl: "http://localhost:8000/v1",
       documentGenerationModel: "meta-llama/Meta-Llama-3.1-8B-Instruct",
-      featureFlags: { enterpriseTemplates: true, privacyReview: true, developerMode: false, allowExternalProviders: false },
+      featureFlags: { developerMode: false, allowExternalProviders: false },
       allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
       providerProfiles: defaultProviderProfiles(),
       managedPolicy: defaultManagedPolicy()
@@ -490,7 +490,7 @@ async function main() {
       documentGenerationModel: "meta-llama/Meta-Llama-3.1-8B-Instruct",
       templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest",
       telemetryEndpointUrl: "https://telemetry.example.internal/events",
-      featureFlags: { enterpriseTemplates: true, privacyReview: true, developerMode: false, allowExternalProviders: false },
+      featureFlags: { developerMode: false, allowExternalProviders: false },
       allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
       providerProfiles: defaultProviderProfiles(),
       managedPolicy: defaultManagedPolicy()
