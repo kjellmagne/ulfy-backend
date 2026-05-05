@@ -3462,9 +3462,30 @@ textarea {
 .provider-enable input {
   margin-top: 2px;
 }
-.provider-enable span {
+.provider-copy {
   display: grid;
   gap: 3px;
+}
+.provider-icon-badge {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f8fafc;
+  color: var(--accent-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  margin-top: -4px;
+}
+.provider-row.enabled .provider-icon-badge {
+  background: var(--accent-soft);
+  border-color: #99f6e4;
+}
+.provider-enable:has(input:disabled) .provider-icon-badge {
+  opacity: 0.55;
+  filter: grayscale(1);
 }
 .provider-enable strong {
   color: var(--ink);
@@ -4193,6 +4214,14 @@ fieldset:disabled .privacy-detection-group {
 }
 .sf-symbol-tile svg {
   display: block;
+}
+.app-provider-icon {
+  display: block;
+  object-fit: contain;
+}
+.sf-symbol-tile .app-provider-icon,
+.provider-icon-badge .app-provider-icon {
+  filter: none;
 }
 .icon-picker-dialog {
   display: grid;

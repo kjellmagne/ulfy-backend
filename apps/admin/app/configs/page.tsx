@@ -5,6 +5,7 @@ import type { KeyboardEvent } from "react";
 import { ChevronDown, CopyPlus, Loader2, Plus, Save, Settings, ShieldCheck, Trash2 } from "lucide-react";
 import { RequireAuth } from "../../components/RequireAuth";
 import { EmptyState, FieldLabel, FormSection, IconAction, InfoTip, LoadingPanel, PageHeader, PanelHeader, SidePanel, StatCard } from "../../components/AdminUI";
+import { TemplateIcon } from "../../components/TemplateControls";
 import { getErrorMessage, useToast } from "../../components/ToastProvider";
 import { api } from "../../lib/api";
 
@@ -54,6 +55,7 @@ type ProviderDefinition = {
   model: boolean;
   diarization?: boolean;
   ready: boolean;
+  iconName: string;
   endpointDefault?: string;
   modelDefault?: string;
 };
@@ -78,17 +80,17 @@ type FormatterProviderProfile = {
 };
 
 const speechProviders: ProviderDefinition[] = [
-  { value: "local", label: "Local", privacy: "Safe", endpoint: false, model: false, diarization: false, ready: true },
-  { value: "apple_online", label: "Apple Online", privacy: "Use with caution", endpoint: false, model: false, diarization: false, ready: true },
-  { value: "openai", label: "OpenAI Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: true, ready: true, endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-4o-transcribe" },
-  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, endpointDefault: "https://kvasetech.com/stt" },
-  { value: "gemini", label: "Gemini Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: false, ready: false, endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-live-2.5-flash-preview" }
+  { value: "local", label: "Local", privacy: "Safe", endpoint: false, model: false, diarization: false, ready: true, iconName: "iphone" },
+  { value: "apple_online", label: "Apple Online", privacy: "Use with caution", endpoint: false, model: false, diarization: false, ready: true, iconName: "appicon:apple" },
+  { value: "openai", label: "OpenAI Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: true, ready: true, iconName: "appicon:chatgpt", endpointDefault: "https://api.openai.com/v1", modelDefault: "gpt-4o-transcribe" },
+  { value: "azure", label: "Azure / on-prem speech", privacy: "Safe", endpoint: true, model: false, diarization: false, ready: true, iconName: "appicon:azure", endpointDefault: "https://kvasetech.com/stt" },
+  { value: "gemini", label: "Gemini Speech", privacy: "Use with caution", endpoint: true, model: true, diarization: false, ready: false, iconName: "appicon:google-gemini", endpointDefault: "https://generativelanguage.googleapis.com", modelDefault: "gemini-live-2.5-flash-preview" }
 ];
 
 const formatterProviders: ProviderDefinition[] = [
-  { value: "apple_intelligence", label: "Apple Intelligence", ready: true, endpoint: false, model: false, privacy: "Safe" },
-  { value: "openai_compatible", label: "OpenAI-compatible", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" },
-  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", endpointDefault: "https://kvasetech.com/ollama" }
+  { value: "apple_intelligence", label: "Apple Intelligence", ready: true, endpoint: false, model: false, privacy: "Safe", iconName: "apple.intelligence" },
+  { value: "openai_compatible", label: "OpenAI-compatible", ready: true, endpoint: true, model: true, privacy: "Managed by default", iconName: "server.rack", endpointDefault: "https://kvasetech.com/ollama" },
+  { value: "ollama", label: "Ollama", ready: true, endpoint: true, model: true, privacy: "Managed by default", iconName: "appicon:ollama", endpointDefault: "https://kvasetech.com/ollama" }
 ];
 
 const privacyReviewProviders = [
@@ -945,15 +947,19 @@ export default function ConfigsPage() {
               <section id="config-speech-section">
               <FormSection title="Speech processing" description="Make speech providers available to the app, configure the providers that need connection details, and choose the default managed provider.">
                 <div className="provider-list">
-                  {speechProviders.map((provider) => {
-                    const available = normalizedSpeechAvailable(form).includes(provider.value);
-                    const config = speechProviderConfig(form, provider.value);
-                    return (
-                      <div className={`provider-row${available ? " enabled" : ""}`} key={provider.value}>
-                        <div className="provider-row-main">
-                          <label className="provider-enable"><input type="checkbox" checked={available} disabled={!provider.ready} onChange={(e) => toggleSpeechProvider(provider.value, e.target.checked)} /><span><strong>{provider.label}</strong><small>{provider.privacy}{provider.ready ? "" : " · coming soon in iOS"}</small></span></label>
-                          <label className="provider-default"><input type="radio" name="speech-default-provider" checked={form.speechProviderType === provider.value} disabled={!available || !provider.ready} onChange={() => setSpeechDefault(provider.value)} /> Default</label>
-                        </div>
+	                  {speechProviders.map((provider) => {
+	                    const available = normalizedSpeechAvailable(form).includes(provider.value);
+	                    const config = speechProviderConfig(form, provider.value);
+	                    return (
+	                      <div className={`provider-row${available ? " enabled" : ""}`} key={provider.value}>
+	                        <div className="provider-row-main">
+	                          <label className="provider-enable">
+	                            <input type="checkbox" checked={available} disabled={!provider.ready} onChange={(e) => toggleSpeechProvider(provider.value, e.target.checked)} />
+	                            <span className="provider-icon-badge"><TemplateIcon symbol={provider.iconName} size={22} /></span>
+	                            <span className="provider-copy"><strong>{provider.label}</strong><small>{provider.privacy}{provider.ready ? "" : " · coming soon in iOS"}</small></span>
+	                          </label>
+	                          <label className="provider-default"><input type="radio" name="speech-default-provider" checked={form.speechProviderType === provider.value} disabled={!available || !provider.ready} onChange={() => setSpeechDefault(provider.value)} /> Default</label>
+	                        </div>
                         {available && (provider.endpoint || provider.model || provider.diarization) && (
                           <div className="provider-config-grid">
                             {provider.endpoint && <div className="field"><FieldLabel help={helpText.speechEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={config.endpointUrl} onChange={(e) => updateSpeechConfig(provider.value, { endpointUrl: e.target.value })} /></div>}
