@@ -179,6 +179,23 @@ Icon button:
 - Placeholder: `#94a3b8`.
 - Textareas: vertical resize, min-height 100px, 12px monospace, line-height 1.7.
 - Checkboxes sit in a flex label with 8px gap.
+- Policy toggles use the `policy-toggle` pattern: a checkbox plus a bold natural-language label and one short explanatory line.
+- Info icons next to policy labels should explain the human purpose of the control, not the implementation detail first. Include a concrete example when it prevents misuse.
+- Disabled policy subsections should remain visible but greyed out when their parent switch makes them inactive. This keeps the relationship between parent and child controls understandable.
+- The config-profile policy editor groups device behavior controls together: hide most app settings, hide the iOS recording floating toolbar, and allow device policy override.
+
+### Policy Form Copy
+
+Policy copy should stay consistent with the iOS app wording:
+
+- Admin switch: `Hide floating recording toolbar`
+- iOS local setting: `Show floating toolbar`
+- Payload key: `managedPolicy.hideRecordingFloatingToolbar`
+- Hidden-settings exception key: `recording_floating_toolbar`
+
+The admin description should make clear that hiding the floating toolbar removes
+the quick setup bubble from New Recording only. It does not disable recording,
+the template picker, or the bottom recording controls.
 
 ## Badges
 

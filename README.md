@@ -149,7 +149,22 @@ Sample enterprise activation payload:
     "featureFlags": { "developerMode": false, "allowExternalProviders": false },
     "allowedProviderRestrictions": ["azure", "openai_compatible", "local_heuristic"],
     "managedPolicy": {
+      "allowPolicyOverride": false,
+      "hideSettings": false,
       "hideRecordingFloatingToolbar": false,
+      "visibleSettingsWhenHidden": [
+        "live_transcription_during_recording",
+        "audio_source",
+        "language",
+        "privacy_info",
+        "dim_screen_during_recording",
+        "recording_floating_toolbar",
+        "optimize_openai_recording",
+        "privacy_prompt",
+        "categories"
+      ],
+      "userMayChangeSpeechProvider": false,
+      "userMayChangeFormatter": false,
       "managePrivacyControl": true,
       "userMayChangePrivacyControl": false,
       "managePIIControl": true,
@@ -206,6 +221,17 @@ Config profiles keep provider domains separate:
 Leave provider fields blank when the backend should not manage that setting for the tenant.
 
 Admin config/policy endpoints require a bearer token from `/api/v1/auth/login`.
+
+Managed-policy behavior:
+
+- `allowPolicyOverride` is the master local bypass. Keep it false for strict enterprise policy.
+- `hideSettings` asks the iOS app to minimize the Settings screen for managed enterprise users.
+- `visibleSettingsWhenHidden` is only a visibility exception list. It can keep specific local rows visible while `hideSettings` is true, but it does not make a centrally managed value editable.
+- `hideRecordingFloatingToolbar` hides the quick floating toolbar on the iOS New Recording screen. Recording still works; users rely on managed defaults or the normal Settings screen instead.
+- `recording_floating_toolbar` is the visibility-exception key for the local `Show floating toolbar` setting when most settings are hidden.
+- Privacy-control values are sent to devices only when their apply switches are enabled: `managePrivacyControl`, `managePIIControl`, `managePrivacyReviewProvider`, and `managePrivacyPrompt`.
+- Template categories are sent when `manageTemplateCategories` is true, which is the enterprise default.
+- The backend accepts compatibility aliases such as `hideRecordingToolbar`, `hideNewRecordingToolbar`, and `hideFloatingRecordingToolbar`, but mobile payloads should use `hideRecordingFloatingToolbar`.
 
 Clone an existing policy/config profile:
 
@@ -273,6 +299,7 @@ The admin UI supports:
 - Config profile creation, editing, deletion, and cloning
 - Provider model lookup directly from the policy editor
 - Policy editing with speech, formatter, Presidio PII, and privacy review kept as separate provider domains
+- Device behavior policy switches for hiding most app settings, hiding the iOS recording floating toolbar, and allowing local policy override
 - Optional managed provider API keys for speech and document generation formatter
 - Template family, language-variant and YAML draft editing
 - Template category and reusable section-preset settings
