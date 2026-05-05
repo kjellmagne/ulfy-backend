@@ -88,7 +88,7 @@ export class ConfigDto {
     required: false,
     enum: ["local", "apple_online", "openai", "azure", "gemini"],
     example: "azure",
-    description: "Managed speech provider for the iOS app. Enterprise policy profiles normally use local, apple_online, openai or azure."
+    description: "Managed speech provider for the iOS app. Values are local, apple_online, openai, azure and gemini; Gemini is supported by the app contract but is still presented as experimental/not-ready in the admin UI."
   })
   @IsOptional()
   @IsString()
@@ -1511,7 +1511,11 @@ export class AdminController {
   }
 
   @Get("templates")
-  @ApiOperation({ summary: "Admin template list", description: "Lists templates with category and version history for the admin UI." })
+  @ApiOperation({
+    summary: "Legacy direct template list",
+    description: "Deprecated compatibility endpoint for direct Template/TemplateVersion records. Use template-family and template-variant endpoints for the current designer/repository workflow.",
+    deprecated: true
+  })
   @ApiOkResponse({ description: "Template list." })
   templatesList(@Req() req: any) {
     const partnerId = this.scopedPartnerId(req);
@@ -1679,7 +1683,11 @@ export class AdminController {
   }
 
   @Post("templates")
-  @ApiOperation({ summary: "Create template draft/version", description: "Creates a template and initial YAML version after YAML/schema validation." })
+  @ApiOperation({
+    summary: "Legacy create direct template draft/version",
+    description: "Deprecated compatibility endpoint for the old direct Template/TemplateVersion model. Use POST /admin/template-families and POST /admin/template-families/{id}/variants for new templates.",
+    deprecated: true
+  })
   @ApiBody({ type: TemplateDto })
   @ApiOkResponse({ description: "Template created." })
   async createTemplate(@Body() dto: TemplateDto, @Req() req: any) {
@@ -1706,7 +1714,11 @@ export class AdminController {
   }
 
   @Patch("templates/:id")
-  @ApiOperation({ summary: "Update template metadata or add a new YAML version" })
+  @ApiOperation({
+    summary: "Legacy update direct template metadata/version",
+    description: "Deprecated compatibility endpoint for old direct templates. Use PATCH /admin/template-variants/{id}/draft for current repository drafts.",
+    deprecated: true
+  })
   @ApiParam({ name: "id", description: "Template UUID." })
   @ApiBody({ type: TemplateDto })
   @ApiOkResponse({ description: "Template updated." })
@@ -1734,7 +1746,11 @@ export class AdminController {
   }
 
   @Post("templates/:id/publish/:versionId")
-  @ApiOperation({ summary: "Publish template version", description: "Validates YAML schema, marks selected version published, and updates the template publishedVersionId." })
+  @ApiOperation({
+    summary: "Legacy publish direct template version",
+    description: "Deprecated compatibility endpoint for TemplateVersion publishing. Use POST /admin/template-variants/{id}/publish for current repository variants.",
+    deprecated: true
+  })
   @ApiParam({ name: "id", description: "Template UUID." })
   @ApiParam({ name: "versionId", description: "TemplateVersion UUID." })
   @ApiOkResponse({ description: "Template version published.", schema: { example: { success: true } } })
@@ -1744,7 +1760,11 @@ export class AdminController {
   }
 
   @Patch("templates/:id/archive")
-  @ApiOperation({ summary: "Archive template" })
+  @ApiOperation({
+    summary: "Legacy archive direct template",
+    description: "Deprecated compatibility endpoint for old direct templates. Use PATCH /admin/template-families/{id}/archive for current repository families.",
+    deprecated: true
+  })
   @ApiParam({ name: "id", description: "Template UUID." })
   @ApiOkResponse({ description: "Template archived." })
   async archive(@Param("id") id: string, @Req() req: any) {

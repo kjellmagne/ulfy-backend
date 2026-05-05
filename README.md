@@ -37,6 +37,13 @@ Default local URLs:
 - OpenAPI JSON: `http://localhost:4000/api/docs-json`
 - Admin UI: `http://localhost:3000`
 
+The OpenAPI document is the canonical API reference for both mobile and admin
+integrations. Every exposed operation should have a summary, a full description,
+request/response shape, authentication notes, and examples where the payload is
+part of the mobile contract. Legacy compatibility endpoints are kept in the
+spec, but marked as deprecated with `x-ulfy-status: legacy` and a replacement
+hint instead of being removed.
+
 Seed admin user:
 
 - Email: `admin@ulfy.local`
@@ -311,6 +318,45 @@ The admin UI supports:
 - Audit log listing
 
 There are no public signup, billing, self-service onboarding, or tenant portal routes.
+
+## API Surface Status
+
+Current mobile app endpoints:
+
+- `POST /api/v1/activate/single`
+- `POST /api/v1/activate/enterprise`
+- `POST /api/v1/activation/refresh`
+- `GET /api/v1/config/effective`
+- `GET /api/v1/license/details`
+- `GET /api/v1/templates/manifest`
+- `GET /api/v1/templates/{id}/download`
+
+Current admin portal endpoints are `/api/v1/auth/login` plus the `/api/v1/admin/*`
+route family. The supported template repository workflow is:
+
+- `GET/POST/PATCH /api/v1/admin/template-families`
+- `POST /api/v1/admin/template-families/{id}/variants`
+- `PATCH /api/v1/admin/template-variants/{id}/draft`
+- `POST /api/v1/admin/template-variants/{id}/publish`
+- `GET /api/v1/admin/template-variants/{id}/versions`
+- `POST /api/v1/admin/template-families/{id}/entitlements`
+- `DELETE /api/v1/admin/template-families/{familyId}/entitlements/{tenantId}`
+
+Legacy compatibility endpoints still exist so old data, seed records, or
+operational scripts do not break:
+
+- `GET /api/v1/templates/manifest?tenantId=...` is a disabled-by-default
+  internal fallback and only works when `ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true`.
+  Mobile clients must use `Authorization: Bearer <activationToken>` instead.
+- `GET/POST /api/v1/admin/templates`, `PATCH /api/v1/admin/templates/{id}`,
+  `POST /api/v1/admin/templates/{id}/publish/{versionId}`, and
+  `PATCH /api/v1/admin/templates/{id}/archive` are the old direct
+  `Template`/`TemplateVersion` model. The current admin template designer does
+  not use these for new work; use family/variant/draft/publish endpoints instead.
+
+Do not remove legacy endpoints without a separate migration and deprecation
+window. For now they are documented, marked deprecated in OpenAPI, and protected
+by tests so their status is visible without breaking existing callers.
 
 ## Docker Deployment
 

@@ -321,7 +321,7 @@ const mobileConfigSchema = {
   properties: {
     id: { type: "string", format: "uuid", description: "Config profile id." },
     name: { type: "string", description: "Config profile display name." },
-    speechProviderType: { type: "string", enum: ["local", "apple_online", "openai", "azure", "gemini"], description: "Managed speech provider decoded by the iOS app. Enterprise policy profiles normally use local, apple_online, openai or azure." },
+    speechProviderType: { type: "string", enum: ["local", "apple_online", "openai", "azure", "gemini"], description: "Managed speech provider decoded by the iOS app. Values are local, apple_online, openai, azure and gemini; Gemini may be disabled by admin readiness controls even though the contract can carry it." },
     speechEndpointUrl: { type: "string", nullable: true, example: "https://kvasetech.com/stt", description: "Speech endpoint URL for endpoint-driven providers such as Azure/STT container or internal gateways." },
     speechModelName: { type: "string", nullable: true, example: "gpt-4o-transcribe", description: "Optional speech model. Mainly used by OpenAI speech." },
     speechApiKey: { type: "string", nullable: true, description: "Optional managed speech credential. The app stores it securely and uses it only for the managed speech provider." },

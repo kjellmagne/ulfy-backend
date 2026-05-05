@@ -1,10 +1,23 @@
 type OperationDoc = {
   description?: string;
+  deprecated?: boolean;
+  "x-ulfy-status"?: string;
+  "x-ulfy-replacement"?: string;
 };
 
 type OpenApiLike = {
   paths?: unknown;
 };
+
+type ParameterDoc = {
+  name?: string;
+  in?: string;
+  description?: string;
+  deprecated?: boolean;
+  "x-ulfy-status"?: string;
+};
+
+type OperationMetadata = Pick<OperationDoc, "deprecated" | "x-ulfy-status" | "x-ulfy-replacement">;
 
 const operationDescriptions: Record<string, string> = {
   "POST /api/v1/auth/login": [
@@ -44,7 +57,8 @@ const operationDescriptions: Record<string, string> = {
   "GET /api/v1/templates/manifest": [
     "Mobile-facing enterprise template catalog endpoint.",
     "Requires an enterprise activation token in Authorization: Bearer <activationToken> and returns only the latest published template variants entitled to that activation's tenant.",
-    "Single-user activations do not receive central repository access; tenant filtering is applied by the backend before the manifest is returned."
+    "Single-user activations do not receive central repository access; tenant filtering is applied by the backend before the manifest is returned.",
+    "The optional tenantId query path is a legacy internal fallback that only works when ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true; mobile clients must not use it."
   ].join(" "),
   "GET /api/v1/templates/{id}/download": [
     "Downloads the raw YAML snapshot for a tenant-entitled published template variant.",
@@ -300,29 +314,29 @@ const operationDescriptions: Record<string, string> = {
   ].join(" "),
 
   "GET /api/v1/admin/templates": [
-    "Lists direct template records with category, tenant and version history for the admin UI.",
-    "This endpoint supports the direct Template/TemplateVersion model used by the admin and seed data alongside the family/variant repository model.",
-    "Partner admins are scoped to global templates and templates for tenants owned by their partner."
+    "Legacy direct-template endpoint retained for compatibility with early Template/TemplateVersion data and seed records.",
+    "The current admin template designer and mobile template repository use template families, variants, drafts and published versions instead.",
+    "Do not build new workflows on this endpoint; use GET /api/v1/admin/template-families for current repository management."
   ].join(" "),
   "POST /api/v1/admin/templates": [
-    "Creates a direct template record and initial YAML version after validating the YAML content.",
-    "The template may be global or tenant-specific depending on access scope and tenantId.",
-    "Use family/variant endpoints for the repository workflow; this endpoint remains a real direct-template management path."
+    "Legacy direct-template create endpoint retained so old operational scripts and seed-compatible data can still be maintained.",
+    "The current supported authoring path is POST /api/v1/admin/template-families followed by POST /api/v1/admin/template-families/{id}/variants.",
+    "New admin UI work should not create direct Template/TemplateVersion records."
   ].join(" "),
   "PATCH /api/v1/admin/templates/{id}": [
-    "Updates direct template metadata and optionally adds a new YAML version.",
+    "Legacy direct-template update endpoint for the old Template/TemplateVersion model.",
     "When version and yamlContent are supplied, the backend validates the YAML and creates another TemplateVersion record.",
-    "Publishing remains a separate explicit step through the publish endpoint."
+    "Current template repository updates should use PATCH /api/v1/admin/template-variants/{id}/draft and explicit variant publish."
   ].join(" "),
   "POST /api/v1/admin/templates/{id}/publish/{versionId}": [
-    "Publishes a selected direct template version.",
+    "Legacy direct-template publish endpoint for old TemplateVersion records.",
     "The backend validates YAML schema, marks the version as published and updates the template's publishedVersionId.",
-    "Published direct templates can be returned by direct-template flows and are audit logged."
+    "Current repository publishing should use POST /api/v1/admin/template-variants/{id}/publish."
   ].join(" "),
   "PATCH /api/v1/admin/templates/{id}/archive": [
-    "Archives a direct template record.",
-    "Archived templates should be hidden from normal template selection and repository-like listing flows while retaining historical versions.",
-    "Use this to retire a direct template without deleting version history."
+    "Legacy direct-template archive endpoint.",
+    "Archived direct templates retain historical versions but are not part of the current family/variant repository workflow.",
+    "Current repository retirement should archive template families through PATCH /api/v1/admin/template-families/{id}/archive."
   ].join(" "),
 
   "GET /api/v1/admin/template-categories": [
@@ -411,6 +425,36 @@ const operationDescriptions: Record<string, string> = {
 
 const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete", "options", "head"]);
 
+const legacyDirectTemplateReplacement = "Use /api/v1/admin/template-families, /api/v1/admin/template-families/{id}/variants, /api/v1/admin/template-variants/{id}/draft and /api/v1/admin/template-variants/{id}/publish.";
+
+const operationMetadata: Record<string, OperationMetadata> = {
+  "GET /api/v1/admin/templates": {
+    deprecated: true,
+    "x-ulfy-status": "legacy",
+    "x-ulfy-replacement": "GET /api/v1/admin/template-families"
+  },
+  "POST /api/v1/admin/templates": {
+    deprecated: true,
+    "x-ulfy-status": "legacy",
+    "x-ulfy-replacement": legacyDirectTemplateReplacement
+  },
+  "PATCH /api/v1/admin/templates/{id}": {
+    deprecated: true,
+    "x-ulfy-status": "legacy",
+    "x-ulfy-replacement": legacyDirectTemplateReplacement
+  },
+  "POST /api/v1/admin/templates/{id}/publish/{versionId}": {
+    deprecated: true,
+    "x-ulfy-status": "legacy",
+    "x-ulfy-replacement": "POST /api/v1/admin/template-variants/{id}/publish"
+  },
+  "PATCH /api/v1/admin/templates/{id}/archive": {
+    deprecated: true,
+    "x-ulfy-status": "legacy",
+    "x-ulfy-replacement": "PATCH /api/v1/admin/template-families/{id}/archive"
+  }
+};
+
 export function enrichOpenApiDescriptions<T extends OpenApiLike>(document: T): T {
   if (!document.paths || typeof document.paths !== "object") return document;
 
@@ -419,11 +463,34 @@ export function enrichOpenApiDescriptions<T extends OpenApiLike>(document: T): T
 
     for (const [method, operation] of Object.entries(pathItem as Record<string, unknown>)) {
       if (!HTTP_METHODS.has(method)) continue;
-      const description = operationDescriptions[`${method.toUpperCase()} ${path}`];
-      if (description && operation && typeof operation === "object") {
-        (operation as OperationDoc).description = description;
+      const operationKey = `${method.toUpperCase()} ${path}`;
+      if (operation && typeof operation === "object") {
+        const operationDoc = operation as OperationDoc & { parameters?: unknown };
+        const description = operationDescriptions[operationKey];
+        if (description) operationDoc.description = description;
+
+        const metadata = operationMetadata[operationKey];
+        if (metadata) Object.assign(operationDoc, metadata);
+
+        markLegacyTemplateTenantQuery(operationDoc);
       }
     }
   }
   return document;
+}
+
+function markLegacyTemplateTenantQuery(operation: OperationDoc & { parameters?: unknown }) {
+  if (!Array.isArray(operation.parameters)) return;
+  for (const parameter of operation.parameters) {
+    if (!parameter || typeof parameter !== "object") continue;
+    const parameterDoc = parameter as ParameterDoc;
+    if (parameterDoc.in !== "query" || parameterDoc.name !== "tenantId") continue;
+    parameterDoc.deprecated = true;
+    parameterDoc["x-ulfy-status"] = "legacy";
+    parameterDoc.description = [
+      parameterDoc.description ?? "Optional tenant filter.",
+      "Legacy internal fallback only; requires ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true.",
+      "Mobile clients must use Authorization: Bearer <activationToken> instead."
+    ].join(" ");
+  }
 }
