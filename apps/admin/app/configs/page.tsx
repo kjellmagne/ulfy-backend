@@ -203,18 +203,24 @@ export default function ConfigsPage() {
   const selectedReviewProviderLabel = form.managePrivacyReviewProvider === false
     ? "Local setting"
     : privacyReviewProviders.find((provider) => provider.value === form.privacyReviewProviderType)?.label ?? "Not managed";
+  const privacyPolicyApplied = Boolean(form.managePrivacyControl);
+  const privacyPolicyHardOff = privacyPolicyApplied && !form.privacyControlEnabled && !form.userMayChangePrivacyControl;
+  const privacySubstepsAvailable = !privacyPolicyHardOff;
+  const piiPolicyApplied = privacySubstepsAvailable && Boolean(form.managePIIControl);
+  const reviewPolicyApplied = privacySubstepsAvailable && Boolean(form.managePrivacyReviewProvider);
+  const privacyPromptPolicyApplied = privacySubstepsAvailable && Boolean(form.managePrivacyPrompt);
   const activePolicySwitches = [
     form.hideSettings,
     form.allowPolicyOverride,
     form.userMayChangeSpeechProvider,
     form.userMayChangeFormatter,
-    form.managePrivacyControl,
-    form.userMayChangePrivacyControl,
-    form.managePIIControl,
-    form.userMayChangePIIControl,
-    form.managePrivacyReviewProvider,
-    form.userMayChangePrivacyReviewProvider,
-    form.managePrivacyPrompt,
+    privacyPolicyApplied,
+    privacyPolicyApplied && form.userMayChangePrivacyControl,
+    piiPolicyApplied,
+    piiPolicyApplied && form.userMayChangePIIControl,
+    reviewPolicyApplied,
+    reviewPolicyApplied && form.userMayChangePrivacyReviewProvider,
+    privacyPromptPolicyApplied,
     form.manageTemplateCategories,
     ...normalizeVisibleSettingsWhenHidden(form)
   ].filter(Boolean).length;
@@ -512,10 +518,11 @@ export default function ConfigsPage() {
       const selectedSpeechConfig = speechProviderConfig(form, form.speechProviderType);
       const selectedFormatter = formatterProfiles.find((provider) => provider.id === form.selectedFormatterProviderId && provider.enabled) ?? enabledFormatterProfiles[0] ?? null;
       const selectedFormatterDefinition = selectedFormatter ? formatterProviders.find((item) => item.value === selectedFormatter.type) : null;
+      const privacySubstepsAvailable = !(form.managePrivacyControl && !form.privacyControlEnabled && !form.userMayChangePrivacyControl);
       const allowedProviderRestrictions = Array.from(new Set([
         ...speechAvailableProviders,
         ...enabledFormatterProfiles.map((provider) => provider.type),
-        form.managePrivacyReviewProvider ? form.privacyReviewProviderType : ""
+        privacySubstepsAvailable && form.managePrivacyReviewProvider ? form.privacyReviewProviderType : ""
       ].filter(Boolean)));
       const allowExternalProviders = Boolean(form.allowExternalProviders || requiresExternalProviderAccess({ speechAvailableProviders }));
       const featureFlags = {
@@ -569,11 +576,11 @@ export default function ConfigsPage() {
         userMayChangeFormatter: Boolean(form.userMayChangeFormatter),
         managePrivacyControl: Boolean(form.managePrivacyControl),
         userMayChangePrivacyControl: Boolean(form.managePrivacyControl && form.userMayChangePrivacyControl),
-        managePIIControl: Boolean(form.managePIIControl),
-        userMayChangePIIControl: Boolean(form.managePIIControl && form.userMayChangePIIControl),
-        managePrivacyReviewProvider: Boolean(form.managePrivacyReviewProvider),
-        userMayChangePrivacyReviewProvider: Boolean(form.managePrivacyReviewProvider && form.userMayChangePrivacyReviewProvider),
-        managePrivacyPrompt: Boolean(form.managePrivacyPrompt),
+        managePIIControl: Boolean(privacySubstepsAvailable && form.managePIIControl),
+        userMayChangePIIControl: Boolean(privacySubstepsAvailable && form.managePIIControl && form.userMayChangePIIControl),
+        managePrivacyReviewProvider: Boolean(privacySubstepsAvailable && form.managePrivacyReviewProvider),
+        userMayChangePrivacyReviewProvider: Boolean(privacySubstepsAvailable && form.managePrivacyReviewProvider && form.userMayChangePrivacyReviewProvider),
+        managePrivacyPrompt: Boolean(privacySubstepsAvailable && form.managePrivacyPrompt),
         manageTemplateCategories: Boolean(form.manageTemplateCategories)
       };
       const speechProvider = speechProviders.find((item) => item.value === form.speechProviderType);
@@ -1000,61 +1007,74 @@ export default function ConfigsPage() {
 
               <section id="config-privacy-section">
               <FormSection title="Privacy control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review.">
-                <div className="row checkbox-group">
-                  <label className="checkbox-row"><input type="checkbox" checked={form.managePrivacyControl} onChange={(e) => setForm({ ...form, managePrivacyControl: e.target.checked, userMayChangePrivacyControl: e.target.checked ? form.userMayChangePrivacyControl : false })} /> <FieldLabel help={helpText.managePrivacyControl}>Apply privacy-control policy</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.privacyControlEnabled}>Privacy control on</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyControl} disabled={!form.managePrivacyControl} onChange={(e) => setForm({ ...form, userMayChangePrivacyControl: e.target.checked })} /> <FieldLabel help={helpText.userMayChangePrivacyControl}>User may change privacy control</FieldLabel></label>
-                </div>
-                <div className="form-subsection">
-                  <div className="form-subsection-header">
-                    <h4>Presidio PII analyzer</h4>
-                    <p>The app appends /health and /analyze to this base URL.</p>
+                <div className="privacy-policy-stack">
+                  <div className={`privacy-policy-card${privacyPolicyApplied ? "" : " inactive"}`}>
+                    <div className="privacy-policy-card-header">
+                      <label className="policy-toggle privacy-apply-toggle"><input type="checkbox" checked={form.managePrivacyControl} onChange={(e) => setForm({ ...form, managePrivacyControl: e.target.checked, userMayChangePrivacyControl: e.target.checked ? form.userMayChangePrivacyControl : false })} /><span><FieldLabel help={helpText.managePrivacyControl}>Apply privacy-control policy</FieldLabel><small>{privacyPolicyApplied ? "Central policy controls the main app switch." : "Devices keep their local privacy-control switch."}</small></span></label>
+                      <span className={`policy-state-pill${privacyPolicyApplied ? " active" : ""}`}>{privacyPolicyApplied ? "Applied" : "Local"}</span>
+                    </div>
+                    <fieldset className="privacy-policy-controls" disabled={!privacyPolicyApplied}>
+                      <label className="policy-toggle"><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> <span><FieldLabel help={helpText.privacyControlEnabled}>Privacy control on</FieldLabel><small>{form.privacyControlEnabled ? "The guardrail is on by policy." : "The guardrail is off by policy."}</small></span></label>
+                      <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangePrivacyControl} onChange={(e) => setForm({ ...form, userMayChangePrivacyControl: e.target.checked })} /> <span><FieldLabel help={helpText.userMayChangePrivacyControl}>User may change privacy control</FieldLabel><small>{form.userMayChangePrivacyControl ? "Policy sets the starting value only." : "Policy locks the value."}</small></span></label>
+                    </fieldset>
                   </div>
-                  <div className="row checkbox-group">
-                    <label className="checkbox-row"><input type="checkbox" checked={form.managePIIControl} onChange={(e) => setForm({ ...form, managePIIControl: e.target.checked, userMayChangePIIControl: e.target.checked ? form.userMayChangePIIControl : false })} /> <FieldLabel help={helpText.managePIIControl}>Apply Presidio PII policy</FieldLabel></label>
-                    <label className="checkbox-row"><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.piiControlEnabled}>Presidio PII on</FieldLabel></label>
-                    <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePIIControl} disabled={!form.managePIIControl} onChange={(e) => setForm({ ...form, userMayChangePIIControl: e.target.checked })} /> <FieldLabel help={helpText.userMayChangePIIControl}>User may change Presidio PII</FieldLabel></label>
+
+                  <div className={`privacy-policy-card${piiPolicyApplied ? "" : " inactive"}${privacyPolicyHardOff ? " blocked" : ""}`}>
+                    <div className="privacy-policy-card-header">
+                      <label className="policy-toggle privacy-apply-toggle"><input type="checkbox" checked={form.managePIIControl} disabled={privacyPolicyHardOff} onChange={(e) => setForm({ ...form, managePIIControl: e.target.checked, userMayChangePIIControl: e.target.checked ? form.userMayChangePIIControl : false })} /><span><FieldLabel help={helpText.managePIIControl}>Apply Presidio PII policy</FieldLabel><small>{privacyPolicyHardOff ? "Inactive because privacy control is locked off." : piiPolicyApplied ? "Presidio defaults are sent to devices." : "Devices keep local Presidio settings."}</small></span></label>
+                      <span className={`policy-state-pill${piiPolicyApplied ? " active" : ""}`}>{privacyPolicyHardOff ? "Blocked" : piiPolicyApplied ? "Applied" : "Local"}</span>
+                    </div>
+                    <fieldset className="privacy-policy-controls" disabled={!piiPolicyApplied}>
+                      <div className="policy-toggle-grid">
+                        <label className="policy-toggle"><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> <span><FieldLabel help={helpText.piiControlEnabled}>Presidio PII on</FieldLabel><small>{form.piiControlEnabled ? "Structured PII check is on." : "Structured PII check is off."}</small></span></label>
+                        <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangePIIControl} onChange={(e) => setForm({ ...form, userMayChangePIIControl: e.target.checked })} /> <span><FieldLabel help={helpText.userMayChangePIIControl}>User may change Presidio PII</FieldLabel><small>{form.userMayChangePIIControl ? "User may tune the analyzer." : "Analyzer settings are locked."}</small></span></label>
+                      </div>
+                      <div className="grid two">
+                        <div className="field"><FieldLabel help={helpText.presidioEndpointUrl}>Presidio endpoint URL</FieldLabel><input className="input" value={form.presidioEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, presidioEndpointUrl: e.target.value })} /></div>
+                        <div className="field"><FieldLabel help={helpText.presidioApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.presidioApiKey ?? ""} onChange={(e) => setForm({ ...form, presidioApiKey: e.target.value })} placeholder="Optional managed key" /></div>
+                        <div className="field"><FieldLabel help={helpText.presidioScoreThreshold}>Minimum score</FieldLabel><div className="range-control"><input type="range" min="0" max="1" step="0.05" value={form.piiScoreThreshold} onChange={(e) => setForm({ ...form, piiScoreThreshold: e.target.value })} /><output>{Number(form.piiScoreThreshold || 0).toFixed(2)}</output></div></div>
+                      </div>
+                      <div className="row checkbox-group privacy-detection-group">
+                        <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.fullPersonNamesOnly)} onChange={(e) => setForm({ ...form, fullPersonNamesOnly: e.target.checked })} /> Only react to full names</label>
+                        <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectPerson)} onChange={(e) => setForm({ ...form, detectPerson: e.target.checked })} /> Person names</label>
+                        <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectEmail)} onChange={(e) => setForm({ ...form, detectEmail: e.target.checked })} /> Email addresses</label>
+                        <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectPhone)} onChange={(e) => setForm({ ...form, detectPhone: e.target.checked })} /> Phone numbers</label>
+                        <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectLocation)} onChange={(e) => setForm({ ...form, detectLocation: e.target.checked })} /> Places and addresses</label>
+                        <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectIdentifier)} onChange={(e) => setForm({ ...form, detectIdentifier: e.target.checked })} /> Other identifiers</label>
+                      </div>
+                    </fieldset>
                   </div>
-                  <div className="grid two">
-                    <div className="field"><FieldLabel help={helpText.presidioEndpointUrl}>Presidio endpoint URL</FieldLabel><input className="input" value={form.presidioEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, presidioEndpointUrl: e.target.value })} /></div>
-                    <div className="field"><FieldLabel help={helpText.presidioApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.presidioApiKey ?? ""} onChange={(e) => setForm({ ...form, presidioApiKey: e.target.value })} placeholder="Optional managed key" /></div>
-                    <div className="field"><FieldLabel help={helpText.presidioScoreThreshold}>Minimum score</FieldLabel><div className="range-control"><input type="range" min="0" max="1" step="0.05" value={form.piiScoreThreshold} onChange={(e) => setForm({ ...form, piiScoreThreshold: e.target.value })} /><output>{Number(form.piiScoreThreshold || 0).toFixed(2)}</output></div></div>
+
+                  <div className={`privacy-policy-card${reviewPolicyApplied ? "" : " inactive"}${privacyPolicyHardOff ? " blocked" : ""}`}>
+                    <div className="privacy-policy-card-header">
+                      <label className="policy-toggle privacy-apply-toggle"><input type="checkbox" checked={form.managePrivacyReviewProvider} disabled={privacyPolicyHardOff} onChange={(e) => setForm({ ...form, managePrivacyReviewProvider: e.target.checked, userMayChangePrivacyReviewProvider: e.target.checked ? form.userMayChangePrivacyReviewProvider : false })} /><span><FieldLabel help={helpText.managePrivacyReviewProvider}>Apply privacy-review policy</FieldLabel><small>{privacyPolicyHardOff ? "Inactive because privacy control is locked off." : reviewPolicyApplied ? "Review provider is sent to devices." : "Devices keep local review provider."}</small></span></label>
+                      <span className={`policy-state-pill${reviewPolicyApplied ? " active" : ""}`}>{privacyPolicyHardOff ? "Blocked" : reviewPolicyApplied ? "Applied" : "Local"}</span>
+                    </div>
+                    <fieldset className="privacy-policy-controls" disabled={!reviewPolicyApplied}>
+                      <div className="policy-toggle-grid single">
+                        <label className="policy-toggle"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> <span><FieldLabel help={helpText.userMayChangePrivacyReviewProvider}>User may change privacy review</FieldLabel><small>{form.userMayChangePrivacyReviewProvider ? "Policy provider is the default only." : "Provider choice is locked."}</small></span></label>
+                      </div>
+                      <ProviderHint provider={selectedPrivacyReviewProvider} />
+                      <div className="grid two">
+                        <div className="field"><FieldLabel help={helpText.privacyReviewProviderType}>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
+                        {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} /></div>}
+                        {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} disabled={!reviewPolicyApplied} loading={modelLoading === "review" && modelLoadingKey === modelRequestKey("review")} options={modelLookupKeys.review === modelRequestKey("review") ? modelOptions.review : []} onOpen={() => lookupModels("review")} />}
+                        {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.privacyReviewApiKey ?? ""} onChange={(e) => setForm({ ...form, privacyReviewApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
+                      </div>
+                    </fieldset>
                   </div>
-                  <div className="row checkbox-group">
-                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.fullPersonNamesOnly)} onChange={(e) => setForm({ ...form, fullPersonNamesOnly: e.target.checked })} /> Only react to full names</label>
-                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectPerson)} onChange={(e) => setForm({ ...form, detectPerson: e.target.checked })} /> Person names</label>
-                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectEmail)} onChange={(e) => setForm({ ...form, detectEmail: e.target.checked })} /> Email addresses</label>
-                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectPhone)} onChange={(e) => setForm({ ...form, detectPhone: e.target.checked })} /> Phone numbers</label>
-                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectLocation)} onChange={(e) => setForm({ ...form, detectLocation: e.target.checked })} /> Places and addresses</label>
-                    <label className="checkbox-row"><input type="checkbox" checked={Boolean(form.detectIdentifier)} onChange={(e) => setForm({ ...form, detectIdentifier: e.target.checked })} /> Other identifiers</label>
-                  </div>
-                </div>
-                <div className="form-subsection">
-                  <div className="form-subsection-header">
-                    <h4>Privacy review / guardrail</h4>
-                    <p>Use local heuristic, Ollama, or an OpenAI-compatible privacy gateway approved by the organization.</p>
-                  </div>
-                  <ProviderHint provider={selectedPrivacyReviewProvider} />
-                  <div className="row checkbox-group">
-                    <label className="checkbox-row"><input type="checkbox" checked={form.managePrivacyReviewProvider} onChange={(e) => setForm({ ...form, managePrivacyReviewProvider: e.target.checked, userMayChangePrivacyReviewProvider: e.target.checked ? form.userMayChangePrivacyReviewProvider : false })} /> <FieldLabel help={helpText.managePrivacyReviewProvider}>Apply privacy-review policy</FieldLabel></label>
-                    <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} disabled={!form.managePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> <FieldLabel help={helpText.userMayChangePrivacyReviewProvider}>User may change privacy review</FieldLabel></label>
-                  </div>
-                  <div className="grid two">
-                    <div className="field"><FieldLabel help={helpText.privacyReviewProviderType}>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
-                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} /></div>}
-                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} loading={modelLoading === "review" && modelLoadingKey === modelRequestKey("review")} options={modelLookupKeys.review === modelRequestKey("review") ? modelOptions.review : []} onOpen={() => lookupModels("review")} />}
-                    {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.privacyReviewApiKey ?? ""} onChange={(e) => setForm({ ...form, privacyReviewApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
-                  </div>
-                </div>
-                <div className="form-subsection">
-                  <div className="form-subsection-header">
-                    <h4>Personvern prompt</h4>
-                    <p>Use this only when the organization wants one shared privacy-review instruction. Otherwise devices keep the built-in prompt or the user's local app setting.</p>
-                  </div>
-                  <label className="checkbox-row section-footer-check"><input type="checkbox" checked={form.managePrivacyPrompt} onChange={(e) => setForm({ ...form, managePrivacyPrompt: e.target.checked })} /> <FieldLabel help={helpText.managePrivacyPrompt}>Use policy Personvern prompt</FieldLabel></label>
-                  <div className="field">
-                    <FieldLabel help={helpText.privacyPrompt}>Personvern prompt text</FieldLabel>
-                    <textarea value={form.privacyPrompt ?? ""} onChange={(e) => setForm({ ...form, privacyPrompt: e.target.value })} placeholder="Example: Remove names, phone numbers and sensitive case details before document generation. Mark uncertainty instead of guessing." />
+
+                  <div className={`privacy-policy-card${privacyPromptPolicyApplied ? "" : " inactive"}${privacyPolicyHardOff ? " blocked" : ""}`}>
+                    <div className="privacy-policy-card-header">
+                      <label className="policy-toggle privacy-apply-toggle"><input type="checkbox" checked={form.managePrivacyPrompt} disabled={privacyPolicyHardOff} onChange={(e) => setForm({ ...form, managePrivacyPrompt: e.target.checked })} /> <span><FieldLabel help={helpText.managePrivacyPrompt}>Use policy Personvern prompt</FieldLabel><small>{privacyPolicyHardOff ? "Inactive because privacy control is locked off." : privacyPromptPolicyApplied ? "Prompt text is sent to devices." : "Devices use built-in or local prompt."}</small></span></label>
+                      <span className={`policy-state-pill${privacyPromptPolicyApplied ? " active" : ""}`}>{privacyPolicyHardOff ? "Blocked" : privacyPromptPolicyApplied ? "Applied" : "Local"}</span>
+                    </div>
+                    <fieldset className="privacy-policy-controls" disabled={!privacyPromptPolicyApplied}>
+                      <div className="field">
+                        <FieldLabel help={helpText.privacyPrompt}>Personvern prompt text</FieldLabel>
+                        <textarea value={form.privacyPrompt ?? ""} onChange={(e) => setForm({ ...form, privacyPrompt: e.target.value })} placeholder="Example: Remove names, phone numbers and sensitive case details before document generation. Mark uncertainty instead of guessing." />
+                      </div>
+                    </fieldset>
                   </div>
                 </div>
               </FormSection>
