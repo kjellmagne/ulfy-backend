@@ -247,7 +247,7 @@ describe("ActivationService", () => {
     expect(result.config.providerProfiles.formatter.providers).toHaveLength(1);
   });
 
-  it("keeps privacy booleans and category catalog sparse unless explicitly managed", async () => {
+  it("keeps privacy booleans sparse while managing category catalog by default", async () => {
     prisma.templateCategory.findMany.mockResolvedValue([
       { slug: "personlig_diktat", title: "Personlig diktat", icon: "waveform.and.mic" }
     ]);
@@ -288,8 +288,10 @@ describe("ActivationService", () => {
 
     expect(result.config).not.toHaveProperty("privacyControlEnabled");
     expect(result.config).not.toHaveProperty("piiControlEnabled");
-    expect(result.config).not.toHaveProperty("templateCategories");
-    expect(result.config.managedPolicy).toMatchObject({ manageTemplateCategories: false });
-    expect(prisma.templateCategory.findMany).not.toHaveBeenCalled();
+    expect(result.config.templateCategories).toEqual([
+      { id: "personlig_diktat", title: "Personlig diktat", icon: "waveform.and.mic" }
+    ]);
+    expect(result.config.managedPolicy).toMatchObject({ manageTemplateCategories: true });
+    expect(prisma.templateCategory.findMany).toHaveBeenCalled();
   });
 });

@@ -55,7 +55,14 @@ describe("AdminController config cloning", () => {
 
     const result = await controller.cloneConfig("profile-1", {}, { user: { sub: "admin-1", email: "admin@example.com", role: "superadmin" } });
 
-    expect(result).toEqual({ ...created, speechApiKey: "********", presidioApiKey: "********", documentGenerationApiKey: "********", privacyReviewApiKey: "********" });
+    expect(result).toEqual({
+      ...created,
+      managedPolicy: { allowPolicyOverride: false, hideSettings: true, manageTemplateCategories: true },
+      speechApiKey: "********",
+      presidioApiKey: "********",
+      documentGenerationApiKey: "********",
+      privacyReviewApiKey: "********"
+    });
     expect(prisma.configProfile.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         name: "Copy of Strict enterprise policy",
@@ -68,7 +75,7 @@ describe("AdminController config cloning", () => {
         privacyReviewApiKey: "privacy-key",
         privacyPrompt: "Check for sensitive details before document generation.",
         documentGenerationApiKey: "docgen-key",
-        managedPolicy: { allowPolicyOverride: false, hideSettings: true }
+        managedPolicy: { allowPolicyOverride: false, hideSettings: true, manageTemplateCategories: true }
       }),
       include: { partner: true }
     });

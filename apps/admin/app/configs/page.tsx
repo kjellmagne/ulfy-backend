@@ -331,7 +331,7 @@ export default function ConfigsPage() {
       userMayChangeSpeechProvider: managedPolicy?.userMayChangeSpeechProvider ?? false,
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
       userMayChangePrivacyReviewProvider: managedPolicy?.userMayChangePrivacyReviewProvider ?? false,
-      manageTemplateCategories: managedPolicy?.manageTemplateCategories ?? managedPolicy?.templateCategoriesManaged ?? false,
+      manageTemplateCategories: managedPolicy?.manageTemplateCategories ?? managedPolicy?.templateCategoriesManaged ?? true,
       defaultTemplateId: profile.defaultTemplateId ?? ""
     });
     setModelOptions({ speech: [], formatter: [], review: [] });

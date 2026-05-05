@@ -382,7 +382,7 @@ export class ActivationService {
       userMayChangeSpeechProvider: speechChangeValue ?? false,
       userMayChangeFormatter: formatterChangeValue ?? false,
       userMayChangePrivacyReviewProvider: privacyReviewChangeValue ?? false,
-      manageTemplateCategories: manageTemplateCategoriesValue ?? false
+      manageTemplateCategories: manageTemplateCategoriesValue ?? true
     };
   }
 }

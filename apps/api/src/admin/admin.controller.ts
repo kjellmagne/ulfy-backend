@@ -1248,6 +1248,7 @@ export class AdminController {
     const profile = await this.prisma.configProfile.create({
       data: {
         ...copyable,
+        managedPolicy: this.normalizeManagedPolicy(copyable.managedPolicy),
         name
       },
       include: { partner: true }
@@ -1822,7 +1823,7 @@ export class AdminController {
       featureFlags: dto.featureFlags ?? {},
       allowedProviderRestrictions: dto.allowedProviderRestrictions ?? [],
       providerProfiles: this.preserveMaskedProviderSecrets(dto.providerProfiles ?? {}, existing?.providerProfiles),
-      managedPolicy: dto.managedPolicy ?? {},
+      managedPolicy: this.normalizeManagedPolicy(dto.managedPolicy),
       defaultTemplateId: this.emptyToNull(dto.defaultTemplateId ?? undefined)
     };
     return data;
@@ -1840,6 +1841,13 @@ export class AdminController {
     return this.emptyToNull(value);
   }
 
+  private normalizeManagedPolicy(policy?: Record<string, unknown>) {
+    return {
+      ...(policy ?? {}),
+      manageTemplateCategories: firstBoolean(policy?.manageTemplateCategories, policy?.templateCategoriesManaged) ?? true
+    };
+  }
+
   private maskAdminConfigSecrets<T extends { speechApiKey?: string | null; documentGenerationApiKey?: string | null; privacyReviewApiKey?: string | null; presidioApiKey?: string | null }>(profile: T) {
     return {
       ...profile,
@@ -1847,6 +1855,7 @@ export class AdminController {
       presidioApiKey: profile.presidioApiKey ? ADMIN_SECRET_MASK : null,
       privacyReviewApiKey: profile.privacyReviewApiKey ? ADMIN_SECRET_MASK : null,
       documentGenerationApiKey: profile.documentGenerationApiKey ? ADMIN_SECRET_MASK : null,
+      managedPolicy: this.normalizeManagedPolicy((profile as T & { managedPolicy?: Record<string, unknown> }).managedPolicy),
       providerProfiles: this.maskNestedProviderSecrets((profile as T & { providerProfiles?: unknown }).providerProfiles)
     };
   }
@@ -2535,4 +2544,8 @@ export class AdminController {
 function normalizeOpenAiCompatibleProvider(providerType?: string | null) {
   if (providerType === "openai" || providerType === "vllm") return "openai_compatible";
   return providerType;
+}
+
+function firstBoolean(...values: unknown[]) {
+  return values.find((value): value is boolean => typeof value === "boolean");
 }

@@ -277,7 +277,7 @@ const managedPolicySchema = {
     userMayChangePrivacyReviewProvider: { type: "boolean", default: false, description: "Allows the user to choose another privacy-review/guardrail provider locally." },
     userMayChangePrivacyReview: { type: "boolean", description: "Accepted alias for userMayChangePrivacyReviewProvider." },
     allowPrivacyReviewProviderChange: { type: "boolean", description: "Accepted alias for userMayChangePrivacyReviewProvider." },
-    manageTemplateCategories: { type: "boolean", default: false, description: "When true, the backend sends the central template category catalog and the iOS app treats category names/icons/order as organization-managed." },
+    manageTemplateCategories: { type: "boolean", default: true, description: "When true, the backend sends the central template category catalog and the iOS app treats category names/icons/order as organization-managed. Profiles default to managed categories unless explicitly set to false." },
     templateCategoriesManaged: { type: "boolean", description: "Accepted alias for manageTemplateCategories." }
   },
   additionalProperties: true,
