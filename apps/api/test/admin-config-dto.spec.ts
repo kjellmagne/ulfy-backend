@@ -44,6 +44,11 @@ describe("ConfigDto", () => {
         visibleSettingsWhenHidden: ["privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
+        managePrivacyControl: true,
+        userMayChangePrivacyControl: true,
+        managePIIControl: true,
+        userMayChangePIIControl: false,
+        managePrivacyReviewProvider: true,
         userMayChangePrivacyReviewProvider: true,
         managePrivacyPrompt: true,
         manageTemplateCategories: true
@@ -92,6 +97,11 @@ describe("ConfigDto", () => {
         visibleSettingsWhenHidden: ["privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
+        managePrivacyControl: true,
+        userMayChangePrivacyControl: true,
+        managePIIControl: true,
+        userMayChangePIIControl: false,
+        managePrivacyReviewProvider: true,
         userMayChangePrivacyReviewProvider: true,
         managePrivacyPrompt: true,
         manageTemplateCategories: true

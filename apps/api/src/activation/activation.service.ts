@@ -310,7 +310,7 @@ export class ActivationService {
   }
 
   private async mapConfig(profile: any) {
-    const managedPolicy = this.mapManagedPolicy(profile.managedPolicy, profile.privacyPrompt);
+    const managedPolicy = this.mapManagedPolicy(profile.managedPolicy, profile);
     const templateCategories = managedPolicy.manageTemplateCategories
       ? await this.templateCategoryCatalog()
       : undefined;
@@ -321,22 +321,22 @@ export class ActivationService {
       speechEndpointUrl: profile.speechEndpointUrl,
       speechModelName: profile.speechModelName,
       speechApiKey: profile.speechApiKey,
-      privacyControlEnabled: profile.privacyControlEnabled,
-      piiControlEnabled: profile.piiControlEnabled,
-      presidioEndpointUrl: profile.presidioEndpointUrl,
-      presidioSecretRef: profile.presidioSecretRef,
-      presidioApiKey: profile.presidioApiKey,
-      presidioScoreThreshold: profile.presidioScoreThreshold,
-      presidioFullPersonNamesOnly: profile.presidioFullPersonNamesOnly,
-      presidioDetectPerson: profile.presidioDetectPerson,
-      presidioDetectEmail: profile.presidioDetectEmail,
-      presidioDetectPhone: profile.presidioDetectPhone,
-      presidioDetectLocation: profile.presidioDetectLocation,
-      presidioDetectIdentifier: profile.presidioDetectIdentifier,
-      privacyReviewProviderType: normalizeOpenAiCompatibleProvider(profile.privacyReviewProviderType),
-      privacyReviewEndpointUrl: profile.privacyReviewEndpointUrl,
-      privacyReviewModel: profile.privacyReviewModel,
-      privacyReviewApiKey: profile.privacyReviewApiKey,
+      privacyControlEnabled: managedPolicy.managePrivacyControl ? profile.privacyControlEnabled : undefined,
+      piiControlEnabled: managedPolicy.managePIIControl ? profile.piiControlEnabled : undefined,
+      presidioEndpointUrl: managedPolicy.managePIIControl ? profile.presidioEndpointUrl : undefined,
+      presidioSecretRef: managedPolicy.managePIIControl ? profile.presidioSecretRef : undefined,
+      presidioApiKey: managedPolicy.managePIIControl ? profile.presidioApiKey : undefined,
+      presidioScoreThreshold: managedPolicy.managePIIControl ? profile.presidioScoreThreshold : undefined,
+      presidioFullPersonNamesOnly: managedPolicy.managePIIControl ? profile.presidioFullPersonNamesOnly : undefined,
+      presidioDetectPerson: managedPolicy.managePIIControl ? profile.presidioDetectPerson : undefined,
+      presidioDetectEmail: managedPolicy.managePIIControl ? profile.presidioDetectEmail : undefined,
+      presidioDetectPhone: managedPolicy.managePIIControl ? profile.presidioDetectPhone : undefined,
+      presidioDetectLocation: managedPolicy.managePIIControl ? profile.presidioDetectLocation : undefined,
+      presidioDetectIdentifier: managedPolicy.managePIIControl ? profile.presidioDetectIdentifier : undefined,
+      privacyReviewProviderType: managedPolicy.managePrivacyReviewProvider ? normalizeOpenAiCompatibleProvider(profile.privacyReviewProviderType) : undefined,
+      privacyReviewEndpointUrl: managedPolicy.managePrivacyReviewProvider ? profile.privacyReviewEndpointUrl : undefined,
+      privacyReviewModel: managedPolicy.managePrivacyReviewProvider ? profile.privacyReviewModel : undefined,
+      privacyReviewApiKey: managedPolicy.managePrivacyReviewProvider ? profile.privacyReviewApiKey : undefined,
       privacyPrompt: managedPolicy.managePrivacyPrompt ? profile.privacyPrompt : undefined,
       documentGenerationProviderType: normalizeOpenAiCompatibleProvider(profile.documentGenerationProviderType),
       documentGenerationEndpointUrl: profile.documentGenerationEndpointUrl,
@@ -365,12 +365,17 @@ export class ActivationService {
     }));
   }
 
-  private mapManagedPolicy(policy: unknown, privacyPrompt?: string | null) {
+  private mapManagedPolicy(policy: unknown, profile?: Record<string, any> | null) {
     const source = isRecord(policy) ? policy : {};
     const overrideValue = firstBoolean(source.allowPolicyOverride, source.allowLocalOverride, source.userMayOverridePolicy);
     const hideSettingsValue = firstBoolean(source.hideSettings, source.hideAppSettings, source.hideSettingsUI);
     const speechChangeValue = firstBoolean(source.userMayChangeSpeechProvider, source.userMayChangeSpeech, source.allowSpeechProviderChange);
     const formatterChangeValue = firstBoolean(source.userMayChangeFormatter, source.userMayChangeDocumentGenerationProvider, source.allowFormatterChange);
+    const privacyControlManagedValue = firstBoolean(source.managePrivacyControl, source.privacyControlManaged);
+    const privacyControlChangeValue = firstBoolean(source.userMayChangePrivacyControl, source.allowPrivacyControlChange);
+    const piiControlManagedValue = firstBoolean(source.managePIIControl, source.piiControlManaged);
+    const piiControlChangeValue = firstBoolean(source.userMayChangePIIControl, source.allowPIIControlChange);
+    const privacyReviewManagedValue = firstBoolean(source.managePrivacyReviewProvider, source.privacyReviewProviderManaged, source.managePrivacyReview);
     const privacyReviewChangeValue = firstBoolean(source.userMayChangePrivacyReviewProvider, source.userMayChangePrivacyReview, source.allowPrivacyReviewProviderChange);
     const managePrivacyPromptValue = firstBoolean(source.managePrivacyPrompt, source.privacyPromptManaged);
     const manageTemplateCategoriesValue = firstBoolean(source.manageTemplateCategories, source.templateCategoriesManaged);
@@ -382,8 +387,13 @@ export class ActivationService {
       visibleSettingsWhenHidden,
       userMayChangeSpeechProvider: speechChangeValue ?? false,
       userMayChangeFormatter: formatterChangeValue ?? false,
+      managePrivacyControl: privacyControlManagedValue ?? profileHasValue(profile, "privacyControlEnabled"),
+      userMayChangePrivacyControl: privacyControlChangeValue ?? false,
+      managePIIControl: piiControlManagedValue ?? hasManagedPIIPolicyFields(profile),
+      userMayChangePIIControl: piiControlChangeValue ?? false,
+      managePrivacyReviewProvider: privacyReviewManagedValue ?? hasManagedPrivacyReviewPolicyFields(profile),
       userMayChangePrivacyReviewProvider: privacyReviewChangeValue ?? false,
-      managePrivacyPrompt: managePrivacyPromptValue ?? Boolean(privacyPrompt?.trim()),
+      managePrivacyPrompt: managePrivacyPromptValue ?? Boolean(profile?.privacyPrompt?.trim()),
       manageTemplateCategories: manageTemplateCategoriesValue ?? true
     };
   }
@@ -406,6 +416,38 @@ function compactObject(input: Record<string, unknown>) {
     if (typeof value === "object" && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length === 0) return false;
     return true;
   }));
+}
+
+function profileHasValue(profile: Record<string, any> | null | undefined, key: string) {
+  const value = profile?.[key];
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+
+function hasManagedPIIPolicyFields(profile: Record<string, any> | null | undefined) {
+  return [
+    "piiControlEnabled",
+    "presidioEndpointUrl",
+    "presidioSecretRef",
+    "presidioApiKey",
+    "presidioScoreThreshold",
+    "presidioFullPersonNamesOnly",
+    "presidioDetectPerson",
+    "presidioDetectEmail",
+    "presidioDetectPhone",
+    "presidioDetectLocation",
+    "presidioDetectIdentifier"
+  ].some((key) => profileHasValue(profile, key));
+}
+
+function hasManagedPrivacyReviewPolicyFields(profile: Record<string, any> | null | undefined) {
+  return [
+    "privacyReviewProviderType",
+    "privacyReviewEndpointUrl",
+    "privacyReviewModel",
+    "privacyReviewApiKey"
+  ].some((key) => profileHasValue(profile, key));
 }
 
 function normalizeOpenAiCompatibleProvider(providerType?: string | null) {

@@ -17,16 +17,20 @@ const helpText = {
   documentGenerationEndpointUrl: "Endpoint URL for the document-generation provider. Use this for internal gateways, self-hosted providers, or OpenAI-compatible services. Locks app UI when set.",
   documentGenerationModel: "Model identifier used for document generation. Choose the organization-approved model for note formatting. Locks app UI when set.",
   documentGenerationApiKey: "Optional API key for the document-generation provider. Prefer internal gateways or tenant-scoped keys. If sent to the app, it should be treated as a managed credential.",
-  managePrivacyControl: "When checked, this profile controls whether privacy control is on or off in the app. Leave it unchecked when each device should keep its own local privacy-control setting.",
-  privacyControlEnabled: "The managed value for privacy control. Turn this on when transcripts should pass through the privacy guardrail before document generation. Turn it off only when the organization intentionally disables that guardrail.",
-  privacyReviewProviderType: "Choose which provider reviews transcript text for privacy concerns before document generation. Best supported with local_heuristic, ollama, or openai_compatible. Other values are partial.",
+  managePrivacyControl: "Apply this profile's main privacy-control setting to the app. When on, the app starts from the value below. Example: turn this on when every municipal device should use privacy control by default; leave it off when privacy control is a local team choice.",
+  userMayChangePrivacyControl: "Let the user change the main privacy-control switch after the policy is applied. Example: enable this when the organization wants privacy control on by default but allows a clinician, manager, or field worker to turn it off for a specific local workflow.",
+  privacyControlEnabled: "The policy value for the main privacy-control switch. On means transcripts pass through privacy protection before document generation. Off means the organization intentionally disables the guardrail for this profile.",
+  managePrivacyReviewProvider: "Apply this profile's privacy-review/guardrail provider to the app. When off, the saved provider below is kept in the admin profile but is not sent to devices. Example: leave it off while testing a new privacy gateway; turn it on when devices should actually use it.",
+  privacyReviewProviderType: "Choose which provider reviews transcript text for privacy concerns before document generation. Local heuristic stays on the device. Ollama or OpenAI-compatible should point to an approved internal gateway or self-hosted service.",
   privacyReviewEndpointUrl: "Endpoint URL for the privacy-review provider. Use this for internal or self-hosted privacy-review services. Locks app UI when set.",
   privacyReviewModel: "Model identifier used for the privacy-review step. Locks app UI when set.",
   privacyReviewApiKey: "Optional API key for the privacy-review provider. Use this for authenticated OpenAI-compatible privacy gateways or protected Ollama routes.",
+  userMayChangePrivacyReviewProvider: "Let the user choose a different privacy-review provider after this policy is applied. Example: keep this off for regulated teams that must use the approved gateway; turn it on for pilots where local heuristic, Ollama, and gateway behavior are being compared.",
   managePrivacyPrompt: "When checked, this profile sends the Personvern prompt below to the app and the app uses that text for privacy review. When unchecked, the text is saved here but not sent, so devices use the built-in prompt or the user's local app setting.",
   privacyPrompt: "Prompt text for privacy review guidance. It is only sent to the app when Use policy Personvern prompt is checked. Example: Ask Ulfy to remove names, phone numbers and sensitive case details before document generation, and to mark uncertainty instead of guessing.",
-  managePIIControl: "When checked, this profile controls the Presidio PII switch in the app. Leave it unchecked when devices should keep their local PII setting.",
-  piiControlEnabled: "The managed value for Presidio PII checking. This is the structured detector step inside privacy control.",
+  managePIIControl: "Apply this profile's Presidio PII analyzer settings to the app. When off, the saved endpoint, score, and detection choices below are not sent to devices. Example: turn it on when Presidio is production-ready; leave it off while the organization is still testing false positives.",
+  userMayChangePIIControl: "Let the user change the Presidio PII analyzer switch and analyzer details after the policy is applied. Example: enable this for pilot users who tune thresholds; keep it off when the central Presidio setup must be used consistently.",
+  piiControlEnabled: "The policy value for the Presidio PII analyzer. This is the structured detector step inside privacy control. On means Presidio checks for names, email, phone numbers, places, and identifiers according to the options below.",
   presidioEndpointUrl: "Endpoint URL for the Presidio analyzer used for PII detection. Typically an internal or protected service. Locks app UI when set.",
   presidioSecretRef: "Optional backend-side secret reference for Presidio access. Use when Presidio is protected by a gateway or internal auth layer. Partial support; no practical UI lock beyond managed connection.",
   presidioApiKey: "Optional managed Presidio API key. The app sends it as Authorization Bearer, X-API-Key, and apikey for common gateway compatibility.",
@@ -118,8 +122,10 @@ const empty = {
   speechProviderConfigs: {},
   managePrivacyControl: true,
   privacyControlEnabled: true,
+  userMayChangePrivacyControl: false,
   managePIIControl: true,
   piiControlEnabled: true,
+  userMayChangePIIControl: false,
   presidioEndpointUrl: "",
   presidioSecretRef: "",
   presidioApiKey: "",
@@ -134,6 +140,7 @@ const empty = {
   privacyReviewEndpointUrl: "",
   privacyReviewModel: "",
   privacyReviewApiKey: "",
+  managePrivacyReviewProvider: true,
   privacyPrompt: "",
   documentGenerationProviderType: "",
   documentGenerationEndpointUrl: "",
@@ -193,7 +200,7 @@ export default function ConfigsPage() {
   const selectedPartnerName = partners.find((partner) => partner.id === form.partnerId)?.name ?? "Internal";
   const selectedSpeechProviderLabel = speechProviders.find((provider) => provider.value === form.speechProviderType)?.label ?? "Not managed";
   const selectedFormatterProviderLabel = selectedFormatterProvider?.name ?? "Not managed";
-  const selectedReviewProviderLabel = form.managePrivacyControl === false
+  const selectedReviewProviderLabel = form.managePrivacyReviewProvider === false
     ? "Local setting"
     : privacyReviewProviders.find((provider) => provider.value === form.privacyReviewProviderType)?.label ?? "Not managed";
   const activePolicySwitches = [
@@ -201,7 +208,14 @@ export default function ConfigsPage() {
     form.allowPolicyOverride,
     form.userMayChangeSpeechProvider,
     form.userMayChangeFormatter,
+    form.managePrivacyControl,
+    form.userMayChangePrivacyControl,
+    form.managePIIControl,
+    form.userMayChangePIIControl,
+    form.managePrivacyReviewProvider,
     form.userMayChangePrivacyReviewProvider,
+    form.managePrivacyPrompt,
+    form.manageTemplateCategories,
     ...normalizeVisibleSettingsWhenHidden(form)
   ].filter(Boolean).length;
 
@@ -310,10 +324,12 @@ export default function ConfigsPage() {
       documentGenerationApiKey: profile.documentGenerationApiKey ? SAVED_SECRET_MASK : "",
       privacyReviewApiKey: profile.privacyReviewApiKey ? SAVED_SECRET_MASK : "",
       privacyPrompt: profile.privacyPrompt ?? "",
-      managePrivacyControl: profile.privacyControlEnabled !== null && profile.privacyControlEnabled !== undefined,
+      managePrivacyControl: managedPolicy?.managePrivacyControl ?? managedPolicy?.privacyControlManaged ?? profileHasValue(profile, "privacyControlEnabled"),
       privacyControlEnabled: profile.privacyControlEnabled ?? true,
-      managePIIControl: profile.piiControlEnabled !== null && profile.piiControlEnabled !== undefined,
+      userMayChangePrivacyControl: managedPolicy?.userMayChangePrivacyControl ?? managedPolicy?.allowPrivacyControlChange ?? false,
+      managePIIControl: managedPolicy?.managePIIControl ?? managedPolicy?.piiControlManaged ?? hasManagedPIIPolicyFields(profile),
       piiControlEnabled: profile.piiControlEnabled ?? true,
+      userMayChangePIIControl: managedPolicy?.userMayChangePIIControl ?? managedPolicy?.allowPIIControlChange ?? false,
       speechDiarizationEnabled: providerProfiles?.speech?.speakerDiarizationEnabled ?? false,
       piiScoreThreshold: String(profile.presidioScoreThreshold ?? providerProfiles?.presidio?.scoreThreshold ?? "0.70"),
       detectEmail: profile.presidioDetectEmail ?? providerProfiles?.presidio?.detectEmail ?? true,
@@ -332,6 +348,7 @@ export default function ConfigsPage() {
       visibleSettingsWhenHidden: normalizeVisibleSettingsWhenHidden(managedPolicy),
       userMayChangeSpeechProvider: managedPolicy?.userMayChangeSpeechProvider ?? false,
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
+      managePrivacyReviewProvider: managedPolicy?.managePrivacyReviewProvider ?? managedPolicy?.privacyReviewProviderManaged ?? managedPolicy?.managePrivacyReview ?? hasManagedPrivacyReviewPolicyFields(profile),
       userMayChangePrivacyReviewProvider: managedPolicy?.userMayChangePrivacyReviewProvider ?? false,
       managePrivacyPrompt: managedPolicy?.managePrivacyPrompt ?? managedPolicy?.privacyPromptManaged ?? Boolean(profile.privacyPrompt?.trim()),
       manageTemplateCategories: managedPolicy?.manageTemplateCategories ?? managedPolicy?.templateCategoriesManaged ?? true,
@@ -498,7 +515,7 @@ export default function ConfigsPage() {
       const allowedProviderRestrictions = Array.from(new Set([
         ...speechAvailableProviders,
         ...enabledFormatterProfiles.map((provider) => provider.type),
-        form.privacyReviewProviderType
+        form.managePrivacyReviewProvider ? form.privacyReviewProviderType : ""
       ].filter(Boolean)));
       const allowExternalProviders = Boolean(form.allowExternalProviders || requiresExternalProviderAccess({ speechAvailableProviders }));
       const featureFlags = {
@@ -550,7 +567,12 @@ export default function ConfigsPage() {
         visibleSettingsWhenHidden: normalizeVisibleSettingsWhenHidden(form),
         userMayChangeSpeechProvider: Boolean(form.userMayChangeSpeechProvider),
         userMayChangeFormatter: Boolean(form.userMayChangeFormatter),
-        userMayChangePrivacyReviewProvider: Boolean(form.userMayChangePrivacyReviewProvider),
+        managePrivacyControl: Boolean(form.managePrivacyControl),
+        userMayChangePrivacyControl: Boolean(form.managePrivacyControl && form.userMayChangePrivacyControl),
+        managePIIControl: Boolean(form.managePIIControl),
+        userMayChangePIIControl: Boolean(form.managePIIControl && form.userMayChangePIIControl),
+        managePrivacyReviewProvider: Boolean(form.managePrivacyReviewProvider),
+        userMayChangePrivacyReviewProvider: Boolean(form.managePrivacyReviewProvider && form.userMayChangePrivacyReviewProvider),
         managePrivacyPrompt: Boolean(form.managePrivacyPrompt),
         manageTemplateCategories: Boolean(form.manageTemplateCategories)
       };
@@ -564,8 +586,8 @@ export default function ConfigsPage() {
         speechEndpointUrl: speechProvider?.endpoint ? selectedSpeechConfig.endpointUrl || null : null,
         speechModelName: speechProvider?.model ? selectedSpeechConfig.modelName || null : null,
         speechApiKey: selected && selectedSpeechConfig.apiKey === SAVED_SECRET_MASK ? undefined : speechProvider?.endpoint ? selectedSpeechConfig.apiKey || null : null,
-        privacyControlEnabled: form.managePrivacyControl ? Boolean(form.privacyControlEnabled) : null,
-        piiControlEnabled: form.managePIIControl ? Boolean(form.piiControlEnabled) : null,
+        privacyControlEnabled: Boolean(form.privacyControlEnabled),
+        piiControlEnabled: Boolean(form.piiControlEnabled),
         presidioEndpointUrl: form.presidioEndpointUrl || null,
         presidioSecretRef: form.presidioSecretRef || null,
         presidioApiKey: selected && form.presidioApiKey === SAVED_SECRET_MASK ? undefined : form.presidioApiKey || null,
@@ -979,15 +1001,19 @@ export default function ConfigsPage() {
               <section id="config-privacy-section">
               <FormSection title="Privacy control" description="Master guardrail switch plus two independent substeps: Presidio PII and privacy review.">
                 <div className="row checkbox-group">
-                  <label className="checkbox-row"><input type="checkbox" checked={form.managePrivacyControl} onChange={(e) => setForm({ ...form, managePrivacyControl: e.target.checked })} /> <FieldLabel help={helpText.managePrivacyControl}>Manage privacy-control switch</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.privacyControlEnabled} disabled={!form.managePrivacyControl} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.privacyControlEnabled}>Privacy control on</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.managePIIControl} onChange={(e) => setForm({ ...form, managePIIControl: e.target.checked })} /> <FieldLabel help={helpText.managePIIControl}>Manage Presidio PII switch</FieldLabel></label>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.piiControlEnabled} disabled={!form.managePIIControl} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.piiControlEnabled}>Presidio PII on</FieldLabel></label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.managePrivacyControl} onChange={(e) => setForm({ ...form, managePrivacyControl: e.target.checked, userMayChangePrivacyControl: e.target.checked ? form.userMayChangePrivacyControl : false })} /> <FieldLabel help={helpText.managePrivacyControl}>Apply privacy-control policy</FieldLabel></label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.privacyControlEnabled} onChange={(e) => setForm({ ...form, privacyControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.privacyControlEnabled}>Privacy control on</FieldLabel></label>
+                  <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyControl} disabled={!form.managePrivacyControl} onChange={(e) => setForm({ ...form, userMayChangePrivacyControl: e.target.checked })} /> <FieldLabel help={helpText.userMayChangePrivacyControl}>User may change privacy control</FieldLabel></label>
                 </div>
                 <div className="form-subsection">
                   <div className="form-subsection-header">
                     <h4>Presidio PII analyzer</h4>
                     <p>The app appends /health and /analyze to this base URL.</p>
+                  </div>
+                  <div className="row checkbox-group">
+                    <label className="checkbox-row"><input type="checkbox" checked={form.managePIIControl} onChange={(e) => setForm({ ...form, managePIIControl: e.target.checked, userMayChangePIIControl: e.target.checked ? form.userMayChangePIIControl : false })} /> <FieldLabel help={helpText.managePIIControl}>Apply Presidio PII policy</FieldLabel></label>
+                    <label className="checkbox-row"><input type="checkbox" checked={form.piiControlEnabled} onChange={(e) => setForm({ ...form, piiControlEnabled: e.target.checked })} /> <FieldLabel help={helpText.piiControlEnabled}>Presidio PII on</FieldLabel></label>
+                    <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePIIControl} disabled={!form.managePIIControl} onChange={(e) => setForm({ ...form, userMayChangePIIControl: e.target.checked })} /> <FieldLabel help={helpText.userMayChangePIIControl}>User may change Presidio PII</FieldLabel></label>
                   </div>
                   <div className="grid two">
                     <div className="field"><FieldLabel help={helpText.presidioEndpointUrl}>Presidio endpoint URL</FieldLabel><input className="input" value={form.presidioEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, presidioEndpointUrl: e.target.value })} /></div>
@@ -1009,13 +1035,16 @@ export default function ConfigsPage() {
                     <p>Use local heuristic, Ollama, or an OpenAI-compatible privacy gateway approved by the organization.</p>
                   </div>
                   <ProviderHint provider={selectedPrivacyReviewProvider} />
+                  <div className="row checkbox-group">
+                    <label className="checkbox-row"><input type="checkbox" checked={form.managePrivacyReviewProvider} onChange={(e) => setForm({ ...form, managePrivacyReviewProvider: e.target.checked, userMayChangePrivacyReviewProvider: e.target.checked ? form.userMayChangePrivacyReviewProvider : false })} /> <FieldLabel help={helpText.managePrivacyReviewProvider}>Apply privacy-review policy</FieldLabel></label>
+                    <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} disabled={!form.managePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> <FieldLabel help={helpText.userMayChangePrivacyReviewProvider}>User may change privacy review</FieldLabel></label>
+                  </div>
                   <div className="grid two">
                     <div className="field"><FieldLabel help={helpText.privacyReviewProviderType}>Selected review provider</FieldLabel><select value={form.privacyReviewProviderType ?? ""} onChange={(e) => applyProviderDefault("review", e.target.value)}>{privacyReviewProviders.map((provider) => <option key={provider.value} value={provider.value}>{provider.label}{provider.ready ? "" : " (not recommended)"}</option>)}</select></div>
                     {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewEndpointUrl}>Endpoint URL</FieldLabel><input className="input" value={form.privacyReviewEndpointUrl ?? ""} onChange={(e) => setForm({ ...form, privacyReviewEndpointUrl: e.target.value })} /></div>}
                     {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <ModelField label="Model name" help={helpText.privacyReviewModel} value={form.privacyReviewModel ?? ""} onChange={(value) => setForm({ ...form, privacyReviewModel: value })} loading={modelLoading === "review" && modelLoadingKey === modelRequestKey("review")} options={modelLookupKeys.review === modelRequestKey("review") ? modelOptions.review : []} onOpen={() => lookupModels("review")} />}
                     {form.privacyReviewProviderType && form.privacyReviewProviderType !== "local_heuristic" && <div className="field"><FieldLabel help={helpText.privacyReviewApiKey}>Managed API key</FieldLabel><input className="input" type="password" autoComplete="off" value={form.privacyReviewApiKey ?? ""} onChange={(e) => setForm({ ...form, privacyReviewApiKey: e.target.value })} placeholder="Optional managed key" /></div>}
                   </div>
-                  <label className="checkbox-row"><input type="checkbox" checked={form.userMayChangePrivacyReviewProvider} onChange={(e) => setForm({ ...form, userMayChangePrivacyReviewProvider: e.target.checked })} /> Allow users to choose another privacy review provider</label>
                 </div>
                 <div className="form-subsection">
                   <div className="form-subsection-header">
@@ -1117,6 +1146,38 @@ function normalizedSpeechAvailable(source: any) {
 
 function requiresExternalProviderAccess(source: any) {
   return normalizedSpeechAvailable(source).some((value: string) => value === "openai");
+}
+
+function profileHasValue(source: any, key: string) {
+  const value = source?.[key];
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+
+function hasManagedPIIPolicyFields(source: any) {
+  return [
+    "piiControlEnabled",
+    "presidioEndpointUrl",
+    "presidioSecretRef",
+    "presidioApiKey",
+    "presidioScoreThreshold",
+    "presidioFullPersonNamesOnly",
+    "presidioDetectPerson",
+    "presidioDetectEmail",
+    "presidioDetectPhone",
+    "presidioDetectLocation",
+    "presidioDetectIdentifier"
+  ].some((key) => profileHasValue(source, key));
+}
+
+function hasManagedPrivacyReviewPolicyFields(source: any) {
+  return [
+    "privacyReviewProviderType",
+    "privacyReviewEndpointUrl",
+    "privacyReviewModel",
+    "privacyReviewApiKey"
+  ].some((key) => profileHasValue(source, key));
 }
 
 function speechProviderConfig(source: any, providerValue: string): SpeechProviderConfig {
@@ -1262,10 +1323,14 @@ function formatterModelSummary(profile: any): ModelSummaryProps {
 }
 
 function privacyReviewModelSummary(profile: any): ModelSummaryProps {
-  if (profile.privacyControlEnabled === null || profile.privacyControlEnabled === undefined) {
+  const managedPolicy = profile.managedPolicy ?? {};
+  const appliesPrivacyControl = managedPolicy.managePrivacyControl ?? managedPolicy.privacyControlManaged ?? profileHasValue(profile, "privacyControlEnabled");
+  const appliesPrivacyReview = managedPolicy.managePrivacyReviewProvider ?? managedPolicy.privacyReviewProviderManaged ?? managedPolicy.managePrivacyReview ?? hasManagedPrivacyReviewPolicyFields(profile);
+  if (!appliesPrivacyControl) {
     return { title: "Local setting", detail: "Not centrally managed", empty: true };
   }
   if (!profile.privacyControlEnabled) return { title: "Privacy disabled", detail: "No review model", empty: true };
+  if (!appliesPrivacyReview) return { title: "Local review", detail: "Review provider not centrally managed", empty: true };
   const providerType = normalizeReviewProviderType(profile.privacyReviewProviderType);
   if (!providerType) return { title: "Not managed", detail: "Local app setting", empty: true };
   const provider = privacyReviewProviders.find((item) => item.value === providerType);

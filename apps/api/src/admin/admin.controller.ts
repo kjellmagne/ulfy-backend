@@ -288,13 +288,18 @@ export class ConfigDto {
   providerProfiles?: Record<string, unknown>;
   @ApiProperty({
     required: false,
-    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; granular flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas. visibleSettingsWhenHidden lists the specific settings/menu items that may remain visible/editable while hideSettings is true. It is only a visibility exception list and does not centrally manage the setting value. The language exception means app UI language, not speech transcription language or template/transcript output language.",
+    description: "Policy switches consumed by the iOS app. allowPolicyOverride is the master bypass; managePrivacyControl/managePIIControl/managePrivacyReviewProvider decide whether the saved privacy fields are sent as policy at all; granular userMayChange flags allow one area to change locally while the rest stays centrally managed. hideSettings asks the app to hide/minimize local settings for managed areas. visibleSettingsWhenHidden lists the specific settings/menu items that may remain visible/editable while hideSettings is true. It is only a visibility exception list and does not centrally manage the setting value. The language exception means app UI language, not speech transcription language or template/transcript output language.",
     example: {
       allowPolicyOverride: false,
       hideSettings: true,
       visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt", "categories"],
       userMayChangeSpeechProvider: true,
       userMayChangeFormatter: false,
+      managePrivacyControl: true,
+      userMayChangePrivacyControl: false,
+      managePIIControl: true,
+      userMayChangePIIControl: false,
+      managePrivacyReviewProvider: true,
       userMayChangePrivacyReviewProvider: false,
       managePrivacyPrompt: true,
       manageTemplateCategories: true
@@ -1249,7 +1254,7 @@ export class AdminController {
     const profile = await this.prisma.configProfile.create({
       data: {
         ...copyable,
-        managedPolicy: this.normalizeManagedPolicy(copyable.managedPolicy, copyable.privacyPrompt),
+        managedPolicy: this.normalizeManagedPolicy(copyable.managedPolicy, copyable),
         name
       },
       include: { partner: true }
@@ -1824,7 +1829,7 @@ export class AdminController {
       featureFlags: dto.featureFlags ?? {},
       allowedProviderRestrictions: dto.allowedProviderRestrictions ?? [],
       providerProfiles: this.preserveMaskedProviderSecrets(dto.providerProfiles ?? {}, existing?.providerProfiles),
-      managedPolicy: this.normalizeManagedPolicy(dto.managedPolicy, dto.privacyPrompt),
+      managedPolicy: this.normalizeManagedPolicy(dto.managedPolicy, dto),
       defaultTemplateId: this.emptyToNull(dto.defaultTemplateId ?? undefined)
     };
     return data;
@@ -1842,10 +1847,16 @@ export class AdminController {
     return this.emptyToNull(value);
   }
 
-  private normalizeManagedPolicy(policy?: Record<string, unknown>, privacyPrompt?: string | null) {
+  private normalizeManagedPolicy(policy?: Record<string, unknown>, profile?: Record<string, any> | null) {
     return {
       ...(policy ?? {}),
-      managePrivacyPrompt: firstBoolean(policy?.managePrivacyPrompt, policy?.privacyPromptManaged) ?? Boolean(privacyPrompt?.trim()),
+      managePrivacyControl: firstBoolean(policy?.managePrivacyControl, policy?.privacyControlManaged) ?? profileHasValue(profile, "privacyControlEnabled"),
+      userMayChangePrivacyControl: firstBoolean(policy?.userMayChangePrivacyControl, policy?.allowPrivacyControlChange) ?? false,
+      managePIIControl: firstBoolean(policy?.managePIIControl, policy?.piiControlManaged) ?? hasManagedPIIPolicyFields(profile),
+      userMayChangePIIControl: firstBoolean(policy?.userMayChangePIIControl, policy?.allowPIIControlChange) ?? false,
+      managePrivacyReviewProvider: firstBoolean(policy?.managePrivacyReviewProvider, policy?.privacyReviewProviderManaged, policy?.managePrivacyReview) ?? hasManagedPrivacyReviewPolicyFields(profile),
+      userMayChangePrivacyReviewProvider: firstBoolean(policy?.userMayChangePrivacyReviewProvider, policy?.userMayChangePrivacyReview, policy?.allowPrivacyReviewProviderChange) ?? false,
+      managePrivacyPrompt: firstBoolean(policy?.managePrivacyPrompt, policy?.privacyPromptManaged) ?? profileHasValue(profile, "privacyPrompt"),
       manageTemplateCategories: firstBoolean(policy?.manageTemplateCategories, policy?.templateCategoriesManaged) ?? true
     };
   }
@@ -1857,7 +1868,7 @@ export class AdminController {
       presidioApiKey: profile.presidioApiKey ? ADMIN_SECRET_MASK : null,
       privacyReviewApiKey: profile.privacyReviewApiKey ? ADMIN_SECRET_MASK : null,
       documentGenerationApiKey: profile.documentGenerationApiKey ? ADMIN_SECRET_MASK : null,
-      managedPolicy: this.normalizeManagedPolicy((profile as T & { managedPolicy?: Record<string, unknown> }).managedPolicy, profile.privacyPrompt),
+      managedPolicy: this.normalizeManagedPolicy((profile as T & { managedPolicy?: Record<string, unknown> }).managedPolicy, profile as Record<string, any>),
       providerProfiles: this.maskNestedProviderSecrets((profile as T & { providerProfiles?: unknown }).providerProfiles)
     };
   }
@@ -2550,4 +2561,36 @@ function normalizeOpenAiCompatibleProvider(providerType?: string | null) {
 
 function firstBoolean(...values: unknown[]) {
   return values.find((value): value is boolean => typeof value === "boolean");
+}
+
+function profileHasValue(profile: Record<string, any> | null | undefined, key: string) {
+  const value = profile?.[key];
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  return true;
+}
+
+function hasManagedPIIPolicyFields(profile: Record<string, any> | null | undefined) {
+  return [
+    "piiControlEnabled",
+    "presidioEndpointUrl",
+    "presidioSecretRef",
+    "presidioApiKey",
+    "presidioScoreThreshold",
+    "presidioFullPersonNamesOnly",
+    "presidioDetectPerson",
+    "presidioDetectEmail",
+    "presidioDetectPhone",
+    "presidioDetectLocation",
+    "presidioDetectIdentifier"
+  ].some((key) => profileHasValue(profile, key));
+}
+
+function hasManagedPrivacyReviewPolicyFields(profile: Record<string, any> | null | undefined) {
+  return [
+    "privacyReviewProviderType",
+    "privacyReviewEndpointUrl",
+    "privacyReviewModel",
+    "privacyReviewApiKey"
+  ].some((key) => profileHasValue(profile, key));
 }

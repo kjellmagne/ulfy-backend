@@ -198,6 +198,7 @@ const operationDescriptions: Record<string, string> = {
     "Lists enterprise config/policy profiles visible to the current admin.",
     "Secrets such as provider API keys are masked in the admin response; write a new value to replace a saved secret.",
     "Profiles contain sparse managed policy fields, provider catalogs, privacy settings, repository settings and device behavior switches.",
+    "Privacy-control, Presidio PII and privacy-review values are delivered to iOS only when their managedPolicy apply switches are true.",
     "The Personvern prompt text is delivered to iOS only when managedPolicy.managePrivacyPrompt is true; otherwise the app uses its built-in or local prompt."
   ].join(" "),
   "POST /api/v1/admin/config-profiles": [
@@ -205,7 +206,8 @@ const operationDescriptions: Record<string, string> = {
     "The payload can manage speech providers, document generation, privacy control, Presidio, privacy review, template repository, telemetry and managedPolicy behavior.",
     "managedPolicy.hideSettings can be paired with visibleSettingsWhenHidden to keep specific app settings such as audio source, app UI language, privacy info, recording dimming, OpenAI recording optimization, privacy prompt, live transcription and categories visible/editable.",
     "visibleSettingsWhenHidden is only a visibility exception list; it does not centrally manage the setting value.",
-    "Only fields intentionally set in the profile should be sent to the app as managed policy."
+    "Use managedPolicy.managePrivacyControl, managePIIControl and managePrivacyReviewProvider to decide whether saved privacy values are actually sent to devices.",
+    "Only fields intentionally applied in the profile should be sent to the app as managed policy."
   ].join(" "),
   "POST /api/v1/admin/config-profiles/{id}/clone": [
     "Copies an existing config profile into a new profile, preserving provider settings, privacy settings, repository fields and managedPolicy flags.",
@@ -221,7 +223,7 @@ const operationDescriptions: Record<string, string> = {
     "Updates an existing config/policy profile.",
     "Masked secrets are preserved when the admin does not submit a replacement key; explicit empty values clear a managed secret.",
     "Use managedPolicy.visibleSettingsWhenHidden as the visibility exception list for settings that should remain visible when hideSettings is enabled. The language exception means app UI language, not speech transcription language or template/transcript output language. Include privacy_prompt when the Personvern prompt UI should remain available.",
-    "Use managedPolicy.managePrivacyPrompt to decide whether the saved Personvern prompt text is actually sent to devices.",
+    "Use managedPolicy.managePrivacyControl, managePIIControl, managePrivacyReviewProvider and managePrivacyPrompt to decide whether saved privacy values and Personvern prompt text are actually sent to devices.",
     "Changes affect future enterprise activation/refresh/effective-config responses for tenants or keys using this profile."
   ].join(" "),
   "DELETE /api/v1/admin/config-profiles/{id}": [

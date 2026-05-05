@@ -225,6 +225,11 @@ describe("ActivationService", () => {
         visibleSettingsWhenHidden: ["live_transcription_during_recording", "audio_source", "language", "privacy_prompt"],
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
+        managePrivacyControl: false,
+        userMayChangePrivacyControl: false,
+        managePIIControl: true,
+        userMayChangePIIControl: false,
+        managePrivacyReviewProvider: true,
         userMayChangePrivacyReviewProvider: true,
         managePrivacyPrompt: true,
         manageTemplateCategories: true
@@ -275,13 +280,23 @@ describe("ActivationService", () => {
         configProfile: {
           id: "profile-2",
           name: "Sparse policy",
-          privacyControlEnabled: null,
-          piiControlEnabled: null,
+          privacyControlEnabled: true,
+          piiControlEnabled: true,
+          presidioEndpointUrl: "https://presidio.example.internal",
+          presidioApiKey: "presidio-key",
+          privacyReviewProviderType: "openai_compatible",
+          privacyReviewEndpointUrl: "https://privacy.example.internal/v1",
+          privacyReviewApiKey: "privacy-key",
           privacyPrompt: "This policy prompt should not be sent.",
           featureFlags: {},
           allowedProviderRestrictions: [],
           providerProfiles: {},
-          managedPolicy: { managePrivacyPrompt: false }
+          managedPolicy: {
+            managePrivacyControl: false,
+            managePIIControl: false,
+            managePrivacyReviewProvider: false,
+            managePrivacyPrompt: false
+          }
         }
       }
     });
@@ -291,11 +306,25 @@ describe("ActivationService", () => {
 
     expect(result.config).not.toHaveProperty("privacyControlEnabled");
     expect(result.config).not.toHaveProperty("piiControlEnabled");
+    expect(result.config).not.toHaveProperty("presidioEndpointUrl");
+    expect(result.config).not.toHaveProperty("presidioApiKey");
+    expect(result.config).not.toHaveProperty("privacyReviewProviderType");
+    expect(result.config).not.toHaveProperty("privacyReviewEndpointUrl");
+    expect(result.config).not.toHaveProperty("privacyReviewApiKey");
     expect(result.config).not.toHaveProperty("privacyPrompt");
     expect(result.config.templateCategories).toEqual([
       { id: "personlig_diktat", title: "Personlig diktat", icon: "waveform.and.mic" }
     ]);
-    expect(result.config.managedPolicy).toMatchObject({ managePrivacyPrompt: false, manageTemplateCategories: true });
+    expect(result.config.managedPolicy).toMatchObject({
+      managePrivacyControl: false,
+      userMayChangePrivacyControl: false,
+      managePIIControl: false,
+      userMayChangePIIControl: false,
+      managePrivacyReviewProvider: false,
+      userMayChangePrivacyReviewProvider: false,
+      managePrivacyPrompt: false,
+      manageTemplateCategories: true
+    });
     expect(prisma.templateCategory.findMany).toHaveBeenCalled();
   });
 });

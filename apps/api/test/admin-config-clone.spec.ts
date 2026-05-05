@@ -52,12 +52,24 @@ describe("AdminController config cloning", () => {
     };
     const audit = { log: vi.fn().mockResolvedValue(undefined) };
     const controller = new AdminController(prisma as any, audit as any, {} as any);
+    const normalizedManagedPolicy = {
+      allowPolicyOverride: false,
+      hideSettings: true,
+      managePrivacyControl: true,
+      userMayChangePrivacyControl: false,
+      managePIIControl: true,
+      userMayChangePIIControl: false,
+      managePrivacyReviewProvider: true,
+      userMayChangePrivacyReviewProvider: false,
+      managePrivacyPrompt: true,
+      manageTemplateCategories: true
+    };
 
     const result = await controller.cloneConfig("profile-1", {}, { user: { sub: "admin-1", email: "admin@example.com", role: "superadmin" } });
 
     expect(result).toEqual({
       ...created,
-      managedPolicy: { allowPolicyOverride: false, hideSettings: true, managePrivacyPrompt: true, manageTemplateCategories: true },
+      managedPolicy: normalizedManagedPolicy,
       speechApiKey: "********",
       presidioApiKey: "********",
       documentGenerationApiKey: "********",
@@ -75,7 +87,7 @@ describe("AdminController config cloning", () => {
         privacyReviewApiKey: "privacy-key",
         privacyPrompt: "Check for sensitive details before document generation.",
         documentGenerationApiKey: "docgen-key",
-        managedPolicy: { allowPolicyOverride: false, hideSettings: true, managePrivacyPrompt: true, manageTemplateCategories: true }
+        managedPolicy: normalizedManagedPolicy
       }),
       include: { partner: true }
     });
