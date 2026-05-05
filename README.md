@@ -148,7 +148,7 @@ Sample enterprise activation payload:
     "templateRepositoryUrl": "http://localhost:4000/api/v1/templates/manifest",
     "featureFlags": { "developerMode": false, "allowExternalProviders": false },
     "allowedProviderRestrictions": ["azure", "openai_compatible", "local_heuristic"],
-    "managedPolicy": { "manageTemplateCategories": true }
+    "managedPolicy": { "managePrivacyPrompt": false, "manageTemplateCategories": true }
   }
 }
 ```

@@ -415,6 +415,7 @@ function defaultManagedPolicy() {
     userMayChangeSpeechProvider: false,
     userMayChangeFormatter: false,
     userMayChangePrivacyReviewProvider: false,
+    managePrivacyPrompt: false,
     manageTemplateCategories: true
   };
 }

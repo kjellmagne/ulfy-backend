@@ -310,7 +310,7 @@ export class ActivationService {
   }
 
   private async mapConfig(profile: any) {
-    const managedPolicy = this.mapManagedPolicy(profile.managedPolicy);
+    const managedPolicy = this.mapManagedPolicy(profile.managedPolicy, profile.privacyPrompt);
     const templateCategories = managedPolicy.manageTemplateCategories
       ? await this.templateCategoryCatalog()
       : undefined;
@@ -337,7 +337,7 @@ export class ActivationService {
       privacyReviewEndpointUrl: profile.privacyReviewEndpointUrl,
       privacyReviewModel: profile.privacyReviewModel,
       privacyReviewApiKey: profile.privacyReviewApiKey,
-      privacyPrompt: profile.privacyPrompt,
+      privacyPrompt: managedPolicy.managePrivacyPrompt ? profile.privacyPrompt : undefined,
       documentGenerationProviderType: normalizeOpenAiCompatibleProvider(profile.documentGenerationProviderType),
       documentGenerationEndpointUrl: profile.documentGenerationEndpointUrl,
       documentGenerationModel: profile.documentGenerationModel,
@@ -365,13 +365,14 @@ export class ActivationService {
     }));
   }
 
-  private mapManagedPolicy(policy: unknown) {
+  private mapManagedPolicy(policy: unknown, privacyPrompt?: string | null) {
     const source = isRecord(policy) ? policy : {};
     const overrideValue = firstBoolean(source.allowPolicyOverride, source.allowLocalOverride, source.userMayOverridePolicy);
     const hideSettingsValue = firstBoolean(source.hideSettings, source.hideAppSettings, source.hideSettingsUI);
     const speechChangeValue = firstBoolean(source.userMayChangeSpeechProvider, source.userMayChangeSpeech, source.allowSpeechProviderChange);
     const formatterChangeValue = firstBoolean(source.userMayChangeFormatter, source.userMayChangeDocumentGenerationProvider, source.allowFormatterChange);
     const privacyReviewChangeValue = firstBoolean(source.userMayChangePrivacyReviewProvider, source.userMayChangePrivacyReview, source.allowPrivacyReviewProviderChange);
+    const managePrivacyPromptValue = firstBoolean(source.managePrivacyPrompt, source.privacyPromptManaged);
     const manageTemplateCategoriesValue = firstBoolean(source.manageTemplateCategories, source.templateCategoriesManaged);
     const visibleSettingsWhenHidden = normalizeVisibleSettingsWhenHidden(source.visibleSettingsWhenHidden, source.settingsVisibleWhenHidden, source.allowedSettingsWhenHidden);
     return {
@@ -382,6 +383,7 @@ export class ActivationService {
       userMayChangeSpeechProvider: speechChangeValue ?? false,
       userMayChangeFormatter: formatterChangeValue ?? false,
       userMayChangePrivacyReviewProvider: privacyReviewChangeValue ?? false,
+      managePrivacyPrompt: managePrivacyPromptValue ?? Boolean(privacyPrompt?.trim()),
       manageTemplateCategories: manageTemplateCategoriesValue ?? true
     };
   }

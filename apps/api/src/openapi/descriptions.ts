@@ -197,7 +197,8 @@ const operationDescriptions: Record<string, string> = {
   "GET /api/v1/admin/config-profiles": [
     "Lists enterprise config/policy profiles visible to the current admin.",
     "Secrets such as provider API keys are masked in the admin response; write a new value to replace a saved secret.",
-    "Profiles contain sparse managed policy fields, provider catalogs, privacy settings, repository settings and device behavior switches."
+    "Profiles contain sparse managed policy fields, provider catalogs, privacy settings, repository settings and device behavior switches.",
+    "The Personvern prompt text is delivered to iOS only when managedPolicy.managePrivacyPrompt is true; otherwise the app uses its built-in or local prompt."
   ].join(" "),
   "POST /api/v1/admin/config-profiles": [
     "Creates an enterprise config profile used by tenants and enterprise activation keys.",
@@ -220,6 +221,7 @@ const operationDescriptions: Record<string, string> = {
     "Updates an existing config/policy profile.",
     "Masked secrets are preserved when the admin does not submit a replacement key; explicit empty values clear a managed secret.",
     "Use managedPolicy.visibleSettingsWhenHidden as the visibility exception list for settings that should remain visible when hideSettings is enabled. The language exception means app UI language, not speech transcription language or template/transcript output language. Include privacy_prompt when the Personvern prompt UI should remain available.",
+    "Use managedPolicy.managePrivacyPrompt to decide whether the saved Personvern prompt text is actually sent to devices.",
     "Changes affect future enterprise activation/refresh/effective-config responses for tenants or keys using this profile."
   ].join(" "),
   "DELETE /api/v1/admin/config-profiles/{id}": [

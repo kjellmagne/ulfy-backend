@@ -215,7 +215,7 @@ export class ConfigDto {
   @ApiProperty({
     required: false,
     example: "Review the transcript for sensitive personal information before document generation. Prefer caution when uncertain.",
-    description: "Optional centrally managed privacy prompt shown or used by the app for privacy review guidance. Omit or clear to keep the app default prompt."
+    description: "Saved Personvern prompt text for privacy review guidance. It is sent to the iOS app only when managedPolicy.managePrivacyPrompt is true; otherwise devices keep the built-in or local prompt."
   })
   @IsOptional()
   @IsString()
@@ -296,6 +296,7 @@ export class ConfigDto {
       userMayChangeSpeechProvider: true,
       userMayChangeFormatter: false,
       userMayChangePrivacyReviewProvider: false,
+      managePrivacyPrompt: true,
       manageTemplateCategories: true
     }
   })
@@ -1248,7 +1249,7 @@ export class AdminController {
     const profile = await this.prisma.configProfile.create({
       data: {
         ...copyable,
-        managedPolicy: this.normalizeManagedPolicy(copyable.managedPolicy),
+        managedPolicy: this.normalizeManagedPolicy(copyable.managedPolicy, copyable.privacyPrompt),
         name
       },
       include: { partner: true }
@@ -1823,7 +1824,7 @@ export class AdminController {
       featureFlags: dto.featureFlags ?? {},
       allowedProviderRestrictions: dto.allowedProviderRestrictions ?? [],
       providerProfiles: this.preserveMaskedProviderSecrets(dto.providerProfiles ?? {}, existing?.providerProfiles),
-      managedPolicy: this.normalizeManagedPolicy(dto.managedPolicy),
+      managedPolicy: this.normalizeManagedPolicy(dto.managedPolicy, dto.privacyPrompt),
       defaultTemplateId: this.emptyToNull(dto.defaultTemplateId ?? undefined)
     };
     return data;
@@ -1841,21 +1842,22 @@ export class AdminController {
     return this.emptyToNull(value);
   }
 
-  private normalizeManagedPolicy(policy?: Record<string, unknown>) {
+  private normalizeManagedPolicy(policy?: Record<string, unknown>, privacyPrompt?: string | null) {
     return {
       ...(policy ?? {}),
+      managePrivacyPrompt: firstBoolean(policy?.managePrivacyPrompt, policy?.privacyPromptManaged) ?? Boolean(privacyPrompt?.trim()),
       manageTemplateCategories: firstBoolean(policy?.manageTemplateCategories, policy?.templateCategoriesManaged) ?? true
     };
   }
 
-  private maskAdminConfigSecrets<T extends { speechApiKey?: string | null; documentGenerationApiKey?: string | null; privacyReviewApiKey?: string | null; presidioApiKey?: string | null }>(profile: T) {
+  private maskAdminConfigSecrets<T extends { speechApiKey?: string | null; documentGenerationApiKey?: string | null; privacyReviewApiKey?: string | null; presidioApiKey?: string | null; privacyPrompt?: string | null }>(profile: T) {
     return {
       ...profile,
       speechApiKey: profile.speechApiKey ? ADMIN_SECRET_MASK : null,
       presidioApiKey: profile.presidioApiKey ? ADMIN_SECRET_MASK : null,
       privacyReviewApiKey: profile.privacyReviewApiKey ? ADMIN_SECRET_MASK : null,
       documentGenerationApiKey: profile.documentGenerationApiKey ? ADMIN_SECRET_MASK : null,
-      managedPolicy: this.normalizeManagedPolicy((profile as T & { managedPolicy?: Record<string, unknown> }).managedPolicy),
+      managedPolicy: this.normalizeManagedPolicy((profile as T & { managedPolicy?: Record<string, unknown> }).managedPolicy, profile.privacyPrompt),
       providerProfiles: this.maskNestedProviderSecrets((profile as T & { providerProfiles?: unknown }).providerProfiles)
     };
   }

@@ -57,7 +57,7 @@ describe("AdminController config cloning", () => {
 
     expect(result).toEqual({
       ...created,
-      managedPolicy: { allowPolicyOverride: false, hideSettings: true, manageTemplateCategories: true },
+      managedPolicy: { allowPolicyOverride: false, hideSettings: true, managePrivacyPrompt: true, manageTemplateCategories: true },
       speechApiKey: "********",
       presidioApiKey: "********",
       documentGenerationApiKey: "********",
@@ -75,7 +75,7 @@ describe("AdminController config cloning", () => {
         privacyReviewApiKey: "privacy-key",
         privacyPrompt: "Check for sensitive details before document generation.",
         documentGenerationApiKey: "docgen-key",
-        managedPolicy: { allowPolicyOverride: false, hideSettings: true, manageTemplateCategories: true }
+        managedPolicy: { allowPolicyOverride: false, hideSettings: true, managePrivacyPrompt: true, manageTemplateCategories: true }
       }),
       include: { partner: true }
     });

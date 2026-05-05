@@ -45,6 +45,7 @@ describe("ConfigDto", () => {
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true,
+        managePrivacyPrompt: true,
         manageTemplateCategories: true
       },
       defaultTemplateId: null,
@@ -92,6 +93,7 @@ describe("ConfigDto", () => {
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true,
+        managePrivacyPrompt: true,
         manageTemplateCategories: true
       },
       defaultTemplateId: null

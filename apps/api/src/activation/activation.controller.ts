@@ -96,6 +96,7 @@ const managedPolicyExample = {
   userMayChangeSpeechProvider: true,
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
+  managePrivacyPrompt: true,
   manageTemplateCategories: true
 };
 const templateCategoriesExample = [
@@ -277,6 +278,8 @@ const managedPolicySchema = {
     userMayChangePrivacyReviewProvider: { type: "boolean", default: false, description: "Allows the user to choose another privacy-review/guardrail provider locally." },
     userMayChangePrivacyReview: { type: "boolean", description: "Accepted alias for userMayChangePrivacyReviewProvider." },
     allowPrivacyReviewProviderChange: { type: "boolean", description: "Accepted alias for userMayChangePrivacyReviewProvider." },
+    managePrivacyPrompt: { type: "boolean", default: false, description: "When true, the backend sends config.privacyPrompt and the iOS app uses it as the managed Personvern prompt. When false, privacyPrompt is omitted from mobile config and the app uses the built-in or local app prompt." },
+    privacyPromptManaged: { type: "boolean", description: "Accepted alias for managePrivacyPrompt." },
     manageTemplateCategories: { type: "boolean", default: true, description: "When true, the backend sends the central template category catalog and the iOS app treats category names/icons/order as organization-managed. Profiles default to managed categories unless explicitly set to false." },
     templateCategoriesManaged: { type: "boolean", description: "Accepted alias for manageTemplateCategories." }
   },
@@ -315,7 +318,7 @@ const mobileConfigSchema = {
     privacyReviewEndpointUrl: { type: "string", nullable: true, example: "https://privacy.example.internal/v1", description: "Endpoint URL for privacy-review providers. Hidden/unused for local_heuristic." },
     privacyReviewModel: { type: "string", nullable: true, example: "privacy-review-v1", description: "Model identifier for the privacy-review step." },
     privacyReviewApiKey: { type: "string", nullable: true, description: "Optional managed privacy-review credential. Used for openai_compatible or authenticated Ollama/gateway setups." },
-    privacyPrompt: { type: "string", nullable: true, description: "Optional centrally managed privacy prompt shown or used by the app for privacy review guidance. If omitted, the app should keep its local/default prompt." },
+    privacyPrompt: { type: "string", nullable: true, description: "Optional centrally managed privacy prompt shown or used by the app for privacy review guidance. Sent only when managedPolicy.managePrivacyPrompt is true; if omitted, the app should keep its built-in or local prompt." },
     documentGenerationProviderType: { type: "string", enum: ["apple_intelligence", "openai_compatible", "ollama"], nullable: true, description: "Document generation formatter provider. OpenAI, vLLM and internal OpenAI-style gateways are all openai_compatible." },
     documentGenerationEndpointUrl: { type: "string", nullable: true, example: "https://api.openai.com/v1", description: "Endpoint URL for document-generation provider. Hidden/unused for Apple Intelligence." },
     documentGenerationModel: { type: "string", nullable: true, example: "gpt-5-mini", description: "Model identifier for document generation." },

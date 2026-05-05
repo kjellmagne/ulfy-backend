@@ -23,7 +23,8 @@ const helpText = {
   privacyReviewEndpointUrl: "Endpoint URL for the privacy-review provider. Use this for internal or self-hosted privacy-review services. Locks app UI when set.",
   privacyReviewModel: "Model identifier used for the privacy-review step. Locks app UI when set.",
   privacyReviewApiKey: "Optional API key for the privacy-review provider. Use this for authenticated OpenAI-compatible privacy gateways or protected Ollama routes.",
-  privacyPrompt: "Optional centrally managed privacy prompt shown/used by the app for privacy review guidance. Leave blank when the tenant should keep the local/default prompt.",
+  managePrivacyPrompt: "When checked, this profile sends the Personvern prompt below to the app and the app uses that text for privacy review. When unchecked, the text is saved here but not sent, so devices use the built-in prompt or the user's local app setting.",
+  privacyPrompt: "Prompt text for privacy review guidance. It is only sent to the app when Use policy Personvern prompt is checked. Example: Ask Ulfy to remove names, phone numbers and sensitive case details before document generation, and to mark uncertainty instead of guessing.",
   managePIIControl: "When checked, this profile controls the Presidio PII switch in the app. Leave it unchecked when devices should keep their local PII setting.",
   piiControlEnabled: "The managed value for Presidio PII checking. This is the structured detector step inside privacy control.",
   presidioEndpointUrl: "Endpoint URL for the Presidio analyzer used for PII detection. Typically an internal or protected service. Locks app UI when set.",
@@ -151,6 +152,7 @@ const empty = {
   userMayChangeSpeechProvider: false,
   userMayChangeFormatter: false,
   userMayChangePrivacyReviewProvider: false,
+  managePrivacyPrompt: false,
   manageTemplateCategories: true,
   defaultTemplateId: ""
 };
@@ -331,6 +333,7 @@ export default function ConfigsPage() {
       userMayChangeSpeechProvider: managedPolicy?.userMayChangeSpeechProvider ?? false,
       userMayChangeFormatter: managedPolicy?.userMayChangeFormatter ?? false,
       userMayChangePrivacyReviewProvider: managedPolicy?.userMayChangePrivacyReviewProvider ?? false,
+      managePrivacyPrompt: managedPolicy?.managePrivacyPrompt ?? managedPolicy?.privacyPromptManaged ?? Boolean(profile.privacyPrompt?.trim()),
       manageTemplateCategories: managedPolicy?.manageTemplateCategories ?? managedPolicy?.templateCategoriesManaged ?? true,
       defaultTemplateId: profile.defaultTemplateId ?? ""
     });
@@ -548,6 +551,7 @@ export default function ConfigsPage() {
         userMayChangeSpeechProvider: Boolean(form.userMayChangeSpeechProvider),
         userMayChangeFormatter: Boolean(form.userMayChangeFormatter),
         userMayChangePrivacyReviewProvider: Boolean(form.userMayChangePrivacyReviewProvider),
+        managePrivacyPrompt: Boolean(form.managePrivacyPrompt),
         manageTemplateCategories: Boolean(form.manageTemplateCategories)
       };
       const speechProvider = speechProviders.find((item) => item.value === form.speechProviderType);
@@ -1016,11 +1020,12 @@ export default function ConfigsPage() {
                 <div className="form-subsection">
                   <div className="form-subsection-header">
                     <h4>Personvern prompt</h4>
-                    <p>Optional central guidance shown or used by the app for privacy review. Leave blank to keep the app default.</p>
+                    <p>Use this only when the organization wants one shared privacy-review instruction. Otherwise devices keep the built-in prompt or the user's local app setting.</p>
                   </div>
+                  <label className="checkbox-row section-footer-check"><input type="checkbox" checked={form.managePrivacyPrompt} onChange={(e) => setForm({ ...form, managePrivacyPrompt: e.target.checked })} /> <FieldLabel help={helpText.managePrivacyPrompt}>Use policy Personvern prompt</FieldLabel></label>
                   <div className="field">
-                    <FieldLabel help={helpText.privacyPrompt}>Managed privacy prompt</FieldLabel>
-                    <textarea value={form.privacyPrompt ?? ""} onChange={(e) => setForm({ ...form, privacyPrompt: e.target.value })} placeholder="Describe how privacy review should behave for this tenant..." />
+                    <FieldLabel help={helpText.privacyPrompt}>Personvern prompt text</FieldLabel>
+                    <textarea value={form.privacyPrompt ?? ""} onChange={(e) => setForm({ ...form, privacyPrompt: e.target.value })} placeholder="Example: Remove names, phone numbers and sensitive case details before document generation. Mark uncertainty instead of guessing." />
                   </div>
                 </div>
               </FormSection>

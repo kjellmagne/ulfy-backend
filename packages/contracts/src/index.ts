@@ -70,6 +70,8 @@ export const ManagedPolicyPayload = z.object({
   userMayChangePrivacyReviewProvider: z.boolean().default(false),
   userMayChangePrivacyReview: z.boolean().optional(),
   allowPrivacyReviewProviderChange: z.boolean().optional(),
+  managePrivacyPrompt: z.boolean().default(false),
+  privacyPromptManaged: z.boolean().optional(),
   manageTemplateCategories: z.boolean().default(true),
   templateCategoriesManaged: z.boolean().optional()
 }).passthrough();

@@ -180,6 +180,7 @@ describe("ActivationService", () => {
             userMayChangeSpeechProvider: true,
             userMayChangeFormatter: true,
             userMayChangePrivacyReviewProvider: true,
+            managePrivacyPrompt: true,
             manageTemplateCategories: true
           }
         }
@@ -225,6 +226,7 @@ describe("ActivationService", () => {
         userMayChangeSpeechProvider: true,
         userMayChangeFormatter: true,
         userMayChangePrivacyReviewProvider: true,
+        managePrivacyPrompt: true,
         manageTemplateCategories: true
       }
     });
@@ -275,10 +277,11 @@ describe("ActivationService", () => {
           name: "Sparse policy",
           privacyControlEnabled: null,
           piiControlEnabled: null,
+          privacyPrompt: "This policy prompt should not be sent.",
           featureFlags: {},
           allowedProviderRestrictions: [],
           providerProfiles: {},
-          managedPolicy: {}
+          managedPolicy: { managePrivacyPrompt: false }
         }
       }
     });
@@ -288,10 +291,11 @@ describe("ActivationService", () => {
 
     expect(result.config).not.toHaveProperty("privacyControlEnabled");
     expect(result.config).not.toHaveProperty("piiControlEnabled");
+    expect(result.config).not.toHaveProperty("privacyPrompt");
     expect(result.config.templateCategories).toEqual([
       { id: "personlig_diktat", title: "Personlig diktat", icon: "waveform.and.mic" }
     ]);
-    expect(result.config.managedPolicy).toMatchObject({ manageTemplateCategories: true });
+    expect(result.config.managedPolicy).toMatchObject({ managePrivacyPrompt: false, manageTemplateCategories: true });
     expect(prisma.templateCategory.findMany).toHaveBeenCalled();
   });
 });
