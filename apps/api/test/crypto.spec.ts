@@ -9,6 +9,7 @@ describe("activation key branding", () => {
     expect(singleKey).toMatch(/^SKRIVDET-S-[A-Z0-9_-]{6}-[A-Z0-9_-]{6}-[A-Z0-9_-]{6}-[A-Z0-9_-]{6}$/);
     expect(enterpriseKey).toMatch(/^SKRIVDET-E-[A-Z0-9_-]{6}-[A-Z0-9_-]{6}-[A-Z0-9_-]{6}-[A-Z0-9_-]{6}$/);
     expect(activationKeyPrefix(singleKey)).toMatch(/^SKRIVDET-S-[A-Z0-9_-]{6}$/);
+    expect(activationKeyPrefix("SKRIVDET-S-HF-ABC-DEF456-GHI789-JKL012")).toBe("SKRIVDET-S-HF-ABC");
     expect(activationKeyPrefix("ULFY-S-ABC123-DEF456-GHI789-JKL012")).toBe("ULFY-S-ABC123");
   });
 });

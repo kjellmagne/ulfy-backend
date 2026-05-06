@@ -5,6 +5,7 @@ export function sha256(value: string) {
 }
 
 export type ActivationKeyPrefix = "SKRIVDET-S" | "SKRIVDET-E" | "ULFY-S" | "ULFY-E";
+const activationKeyPrefixes: ActivationKeyPrefix[] = ["SKRIVDET-S", "SKRIVDET-E", "ULFY-S", "ULFY-E"];
 
 export function createActivationKey(prefix: ActivationKeyPrefix) {
   const body = randomBytes(18).toString("base64url").toUpperCase();
@@ -12,6 +13,11 @@ export function createActivationKey(prefix: ActivationKeyPrefix) {
 }
 
 export function activationKeyPrefix(activationKey: string) {
+  const knownPrefix = activationKeyPrefixes.find((prefix) => activationKey.startsWith(`${prefix}-`));
+  if (knownPrefix) {
+    const bodyStart = knownPrefix.length + 1;
+    return `${knownPrefix}-${activationKey.slice(bodyStart, bodyStart + 6)}`;
+  }
   return activationKey.split("-").slice(0, 3).join("-");
 }
 

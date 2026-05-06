@@ -23,7 +23,7 @@ async function bootstrap() {
       "Public deployment path through APISIX is /backend/api/v1; Swagger UI is available at /backend/api/docs and raw OpenAPI JSON at /backend/api/docs-json."
     ].join(" "))
     .setVersion("1.0")
-    .addServer("https://kvasetech.com/backend", "Kvasetech production through APISIX")
+    .addServer("https://skrivdet.no/backend", "skrivDET production through APISIX")
     .addServer("http://localhost:4000", "Local development")
     .addBearerAuth()
     .build();
