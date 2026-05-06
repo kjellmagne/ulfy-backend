@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HOST="${ULFY_HOST:-kvasetech.com}"
-PUBLIC_PATH="${ULFY_PUBLIC_PATH:-/skrivdet}"
+PUBLIC_PATH="${ULFY_BACKEND_PUBLIC_PATH:-/backend}"
 PUBLIC_PATH="/${PUBLIC_PATH#/}"
 PUBLIC_PATH="${PUBLIC_PATH%/}"
 BASE_URL="${ULFY_PUBLIC_BASE_URL:-https://${HOST}${PUBLIC_PATH}}"

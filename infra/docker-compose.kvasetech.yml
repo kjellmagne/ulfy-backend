@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: ""
-      NEXT_PUBLIC_BASE_PATH: /skrivdet
+      NEXT_PUBLIC_BASE_PATH: /backend
     ports:
       - "192.168.222.171:3300:3000"
     depends_on:

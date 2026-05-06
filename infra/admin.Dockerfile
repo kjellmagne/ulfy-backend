@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile=false
 FROM deps AS build
 COPY . .
 ARG NEXT_PUBLIC_API_BASE_URL=
-ARG NEXT_PUBLIC_BASE_PATH=/skrivdet
+ARG NEXT_PUBLIC_BASE_PATH=/backend
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
 RUN pnpm --filter @ulfy/admin build
@@ -18,7 +18,7 @@ RUN node -e 'const fs=require("fs"); const raw=process.env.NEXT_PUBLIC_BASE_PATH
 
 FROM node:22-alpine AS runner
 WORKDIR /app
-ARG NEXT_PUBLIC_BASE_PATH=/skrivdet
+ARG NEXT_PUBLIC_BASE_PATH=/backend
 ENV NODE_ENV=production
 ENV NEXT_PUBLIC_API_BASE_URL=
 ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
