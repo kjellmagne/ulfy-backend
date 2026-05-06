@@ -41,11 +41,11 @@ services:
       dockerfile: infra/admin.Dockerfile
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
-        NEXT_PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-/backend}
+        NEXT_PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-/skrivdet}
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
-      NEXT_PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-/backend}
+      NEXT_PUBLIC_BASE_PATH: ${PUBLIC_BASE_PATH:-/skrivdet}
     depends_on:
       - api
     ports:

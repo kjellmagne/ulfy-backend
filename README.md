@@ -423,12 +423,12 @@ sudo docker rm -f ulfy_api_1 ulfy_admin_1
 sudo docker-compose up -d --no-deps api admin
 ```
 
-The Kvasetech/APISIX deployment serves skrivDET publicly at `https://kvasetech.com/backend/`.
+The Kvasetech/APISIX deployment serves skrivDET publicly at `https://kvasetech.com/skrivdet/`.
 
 Important routing rule:
 
-- API route: `/backend/api/*` is proxied to the API after stripping `/backend`, so the API receives `/api/*`.
-- Admin route: `/backend` and `/backend/*` is proxied to the admin after stripping `/backend`, so Next.js receives `/`, `/templates`, and `/_next/*`. The admin image uses `NEXT_PUBLIC_BASE_PATH=/backend` as an asset/link prefix, not as a Next.js `basePath`.
+- API route: `/skrivdet/api/*` is proxied to the API after stripping `/skrivdet`, so the API receives `/api/*`.
+- Admin route: `/skrivdet` and `/skrivdet/*` is proxied to the admin after stripping `/skrivdet`, so Next.js receives `/`, `/templates`, and `/_next/*`. The admin image uses `NEXT_PUBLIC_BASE_PATH=/skrivdet` as an asset/link prefix, not as a Next.js `basePath`.
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml pull
@@ -445,12 +445,12 @@ Verify the deployed routing after pulling a new admin image:
 bash infra/apisix/check-kvasetech-backend.sh
 ```
 
-This check fails if either the template list or the full template designer route serves root `/_next/...` assets instead of `/backend/_next/...`.
+This check fails if either the template list or the full template designer route serves root `/_next/...` assets instead of `/skrivdet/_next/...`.
 
 Public API documentation is available through APISIX at:
 
-- Swagger UI: `https://kvasetech.com/backend/api/docs`
-- OpenAPI JSON: `https://kvasetech.com/backend/api/docs-json`
+- Swagger UI: `https://kvasetech.com/skrivdet/api/docs`
+- OpenAPI JSON: `https://kvasetech.com/skrivdet/api/docs-json`
 
 ## GitHub Docker Images
 
@@ -461,14 +461,14 @@ GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0
 - `ghcr.io/kjellmagne/ulfy-backend-api:sha-<commit>`
 - `ghcr.io/kjellmagne/ulfy-backend-admin:sha-<commit>`
 
-The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time for public links and `_next` asset URLs, while APISIX strips `/backend` before forwarding admin requests to Next.js. It leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, include the complete public API prefix, for example `https://kvasetech.com/backend`.
+The GitHub admin image is built for the APISIX `/skrivdet` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/skrivdet` at build time for public links and `_next` asset URLs, while APISIX strips `/skrivdet` before forwarding admin requests to Next.js. It leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/skrivdet/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, include the complete public API prefix, for example `https://kvasetech.com/skrivdet`.
 
 Required deployment environment variables:
 
 - `DATABASE_URL` for non-compose deployments
 - `JWT_SECRET`
 - `ACTIVATION_TOKEN_SECRET`
-- `PUBLIC_BASE_PATH` when serving the admin under a gateway prefix such as `/backend`
+- `PUBLIC_BASE_PATH` when serving the admin under a gateway prefix such as `/skrivdet`
 - AI preview provider is normally configured in the admin portal under `Settings` by a superadmin. `TEMPLATE_PREVIEW_ENDPOINT_URL`, `TEMPLATE_PREVIEW_API_KEY`, and `TEMPLATE_PREVIEW_MODEL` remain optional deployment fallbacks.
 - optional `TEMPLATE_REPOSITORY_API_KEY` for internal repository override access
 

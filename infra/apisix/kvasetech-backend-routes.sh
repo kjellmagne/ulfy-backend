@@ -7,24 +7,26 @@ set -euo pipefail
 HOST="${ULFY_HOST:-kvasetech.com}"
 API_UPSTREAM="${ULFY_API_UPSTREAM:-192.168.222.171:4000}"
 ADMIN_UPSTREAM="${ULFY_ADMIN_UPSTREAM:-192.168.222.171:3300}"
+PUBLIC_PATH="${ULFY_PUBLIC_PATH:-/skrivdet}"
+PUBLIC_PATH="/${PUBLIC_PATH#/}"
+PUBLIC_PATH="${PUBLIC_PATH%/}"
 
-curl -fsS -X DELETE "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-backend-redirect" \
-  -H "X-API-KEY: ${APISIX_ADMIN_KEY}" >/dev/null || true
+for route_id in ulfy-backend-redirect ulfy-admin-root ulfy-api ulfy-admin skrivdet-api skrivdet-admin; do
+  curl -fsS -X DELETE "${APISIX_ADMIN_URL}/apisix/admin/routes/${route_id}" \
+    -H "X-API-KEY: ${APISIX_ADMIN_KEY}" >/dev/null || true
+done
 
-curl -fsS -X DELETE "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin-root" \
-  -H "X-API-KEY: ${APISIX_ADMIN_KEY}" >/dev/null || true
-
-curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-api" \
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-api" \
   -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
-    \"name\": \"ulfy-api\",
+    \"name\": \"skrivdet-api\",
     \"host\": \"${HOST}\",
-    \"uri\": \"/backend/api/*\",
+    \"uri\": \"${PUBLIC_PATH}/api/*\",
     \"priority\": 200,
     \"plugins\": {
       \"proxy-rewrite\": {
-        \"regex_uri\": [\"^/backend/(.*)\", \"/\$1\"]
+        \"regex_uri\": [\"^${PUBLIC_PATH}/(.*)\", \"/\$1\"]
       }
     },
     \"upstream\": {
@@ -35,17 +37,17 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-api" \
     }
   }"
 
-curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin" \
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-admin" \
   -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
-    \"name\": \"ulfy-admin\",
+    \"name\": \"skrivdet-admin\",
     \"host\": \"${HOST}\",
-    \"uris\": [\"/backend\", \"/backend/*\"],
+    \"uris\": [\"${PUBLIC_PATH}\", \"${PUBLIC_PATH}/*\"],
     \"priority\": 100,
     \"plugins\": {
       \"proxy-rewrite\": {
-        \"regex_uri\": [\"^/backend/?(.*)\", \"/\$1\"]
+        \"regex_uri\": [\"^${PUBLIC_PATH}/?(.*)\", \"/\$1\"]
       }
     },
     \"upstream\": {
@@ -57,5 +59,5 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin" \
   }"
 
 echo "Configured skrivDET routes:"
-echo "  https://${HOST}/backend/api/* -> http://${API_UPSTREAM}/api/*"
-echo "  https://${HOST}/backend/*     -> http://${ADMIN_UPSTREAM}/*"
+echo "  https://${HOST}${PUBLIC_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
+echo "  https://${HOST}${PUBLIC_PATH}/*     -> http://${ADMIN_UPSTREAM}/*"

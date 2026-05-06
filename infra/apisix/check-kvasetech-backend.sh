@@ -2,7 +2,10 @@
 set -euo pipefail
 
 HOST="${ULFY_HOST:-kvasetech.com}"
-BASE_URL="${ULFY_PUBLIC_BASE_URL:-https://${HOST}/backend}"
+PUBLIC_PATH="${ULFY_PUBLIC_PATH:-/skrivdet}"
+PUBLIC_PATH="/${PUBLIC_PATH#/}"
+PUBLIC_PATH="${PUBLIC_PATH%/}"
+BASE_URL="${ULFY_PUBLIC_BASE_URL:-https://${HOST}${PUBLIC_PATH}}"
 DETAIL_PATH="${ULFY_TEMPLATE_DETAIL_PATH:-/templates/designer?familyId=00000000-0000-4000-8000-000000000304&variantId=00000000-0000-4000-8000-000000000404}"
 
 TMP_DIR="$(mktemp -d)"
@@ -31,12 +34,12 @@ assert_no_root_next_assets() {
   fi
 }
 
-assert_backend_next_assets() {
+assert_gateway_next_assets() {
   local file="$1"
   local label="$2"
 
-  if ! grep -E 'href="/backend/_next|src="/backend/_next' "${file}" >/dev/null; then
-    echo "${label} does not contain /backend/_next assets. Admin basePath is not active." >&2
+  if ! grep -E "href=\"${PUBLIC_PATH}/_next|src=\"${PUBLIC_PATH}/_next" "${file}" >/dev/null; then
+    echo "${label} does not contain ${PUBLIC_PATH}/_next assets. Admin basePath is not active." >&2
     return 1
   fi
 }
@@ -51,8 +54,8 @@ fetch "${BASE_URL}/api/v1/health" "${HEALTH_JSON}"
 
 assert_no_root_next_assets "${LIST_HTML}" "Template list"
 assert_no_root_next_assets "${DETAIL_HTML}" "Template designer"
-assert_backend_next_assets "${LIST_HTML}" "Template list"
-assert_backend_next_assets "${DETAIL_HTML}" "Template designer"
+assert_gateway_next_assets "${LIST_HTML}" "Template list"
+assert_gateway_next_assets "${DETAIL_HTML}" "Template designer"
 
 if ! grep -F '"ok":true' "${HEALTH_JSON}" >/dev/null; then
   echo "API health did not return ok=true:" >&2

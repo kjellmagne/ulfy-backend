@@ -247,7 +247,7 @@ export class ConfigDto {
   documentGenerationApiKey?: string;
   @ApiProperty({
     required: false,
-    example: "https://kvasetech.com/backend/api/v1/templates/manifest",
+    example: "https://kvasetech.com/skrivdet/api/v1/templates/manifest",
     description: "Enterprise template manifest URL. The app should call it with Authorization: Bearer <activationToken>."
   })
   @IsOptional()

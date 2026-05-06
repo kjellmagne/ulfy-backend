@@ -20,10 +20,10 @@ async function bootstrap() {
       "Mobile activation endpoints return a consistent { success, error: { code, message } } shape for errors.",
       "Enterprise config is sparse: omitted config fields mean the iOS app should keep local settings, while present fields are intentional managed policy.",
       "Admin endpoints require a bearer token from /auth/login.",
-      "Public deployment path through APISIX is /backend/api/v1; Swagger UI is available at /backend/api/docs and raw OpenAPI JSON at /backend/api/docs-json."
+      "Public deployment path through APISIX is /skrivdet/api/v1; Swagger UI is available at /skrivdet/api/docs and raw OpenAPI JSON at /skrivdet/api/docs-json."
     ].join(" "))
     .setVersion("1.0")
-    .addServer("https://kvasetech.com/backend", "Kvasetech production through APISIX")
+    .addServer("https://kvasetech.com/skrivdet", "Kvasetech production through APISIX")
     .addServer("http://localhost:4000", "Local development")
     .addBearerAuth()
     .build();
