@@ -5,7 +5,7 @@ import { apiUrl } from "./api-url";
 
 export function getToken() {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("ulfy_admin_token") ?? "";
+  return localStorage.getItem("skrivdet_admin_token") ?? localStorage.getItem("ulfy_admin_token") ?? "";
 }
 
 export async function api(path: string, init: RequestInit = {}) {

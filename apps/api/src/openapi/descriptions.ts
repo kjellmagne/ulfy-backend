@@ -21,7 +21,7 @@ type OperationMetadata = Pick<OperationDoc, "deprecated" | "x-ulfy-status" | "x-
 
 const operationDescriptions: Record<string, string> = {
   "POST /api/v1/auth/login": [
-    "Authenticates an internal Ulfy admin portal user with email and password and returns a bearer JWT plus safe user metadata.",
+    "Authenticates an internal skrivDET admin portal user with email and password and returns a bearer JWT plus safe user metadata.",
     "There is no public registration flow: admin users are created by superadmins from the admin portal.",
     "Use this token as Authorization: Bearer <token> for all /api/v1/admin/* endpoints."
   ].join(" "),

@@ -42,7 +42,7 @@ export class TemplatesService {
     });
 
     return {
-      name: tenantId ? "Enterprise Templates" : "Ulfy Templates",
+      name: tenantId ? "Enterprise Templates" : "skrivDET Templates",
       templates: templates
         .map((template) => {
           const version = template.versions.find((item) => item.id === template.publishedVersionId) ?? template.versions.find((item) => item.state === "published");
@@ -78,7 +78,7 @@ export class TemplatesService {
       include: this.variantManifestInclude(),
       orderBy: [{ family: { title: "asc" } }, { language: "asc" }]
     });
-    return this.manifestFromVariants(variants, "Ulfy Templates");
+    return this.manifestFromVariants(variants, "skrivDET Templates");
   }
 
   async downloadYaml(id: string) {
@@ -477,7 +477,7 @@ export class TemplatesService {
 
   private titleFromUseCase(useCase: string) {
     const cleaned = useCase.trim().replace(/\s+/g, " ");
-    if (!cleaned) return "New Ulfy template";
+    if (!cleaned) return "New skrivDET template";
     return cleaned.length > 64 ? `${cleaned.slice(0, 61)}...` : cleaned;
   }
 
@@ -839,7 +839,7 @@ function genericProfile(language: string): AssistedDraftProfile {
     tags: ["general", "structured-note"],
     context: {
       purpose: nb ? "Gjør en samtale, et møte eller et diktat om til et tydelig og nyttig notat." : "Turn a conversation, meeting, or dictation into a clear and useful note.",
-      typical_setting: nb ? "Opptak, samtale, møte eller muntlig notat fanget i Ulfy." : "Recording, conversation, meeting, or spoken note captured in Ulfy.",
+      typical_setting: nb ? "Opptak, samtale, møte eller muntlig notat fanget i skrivDET." : "Recording, conversation, meeting, or spoken note captured in skrivDET.",
       typical_participants: nb ? [{ role: "deltaker" }, { role: "ansvarlig", name: null }] : [{ role: "participant" }, { role: "responsible person", name: null }],
       goals: nb ? ["Oppsummere hovedpoeng.", "Fange beslutninger og åpne spørsmål.", "Synliggjøre neste steg."] : ["Summarize main points.", "Capture decisions and open questions.", "Show next steps."],
       related_processes: []
@@ -903,7 +903,7 @@ function normalizeTemplateLanguage(value?: string | null): AppTemplateYaml["iden
 }
 
 function limitTemplateTitle(value: string) {
-  const normalized = value.trim().replace(/\s+/g, " ") || "New Ulfy template";
+  const normalized = value.trim().replace(/\s+/g, " ") || "New skrivDET template";
   return normalized.length > 80 ? `${normalized.slice(0, 77)}...` : normalized;
 }
 

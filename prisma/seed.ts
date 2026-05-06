@@ -9,9 +9,13 @@ function sha256(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function createActivationKey(prefix: "ULFY-S" | "ULFY-E") {
+function createActivationKey(prefix: "SKRIVDET-S" | "SKRIVDET-E" | "ULFY-S" | "ULFY-E") {
   const body = randomBytes(18).toString("base64url").toUpperCase();
   return `${prefix}-${body.slice(0, 6)}-${body.slice(6, 12)}-${body.slice(12, 18)}-${body.slice(18, 24)}`;
+}
+
+function activationKeyPrefix(activationKey: string) {
+  return activationKey.split("-").slice(0, 3).join("-");
 }
 
 export type SeedTemplate = {
@@ -425,11 +429,11 @@ async function main() {
   const maintenanceUntil = new Date("2027-04-29T00:00:00.000Z");
   const passwordHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!", 12);
   await prisma.adminUser.upsert({
-    where: { email: "admin@ulfy.local" },
+    where: { email: "admin@skrivdet.local" },
     update: {},
     create: {
-      email: "admin@ulfy.local",
-      fullName: "Ulfy Admin",
+      email: "admin@skrivdet.local",
+      fullName: "skrivDET Admin",
       passwordHash,
       role: "superadmin"
     }
@@ -445,7 +449,7 @@ async function main() {
       privacyControlEnabled: true,
       piiControlEnabled: true,
       presidioEndpointUrl: "https://presidio.example.internal",
-      presidioSecretRef: "secret://ulfy/presidio",
+      presidioSecretRef: "secret://skrivdet/presidio",
       presidioApiKey: null,
       presidioScoreThreshold: 0.7,
       presidioFullPersonNamesOnly: false,
@@ -475,7 +479,7 @@ async function main() {
       privacyControlEnabled: true,
       piiControlEnabled: true,
       presidioEndpointUrl: "https://presidio.example.internal",
-      presidioSecretRef: "secret://ulfy/presidio",
+      presidioSecretRef: "secret://skrivdet/presidio",
       presidioApiKey: null,
       presidioScoreThreshold: 0.7,
       presidioFullPersonNamesOnly: false,
@@ -530,13 +534,13 @@ async function main() {
   await seedTemplateSectionPresets();
   await seedTemplateRepository(tenant.id);
 
-  const singleKey = process.env.SEED_SINGLE_KEY ?? createActivationKey("ULFY-S");
+  const singleKey = process.env.SEED_SINGLE_KEY ?? createActivationKey("SKRIVDET-S");
   await prisma.singleLicenseKey.upsert({
     where: { keyHash: sha256(singleKey) },
     update: {},
     create: {
       keyHash: sha256(singleKey),
-      keyPrefix: singleKey.slice(0, 14),
+      keyPrefix: activationKeyPrefix(singleKey),
       purchaserFullName: "Seed User",
       purchaserEmail: "seed.user@example.com",
       maintenanceUntil,
@@ -544,13 +548,13 @@ async function main() {
     }
   });
 
-  const enterpriseKey = process.env.SEED_ENTERPRISE_KEY ?? createActivationKey("ULFY-E");
+  const enterpriseKey = process.env.SEED_ENTERPRISE_KEY ?? createActivationKey("SKRIVDET-E");
   await prisma.enterpriseLicenseKey.upsert({
     where: { keyHash: sha256(enterpriseKey) },
     update: {},
     create: {
       keyHash: sha256(enterpriseKey),
-      keyPrefix: enterpriseKey.slice(0, 14),
+      keyPrefix: activationKeyPrefix(enterpriseKey),
       tenantId: tenant.id,
       configProfileId: profile.id,
       maxDevices: 100,
@@ -559,7 +563,7 @@ async function main() {
     }
   });
 
-  console.log("Seed admin: admin@ulfy.local /", process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!");
+  console.log("Seed admin: admin@skrivdet.local /", process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!");
   console.log("Seed single key:", singleKey);
   console.log("Seed enterprise key:", enterpriseKey);
 }

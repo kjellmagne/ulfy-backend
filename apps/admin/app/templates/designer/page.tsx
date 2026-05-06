@@ -310,7 +310,7 @@ function starterYaml(family: Family, presets: SectionPreset[] = fallbackSectionP
     },
     context: {
       purpose: `Create a clear, structured document for ${family.title || "this recording"}.`,
-      typical_setting: "Recording, dictation, meeting, or conversation captured in Ulfy.",
+      typical_setting: "Recording, dictation, meeting, or conversation captured in skrivDET.",
       typical_participants: [{ role: "speaker" }],
       goals: ["Create a useful structured note from the transcript."],
       related_processes: []

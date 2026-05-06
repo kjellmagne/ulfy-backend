@@ -13,6 +13,7 @@ export function AdminSession() {
   }, []);
 
   function logout() {
+    localStorage.removeItem("skrivdet_admin_token");
     localStorage.removeItem("ulfy_admin_token");
     window.location.href = appPath("/login");
   }

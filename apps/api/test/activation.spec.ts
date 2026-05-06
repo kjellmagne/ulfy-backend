@@ -168,7 +168,7 @@ describe("ActivationService", () => {
               selectedProviderId: "docgen-provider",
               available: ["docgen-provider", "disabled-provider"],
               providers: [
-                { id: "docgen-provider", name: "Docgen", type: "openai_compatible", enabled: true, endpointUrl: "https://llm.example.internal/v1", modelName: "ulfy-docgen", apiKey: "docgen-profile-key" },
+                { id: "docgen-provider", name: "Docgen", type: "openai_compatible", enabled: true, endpointUrl: "https://llm.example.internal/v1", modelName: "skrivdet-docgen", apiKey: "docgen-profile-key" },
                 { id: "disabled-provider", name: "Disabled", type: "openai_compatible", enabled: false, endpointUrl: "https://disabled.example/v1", modelName: "disabled", apiKey: "disabled-docgen-key" }
               ]
             }

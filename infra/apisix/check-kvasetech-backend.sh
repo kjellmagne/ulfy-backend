@@ -60,4 +60,4 @@ if ! grep -F '"ok":true' "${HEALTH_JSON}" >/dev/null; then
   exit 1
 fi
 
-echo "Ulfy backend routing check passed for ${BASE_URL}"
+echo "skrivDET backend routing check passed for ${BASE_URL}"

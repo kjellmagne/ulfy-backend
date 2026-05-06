@@ -14,9 +14,9 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const config = new DocumentBuilder()
-    .setTitle("Ulfy Backend API")
+    .setTitle("skrivDET Backend API")
     .setDescription([
-      "Internal/admin-controlled backend for Ulfy licensing, enterprise config and templates.",
+      "Internal/admin-controlled backend for skrivDET licensing, enterprise config and templates.",
       "Mobile activation endpoints return a consistent { success, error: { code, message } } shape for errors.",
       "Enterprise config is sparse: omitted config fields mean the iOS app should keep local settings, while present fields are intentional managed policy.",
       "Admin endpoints require a bearer token from /auth/login.",
@@ -29,7 +29,7 @@ async function bootstrap() {
     .build();
   const document = enrichOpenApiDescriptions(SwaggerModule.createDocument(app, config));
   SwaggerModule.setup("api/docs", app, document, {
-    customSiteTitle: "Ulfy API Docs",
+    customSiteTitle: "skrivDET API Docs",
     jsonDocumentUrl: "api/docs-json",
     swaggerOptions: {
       persistAuthorization: true,

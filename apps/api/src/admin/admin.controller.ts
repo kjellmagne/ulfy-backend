@@ -6,7 +6,7 @@ import * as yaml from "js-yaml";
 import { TemplateSectionFormatValues } from "@ulfy/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdminGuard } from "../auth/admin.guard";
-import { createActivationKey, sha256 } from "../common/crypto";
+import { activationKeyPrefix, createActivationKey, sha256 } from "../common/crypto";
 import { AuditService } from "../common/audit.service";
 import { TemplatesService } from "../templates/templates.service";
 
@@ -141,7 +141,7 @@ export class ConfigDto {
   presidioEndpointUrl?: string;
   @ApiProperty({
     required: false,
-    example: "secret://ulfy/presidio",
+    example: "secret://skrivdet/presidio",
     description: "Optional backend-side secret reference for Presidio. Retained for compatibility/internal operations; the app does not dereference this."
   })
   @IsOptional()
@@ -779,7 +779,7 @@ export class AdminController {
 
   @Get("me")
   @ApiOperation({ summary: "Current admin user" })
-  @ApiOkResponse({ description: "Decoded admin JWT claims.", schema: { example: { sub: "admin-uuid", email: "admin@ulfy.local", role: "superadmin", partnerId: null } } })
+  @ApiOkResponse({ description: "Decoded admin JWT claims.", schema: { example: { sub: "admin-uuid", email: "admin@example.com", role: "superadmin", partnerId: null } } })
   async me(@Req() req: any) {
     const user = await this.prisma.adminUser.findUnique({ where: { id: req.user.sub }, include: { partner: true } });
     return user ? { id: user.id, email: user.email, fullName: user.fullName, role: user.role, partnerId: user.partnerId, partner: user.partner } : req.user;
@@ -1014,14 +1014,14 @@ export class AdminController {
   @Post("single-keys")
   @ApiOperation({ summary: "Generate single-user activation key", description: "Creates a display-once activation key. The response includes activationKey once; store/copy it immediately." })
   @ApiBody({ type: SingleKeyDto })
-  @ApiOkResponse({ description: "Single-user key generated.", schema: { example: { id: "license-uuid", activationKey: "ULFY-S-ABC123-DEF456-GHI789-JKL012", keyPrefix: "ULFY-S-ABC123", purchaserFullName: "Ola Nordmann", purchaserEmail: "ola@example.com", status: "active" } } })
+  @ApiOkResponse({ description: "Single-user key generated.", schema: { example: { id: "license-uuid", activationKey: "SKRIVDET-S-ABC123-DEF456-GHI789-JKL012", keyPrefix: "SKRIVDET-S-ABC123", purchaserFullName: "Ola Nordmann", purchaserEmail: "ola@example.com", status: "active" } } })
   async createSingleKey(@Body() dto: SingleKeyDto, @Req() req: any) {
     const partnerId = this.scopedPartnerId(req) ?? dto.partnerId;
-    const activationKey = createActivationKey("ULFY-S");
+    const activationKey = createActivationKey("SKRIVDET-S");
     const key = await this.prisma.singleLicenseKey.create({
       data: {
         keyHash: sha256(activationKey),
-        keyPrefix: activationKey.slice(0, 14),
+        keyPrefix: activationKeyPrefix(activationKey),
         purchaserFullName: dto.purchaserFullName,
         purchaserEmail: dto.purchaserEmail,
         purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : undefined,
@@ -1094,15 +1094,15 @@ export class AdminController {
   @Post("enterprise-keys")
   @ApiOperation({ summary: "Generate enterprise activation key", description: "Creates a display-once enterprise activation key linked to a tenant and config profile." })
   @ApiBody({ type: EnterpriseKeyDto })
-  @ApiOkResponse({ description: "Enterprise key generated.", schema: { example: { id: "enterprise-key-uuid", activationKey: "ULFY-E-ABC123-DEF456-GHI789-JKL012", keyPrefix: "ULFY-E-ABC123", status: "active", maxDevices: 100 } } })
+  @ApiOkResponse({ description: "Enterprise key generated.", schema: { example: { id: "enterprise-key-uuid", activationKey: "SKRIVDET-E-ABC123-DEF456-GHI789-JKL012", keyPrefix: "SKRIVDET-E-ABC123", status: "active", maxDevices: 100 } } })
   async createEnterpriseKey(@Body() dto: EnterpriseKeyDto, @Req() req: any) {
     const tenant = await this.assertTenantAccess(req, dto.tenantId);
     await this.assertConfigAccess(req, dto.configProfileId);
-    const activationKey = createActivationKey("ULFY-E");
+    const activationKey = createActivationKey("SKRIVDET-E");
     const key = await this.prisma.enterpriseLicenseKey.create({
       data: {
         keyHash: sha256(activationKey),
-        keyPrefix: activationKey.slice(0, 14),
+        keyPrefix: activationKeyPrefix(activationKey),
         tenantId: dto.tenantId,
         configProfileId: dto.configProfileId,
         maxDevices: dto.maxDevices,

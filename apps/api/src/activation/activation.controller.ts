@@ -5,7 +5,7 @@ import { ActivationService } from "./activation.service";
 import { MobileExceptionFilter } from "./mobile-exception.filter";
 
 class ActivateDto {
-  @ApiProperty({ example: "ULFY-S-ABC123-DEF456-GHI789-JKL012", description: "Activation key manually entered by the iPhone user." })
+  @ApiProperty({ example: "SKRIVDET-S-ABC123-DEF456-GHI789-JKL012", description: "Activation key manually entered by the iPhone user. New keys use SKRIVDET-S or SKRIVDET-E prefixes; existing ULFY-S and ULFY-E keys remain valid." })
   @IsString()
   @MinLength(12)
   activationKey!: string;
@@ -122,7 +122,7 @@ const enterpriseConfigExample = {
   privacyControlEnabled: true,
   piiControlEnabled: true,
   presidioEndpointUrl: "https://presidio.example.internal",
-  presidioSecretRef: "secret://ulfy/presidio",
+  presidioSecretRef: "secret://skrivdet/presidio",
   presidioApiKey: "optional-managed-presidio-key",
   presidioScoreThreshold: 0.35,
   presidioFullPersonNamesOnly: true,

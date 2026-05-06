@@ -135,7 +135,7 @@ function uuid() {
 }
 
 function starterYaml(family?: Partial<Family>, language = "nb-NO") {
-  const title = family?.title || "New Ulfy template";
+  const title = family?.title || "New skrivDET template";
   const category = family?.category?.slug || "annet";
   const firstSection = localizeTemplateSectionPresets([fallbackSectionPresets[0]], language)[0];
   return `identity:
@@ -211,7 +211,7 @@ function ensureTemplateDoc(content: string, family?: Partial<Family> | null, lan
   const parsed = parseTemplateYaml(content) ?? fallback;
   parsed.identity = { ...(parsed.identity ?? {}) };
   parsed.identity.id = parsed.identity.id || uuid();
-  parsed.identity.title = parsed.identity.title || family?.title || "New Ulfy template";
+  parsed.identity.title = parsed.identity.title || family?.title || "New skrivDET template";
   parsed.identity.short_description = parsed.identity.short_description || family?.shortDescription || "";
   parsed.identity.icon = parsed.identity.icon || family?.icon || "doc.text";
   parsed.identity.category = parsed.identity.category || family?.category?.slug || "annet";

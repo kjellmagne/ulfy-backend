@@ -73,13 +73,18 @@ button, input, textarea, select { font: inherit; }
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #0d9488, #0891b2);
+  background: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
-  font-weight: 700;
-  color: white;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(45,96,122,0.14);
+}
+.brand-icon img {
+  width: 24px;
+  height: 24px;
+  display: block;
+  object-fit: contain;
 }
 .brand-text {
   display: flex;
@@ -89,7 +94,7 @@ button, input, textarea, select { font: inherit; }
   font-size: 14px;
   font-weight: 700;
   color: white;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .brand-subtitle {
   font-size: 10px;
@@ -1588,10 +1593,15 @@ textarea {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: linear-gradient(135deg, #0d9488, #0891b2);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 800;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(45,96,122,0.16);
+}
+.login-logo img {
+  width: 29px;
+  height: 29px;
+  display: block;
+  object-fit: contain;
 }
 .login-product {
   color: #fff;

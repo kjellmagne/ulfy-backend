@@ -27,9 +27,11 @@ export function AdminNav() {
   return (
     <nav className="nav">
       <div className="brand">
-        <div className="brand-icon">U</div>
+        <div className="brand-icon">
+          <img src={appPath("/brand/skrivdet-icon.svg")} alt="" aria-hidden="true" />
+        </div>
         <div className="brand-text">
-          <div className="brand-title">Ulfy</div>
+          <div className="brand-title">skrivDET</div>
           <div className="brand-subtitle">Admin Portal</div>
         </div>
       </div>

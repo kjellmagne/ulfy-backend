@@ -26,7 +26,8 @@ export default function LoginPage() {
       });
       if (!res.ok) throw new Error("Email or password is incorrect.");
       const data = await res.json();
-      localStorage.setItem("ulfy_admin_token", data.accessToken);
+      localStorage.setItem("skrivdet_admin_token", data.accessToken);
+      localStorage.removeItem("ulfy_admin_token");
       window.location.href = appPath("/");
     } catch (err: any) {
       const message = getErrorMessage(err);
@@ -40,11 +41,13 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-layout">
-        <section className="login-intro" aria-label="Ulfy Admin">
+        <section className="login-intro" aria-label="skrivDET Admin">
           <div className="login-brand">
-            <div className="login-logo">U</div>
+            <div className="login-logo">
+              <img src={appPath("/brand/skrivdet-icon.svg")} alt="" aria-hidden="true" />
+            </div>
             <div>
-              <div className="login-product">Ulfy</div>
+              <div className="login-product">skrivDET</div>
               <div className="login-subtitle">Admin Portal</div>
             </div>
           </div>
@@ -64,7 +67,7 @@ export default function LoginPage() {
             <div className="login-card-icon"><LockKeyhole size={18} /></div>
             <div>
               <h2>Sign in</h2>
-              <p>Use your assigned Ulfy admin account.</p>
+              <p>Use your assigned skrivDET admin account.</p>
             </div>
           </div>
           <form onSubmit={submit} className="login-form">
@@ -75,7 +78,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 autoComplete="email"
-                placeholder="admin@ulfy.local"
+                placeholder="admin@example.com"
                 onChange={(e) => setEmail(e.target.value)}
                 autoFocus
                 required

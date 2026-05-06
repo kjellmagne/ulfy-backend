@@ -1,6 +1,6 @@
-# Ulfy Backend
+# skrivDET Backend
 
-Internal/admin-controlled backend monorepo for Ulfy licensing, enterprise configuration, and YAML template management.
+Internal/admin-controlled backend monorepo for skrivDET licensing, enterprise configuration, and YAML template management.
 
 ## Local Development
 
@@ -46,7 +46,7 @@ hint instead of being removed.
 
 Seed admin user:
 
-- Email: `admin@ulfy.local`
+- Email: `admin@skrivdet.local`
 - Password: `ChangeMe123!`
 
 To choose a different first admin password during seeding:
@@ -69,12 +69,16 @@ pnpm prisma:seed
 
 ## API Examples
 
+Newly generated activation keys use the `SKRIVDET-S` and `SKRIVDET-E`
+prefixes. Existing `ULFY-S` and `ULFY-E` keys remain valid because activation
+checks use the stored key hash, not a hard-coded brand prefix.
+
 Single activation:
 
 ```bash
 curl -X POST http://localhost:4000/api/v1/activate/single \
   -H 'Content-Type: application/json' \
-  -d '{"activationKey":"ULFY-S-...","deviceIdentifier":"iphone-abc","deviceSerialNumber":"C39XK123N72Q","appVersion":"1.0.0"}'
+  -d '{"activationKey":"SKRIVDET-S-...","deviceIdentifier":"iphone-abc","deviceSerialNumber":"C39XK123N72Q","appVersion":"1.0.0"}'
 ```
 
 Enterprise activation:
@@ -82,7 +86,7 @@ Enterprise activation:
 ```bash
 curl -X POST http://localhost:4000/api/v1/activate/enterprise \
   -H 'Content-Type: application/json' \
-  -d '{"activationKey":"ULFY-E-...","deviceIdentifier":"iphone-enterprise-1","deviceSerialNumber":"C39XK123N72Q","appVersion":"1.0.0"}'
+  -d '{"activationKey":"SKRIVDET-E-...","deviceIdentifier":"iphone-enterprise-1","deviceSerialNumber":"C39XK123N72Q","appVersion":"1.0.0"}'
 ```
 
 License refresh/check-in:
@@ -274,7 +278,7 @@ Sample model lookup response:
   "success": true,
   "providerType": "openai_compatible",
   "models": [
-    { "id": "ulfy-docgen", "name": "ulfy-docgen" }
+    { "id": "skrivdet-docgen", "name": "skrivdet-docgen" }
   ]
 }
 ```
@@ -419,7 +423,7 @@ sudo docker rm -f ulfy_api_1 ulfy_admin_1
 sudo docker-compose up -d --no-deps api admin
 ```
 
-The Kvasetech/APISIX deployment serves Ulfy publicly at `https://kvasetech.com/backend/`.
+The Kvasetech/APISIX deployment serves skrivDET publicly at `https://kvasetech.com/backend/`.
 
 Important routing rule:
 

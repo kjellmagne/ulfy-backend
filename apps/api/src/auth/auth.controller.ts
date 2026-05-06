@@ -4,7 +4,7 @@ import { ApiOkResponse, ApiOperation, ApiProperty, ApiTags, ApiUnauthorizedRespo
 import { AuthService } from "./auth.service";
 
 class LoginDto {
-  @ApiProperty({ example: "admin@ulfy.local" })
+  @ApiProperty({ example: "admin@example.com" })
   @IsEmail()
   email!: string;
 
@@ -26,7 +26,7 @@ export class AuthController {
     schema: {
       example: {
         accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-        user: { id: "85d6ab1c-cf8b-4e5e-9af0-b3e836029d28", email: "admin@ulfy.local", fullName: "Ulfy Admin", role: "superadmin", partnerId: null }
+        user: { id: "85d6ab1c-cf8b-4e5e-9af0-b3e836029d28", email: "admin@example.com", fullName: "skrivDET Admin", role: "superadmin", partnerId: null }
       }
     }
   })

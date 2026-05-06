@@ -56,6 +56,6 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin" \
     }
   }"
 
-echo "Configured Ulfy routes:"
+echo "Configured skrivDET routes:"
 echo "  https://${HOST}/backend/api/* -> http://${API_UPSTREAM}/api/*"
 echo "  https://${HOST}/backend/*     -> http://${ADMIN_UPSTREAM}/*"

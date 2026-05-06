@@ -107,7 +107,7 @@ export default function Home() {
                         <span style={{ fontWeight: 500, color: '#0f172a' }}>Created tenant</span>
                         <span style={{ color: '#64748b' }}> — Alta kommune</span>
                       </div>
-                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>admin@ulfy.local</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>admin@example.com</div>
                       <div style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap', minWidth: '150px', textAlign: 'right' }}>29/04/2026, 02:17:56</div>
                     </td>
                   </tr>

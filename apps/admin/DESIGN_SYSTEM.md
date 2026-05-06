@@ -1,4 +1,4 @@
-# Ulfy Admin Portal Design System
+# skrivDET Admin Portal Design System
 
 This document is the source of truth for the internal admin UI visual system. It is intentionally compact, operational, and suited for an admin control plane rather than a public marketing surface.
 
@@ -74,10 +74,9 @@ Sidebar tokens:
 
 Brand:
 
-- 32px rounded-square mark, 8px radius.
-- Gradient: teal to cyan.
-- White `U`, 15px, 700.
-- Title: Ulfy, 14px, 700, white.
+- 32px rounded-square white mark, 8px radius, using `/brand/skrivdet-icon.svg`.
+- Icon inset: 24px, preserving the supplied skrivDET vector mark.
+- Title: skrivDET, 14px, 700, white.
 - Subtitle: Admin Portal, 10px, uppercase, `#4b6179`.
 
 Session block:
