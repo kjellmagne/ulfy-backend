@@ -452,7 +452,7 @@ After the cutover, legacy `https://kvasetech.com/backend*`, `https://kvasetech.c
 Verify the deployed routing after pulling a new admin image:
 
 ```bash
-bash infra/apisix/check-kvasetech-backend.sh
+bash infra/apisix/check-skrivdet-backend.sh
 ```
 
 This check fails if either the template list or the full template designer route serves root `/_next/...` assets instead of `/backend/_next/...`.

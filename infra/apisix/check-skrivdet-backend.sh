@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HOST="${SKRIVDET_HOST:-skrivdet.no}"
+PUBLIC_PATH="${SKRIVDET_BACKEND_PUBLIC_PATH:-/backend}"
+PUBLIC_PATH="/${PUBLIC_PATH#/}"
+PUBLIC_PATH="${PUBLIC_PATH%/}"
+BASE_URL="${SKRIVDET_PUBLIC_BASE_URL:-https://${HOST}${PUBLIC_PATH}}"
+DETAIL_PATH="${SKRIVDET_TEMPLATE_DETAIL_PATH:-/templates/designer?familyId=00000000-0000-4000-8000-000000000304&variantId=00000000-0000-4000-8000-000000000404}"
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "${TMP_DIR}"' EXIT
+
+fetch() {
+  local url="$1"
+  local output="$2"
+  local status
+
+  status="$(curl -fsS -o "${output}" -w "%{http_code}" "${url}")"
+  if [ "${status}" != "200" ]; then
+    echo "Expected 200 from ${url}, got ${status}" >&2
+    return 1
+  fi
+}
+
+assert_no_root_next_assets() {
+  local file="$1"
+  local label="$2"
+
+  if grep -E 'href="/_next|src="/_next' "${file}" >/dev/null; then
+    echo "${label} contains root /_next asset references. Admin basePath build or APISIX routing is wrong." >&2
+    grep -Eo 'href="/_next[^"]+|src="/_next[^"]+' "${file}" >&2 || true
+    return 1
+  fi
+}
+
+assert_gateway_next_assets() {
+  local file="$1"
+  local label="$2"
+
+  if ! grep -E "href=\"${PUBLIC_PATH}/_next|src=\"${PUBLIC_PATH}/_next" "${file}" >/dev/null; then
+    echo "${label} does not contain ${PUBLIC_PATH}/_next assets. Admin basePath is not active." >&2
+    return 1
+  fi
+}
+
+LIST_HTML="${TMP_DIR}/templates.html"
+DETAIL_HTML="${TMP_DIR}/template-detail.html"
+HEALTH_JSON="${TMP_DIR}/health.json"
+
+fetch "${BASE_URL}/templates" "${LIST_HTML}"
+fetch "${BASE_URL}${DETAIL_PATH}" "${DETAIL_HTML}"
+fetch "${BASE_URL}/api/v1/health" "${HEALTH_JSON}"
+
+assert_no_root_next_assets "${LIST_HTML}" "Template list"
+assert_no_root_next_assets "${DETAIL_HTML}" "Template designer"
+assert_gateway_next_assets "${LIST_HTML}" "Template list"
+assert_gateway_next_assets "${DETAIL_HTML}" "Template designer"
+
+if ! grep -F '"ok":true' "${HEALTH_JSON}" >/dev/null; then
+  echo "API health did not return ok=true:" >&2
+  cat "${HEALTH_JSON}" >&2
+  exit 1
+fi
+
+echo "skrivDET backend routing check passed for ${BASE_URL}"
