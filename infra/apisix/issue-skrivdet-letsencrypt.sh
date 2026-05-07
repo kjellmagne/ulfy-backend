@@ -82,7 +82,7 @@ sleep 1
 
 # shellcheck disable=SC2086
 certbot certonly --webroot -w "${WEBROOT}" ${domain_args} \
-  --non-interactive --agree-tos ${email_args} --keep-until-expiring
+  --non-interactive --agree-tos ${email_args} --keep-until-expiring --no-directory-hooks
 
 cert_path="/etc/letsencrypt/live/${primary_domain}/fullchain.pem"
 key_path="/etc/letsencrypt/live/${primary_domain}/privkey.pem"
