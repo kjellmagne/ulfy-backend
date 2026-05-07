@@ -437,9 +437,8 @@ docker compose --env-file .env -f docker-compose.yml up -d postgres
 docker compose --env-file .env -f docker-compose.yml run --rm api pnpm prisma migrate deploy
 docker compose --env-file .env -f docker-compose.yml run --rm api pnpm prisma db seed
 docker compose --env-file .env -f docker-compose.yml up -d api admin
-APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-backend-routes.sh
-APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-website-routes.sh
 APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/skrivdet-domain-routes.sh
+APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-legacy-redirects.sh
 ```
 
 Issue and install the Let's Encrypt certificate after DNS for `skrivdet.no` and `www.skrivdet.no` resolves to the APISIX host:
@@ -447,6 +446,8 @@ Issue and install the Let's Encrypt certificate after DNS for `skrivdet.no` and 
 ```bash
 sudo APISIX_ADMIN_KEY='your-admin-key' LETSENCRYPT_EMAIL='ops@example.com' bash infra/apisix/issue-skrivdet-letsencrypt.sh
 ```
+
+After the cutover, legacy `https://kvasetech.com/backend*`, `https://kvasetech.com/skrivdet*`, and `https://kvasetech.com/ulfy*` redirect permanently to the equivalent `https://skrivdet.no` URLs.
 
 Verify the deployed routing after pulling a new admin image:
 
