@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 import { UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { z } from "zod";
-import { appEnvironment } from "../config/environment";
+import { activationTokenVerificationSecrets, appEnvironment } from "../config/environment";
 
 export const ACTIVATION_TOKEN_ISSUER = "skrivdet-api";
 export const ACTIVATION_TOKEN_AUDIENCE = "skrivdet-mobile";
@@ -44,14 +44,18 @@ export async function issueActivationToken(jwt: JwtService, input: {
 export async function verifyActivationToken(jwt: JwtService, token: string) {
   const env = appEnvironment();
 
-  try {
-    const claims = await jwt.verifyAsync(token, {
-      secret: env.ACTIVATION_TOKEN_SECRET,
-      issuer: ACTIVATION_TOKEN_ISSUER,
-      audience: ACTIVATION_TOKEN_AUDIENCE
-    });
-    return ActivationTokenClaimsSchema.parse(claims);
-  } catch {
-    throw new UnauthorizedException("Invalid activation token");
+  for (const secret of activationTokenVerificationSecrets(env)) {
+    try {
+      const claims = await jwt.verifyAsync(token, {
+        secret,
+        issuer: ACTIVATION_TOKEN_ISSUER,
+        audience: ACTIVATION_TOKEN_AUDIENCE
+      });
+      return ActivationTokenClaimsSchema.parse(claims);
+    } catch {
+      // Try the next configured verification secret.
+    }
   }
+
+  throw new UnauthorizedException("Invalid activation token");
 }

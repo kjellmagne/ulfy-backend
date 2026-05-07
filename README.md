@@ -489,7 +489,9 @@ Required deployment environment variables:
 
 - `DATABASE_URL` for non-compose deployments
 - `JWT_SECRET`
+- optional `JWT_PREVIOUS_SECRETS` as a comma-separated verification-only rollover list during secret rotation
 - `ACTIVATION_TOKEN_SECRET`
+- optional `ACTIVATION_TOKEN_PREVIOUS_SECRETS` as a comma-separated verification-only rollover list during activation-token secret rotation
 - `CONFIG_SECRET_KEY` as a 32-byte AES key encoded as hex, base64, or base64url
 - `CORS_ALLOWED_ORIGINS` with the allowed browser origins, for example `https://skrivdet.no,https://www.skrivdet.no`
 - `SWAGGER_ENABLED` plus `SWAGGER_BASIC_AUTH_USERNAME` and `SWAGGER_BASIC_AUTH_PASSWORD` when Swagger should stay exposed in production
@@ -502,6 +504,7 @@ Required deployment environment variables:
 - Partner-admin scoping is represented in the model but not fully enforced on every admin list endpoint.
 - Config profiles are manually managed JSON-backed records, without an advanced policy engine.
 - Activation tokens are short-lived signed device credentials. The API verifies signature, issuer, audience, expiry, and device/license claims on every use, then rotates the token on refresh.
+- Secret rotation can be staged by setting `JWT_PREVIOUS_SECRETS` or `ACTIVATION_TOKEN_PREVIOUS_SECRETS`; the API verifies with both current and previous values, but always reissues tokens with the current secret.
 - Existing plaintext config-provider secrets should be backfilled with `pnpm prisma:encrypt-secrets` after deploy. New admin saves are encrypted automatically at rest.
 - The mobile app still owns local template forking/update behavior; the backend provides the authoritative published repository, tenant filtering, history, and preview tooling.
 - AI preview uses one centrally configured OpenAI-compatible preview provider/model. It is managed by superadmins in Settings, with environment variables kept as deployment fallbacks.

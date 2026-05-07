@@ -39,10 +39,12 @@ const EnvironmentSchema = z.object({
   PORT: integerWithDefault(4000, 1, 65535),
   DATABASE_URL: z.string().trim().min(1, "DATABASE_URL is required"),
   JWT_SECRET: z.string().trim().min(32, "JWT_SECRET must be at least 32 characters"),
+  JWT_PREVIOUS_SECRETS: z.string().optional(),
   JWT_EXPIRES_IN_HOURS: integerWithDefault(12, 1, 168),
   LOGIN_MAX_FAILURES: integerWithDefault(5, 1, 20),
   LOGIN_LOCKOUT_MINUTES: integerWithDefault(15, 1, 1440),
   ACTIVATION_TOKEN_SECRET: z.string().trim().min(32, "ACTIVATION_TOKEN_SECRET must be at least 32 characters"),
+  ACTIVATION_TOKEN_PREVIOUS_SECRETS: z.string().optional(),
   ACTIVATION_TOKEN_TTL_HOURS: integerWithDefault(720, 24, 2160),
   TEMPLATE_REPOSITORY_API_KEY: trimmedOptionalString,
   CONFIG_SECRET_KEY: z.string().trim().min(32, "CONFIG_SECRET_KEY is required"),
@@ -93,6 +95,14 @@ export function corsAllowedOrigins(env: AppEnvironment = appEnvironment()) {
     .filter(Boolean);
 }
 
+export function jwtVerificationSecrets(env: AppEnvironment = appEnvironment()) {
+  return [env.JWT_SECRET, ...commaSeparatedSecrets(env.JWT_PREVIOUS_SECRETS)];
+}
+
+export function activationTokenVerificationSecrets(env: AppEnvironment = appEnvironment()) {
+  return [env.ACTIVATION_TOKEN_SECRET, ...commaSeparatedSecrets(env.ACTIVATION_TOKEN_PREVIOUS_SECRETS)];
+}
+
 export function configSecretKeyBytes(env: AppEnvironment = appEnvironment()) {
   const decoded = decodeSecretKey(env.CONFIG_SECRET_KEY);
   if (!decoded) {
@@ -117,4 +127,11 @@ function decodeSecretKey(value: string) {
   }
 
   return null;
+}
+
+function commaSeparatedSecrets(value?: string) {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
