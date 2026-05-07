@@ -1,12 +1,15 @@
 import { PrismaClient } from "@prisma/client";
-import {
-  encryptConfigProfileSecrets,
-  encryptPreviewProviderSetting
-} from "../apps/api/src/common/secret-crypto";
+import { existsSync } from "fs";
+import { dirname, resolve } from "path";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
 
 async function main() {
+  const {
+    encryptConfigProfileSecrets,
+    encryptPreviewProviderSetting
+  } = await loadSecretCryptoModule();
   const prisma = new PrismaClient();
   try {
     const profiles = await prisma.configProfile.findMany({
@@ -87,3 +90,17 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+async function loadSecretCryptoModule() {
+  const baseDir = dirname(fileURLToPath(import.meta.url));
+  for (const candidate of [
+    resolve(baseDir, "../apps/api/src/common/secret-crypto.ts"),
+    resolve(baseDir, "../apps/api/dist/common/secret-crypto.js")
+  ]) {
+    if (existsSync(candidate)) {
+      return import(pathToFileURL(candidate).href);
+    }
+  }
+
+  throw new Error("Could not locate secret-crypto module from prisma/encrypt-config-secrets.ts.");
+}
