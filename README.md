@@ -432,6 +432,7 @@ Important routing rule:
 - Admin route: `/backend` and `/backend/*` is proxied to the admin after stripping `/backend`, so Next.js receives `/`, `/templates`, and `/_next/*`. The admin image uses `NEXT_PUBLIC_BASE_PATH=/backend` as an asset/link prefix, not as a Next.js `basePath`.
 - Public product website route: `/` and `/*` on `skrivdet.no`/`www.skrivdet.no` is proxied to the website container on port `8080`.
 - Website asset compatibility route: `/skrivdet/assets/*` on `skrivdet.no`/`www.skrivdet.no` strips `/skrivdet` before proxying to the website container. This supports the current website image, which was originally built for the old `/skrivdet` mount path.
+- Legacy mobile API compatibility: stale `kvasetech.com/api/*`, `kvasetech.com/backend/api/*`, `kvasetech.com/skrivdet/api/*`, and `kvasetech.com/ulfy/api/*` paths are proxied to the API without redirecting, so mobile Authorization headers are preserved while old app/profile data is refreshed.
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml pull

@@ -153,7 +153,7 @@ const empty = {
   formatterPrivacyEmphasis: "safe",
   selectedFormatterProviderId: "",
   formatterProviders: [],
-  templateRepositoryUrl: "http://localhost:4000/api/v1/templates/manifest",
+  templateRepositoryUrl: "https://api.skrivdet.no/api/v1/templates/manifest",
   telemetryEndpointUrl: "",
   developerMode: false,
   allowExternalProviders: false,

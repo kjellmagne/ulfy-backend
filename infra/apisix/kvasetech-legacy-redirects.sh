@@ -5,7 +5,9 @@ set -euo pipefail
 : "${APISIX_ADMIN_KEY:?Set APISIX_ADMIN_KEY to your APISIX admin key}"
 
 LEGACY_HOST="${KVASETECH_LEGACY_HOST:-kvasetech.com}"
+LEGACY_HOSTS="${KVASETECH_LEGACY_HOSTS:-${LEGACY_HOST}}"
 TARGET_ORIGIN="${SKRIVDET_TARGET_ORIGIN:-https://skrivdet.no}"
+API_UPSTREAM="${ULFY_API_UPSTREAM:-192.168.222.171:4000}"
 BACKEND_PATH="${SKRIVDET_BACKEND_PATH:-/backend}"
 WEBSITE_PATH="${SKRIVDET_OLD_WEBSITE_PATH:-/skrivdet}"
 ULFY_PATH="${SKRIVDET_OLD_ULFY_PATH:-/ulfy}"
@@ -18,11 +20,37 @@ ULFY_PATH="/${ULFY_PATH#/}"
 ULFY_PATH="${ULFY_PATH%/}"
 TARGET_ORIGIN="${TARGET_ORIGIN%/}"
 
+json_array_from_csv() {
+  local csv="$1"
+  local first=1
+  local item
+
+  printf '['
+  while IFS= read -r item; do
+    item="$(printf '%s' "${item}" | xargs)"
+    [ -n "${item}" ] || continue
+    if [ "${first}" -eq 0 ]; then
+      printf ','
+    fi
+    first=0
+    printf '"%s"' "${item}"
+  done <<EOF
+$(printf '%s' "${csv}" | tr ',' '\n')
+EOF
+  printf ']'
+}
+
+LEGACY_HOSTS_JSON="$(json_array_from_csv "${LEGACY_HOSTS}")"
+
 for route_id in \
   ulfy-api \
   ulfy-admin \
   skrivdet-website \
   skrivdet-legacy-redirect \
+  kvasetech-api-compat \
+  kvasetech-backend-api-compat \
+  kvasetech-skrivdet-api-compat \
+  kvasetech-ulfy-api-compat \
   kvasetech-backend-redirect \
   kvasetech-skrivdet-redirect \
   kvasetech-ulfy-redirect; do
@@ -30,12 +58,91 @@ for route_id in \
     -H "X-API-KEY: ${APISIX_ADMIN_KEY}" >/dev/null || true
 done
 
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-api-compat" \
+  -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"kvasetech-api-compat\",
+    \"hosts\": ${LEGACY_HOSTS_JSON},
+    \"uri\": \"/api/*\",
+    \"priority\": 800,
+    \"upstream\": {
+      \"type\": \"roundrobin\",
+      \"nodes\": {
+        \"${API_UPSTREAM}\": 1
+      }
+    }
+  }"
+
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-backend-api-compat" \
+  -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"kvasetech-backend-api-compat\",
+    \"hosts\": ${LEGACY_HOSTS_JSON},
+    \"uri\": \"${BACKEND_PATH}/api/*\",
+    \"priority\": 750,
+    \"plugins\": {
+      \"proxy-rewrite\": {
+        \"regex_uri\": [\"^${BACKEND_PATH}/(.*)\", \"/\$1\"]
+      }
+    },
+    \"upstream\": {
+      \"type\": \"roundrobin\",
+      \"nodes\": {
+        \"${API_UPSTREAM}\": 1
+      }
+    }
+  }"
+
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-skrivdet-api-compat" \
+  -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"kvasetech-skrivdet-api-compat\",
+    \"hosts\": ${LEGACY_HOSTS_JSON},
+    \"uri\": \"${WEBSITE_PATH}/api/*\",
+    \"priority\": 750,
+    \"plugins\": {
+      \"proxy-rewrite\": {
+        \"regex_uri\": [\"^${WEBSITE_PATH}/(.*)\", \"/\$1\"]
+      }
+    },
+    \"upstream\": {
+      \"type\": \"roundrobin\",
+      \"nodes\": {
+        \"${API_UPSTREAM}\": 1
+      }
+    }
+  }"
+
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-ulfy-api-compat" \
+  -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"name\": \"kvasetech-ulfy-api-compat\",
+    \"hosts\": ${LEGACY_HOSTS_JSON},
+    \"uri\": \"${ULFY_PATH}/api/*\",
+    \"priority\": 750,
+    \"plugins\": {
+      \"proxy-rewrite\": {
+        \"regex_uri\": [\"^${ULFY_PATH}/(.*)\", \"/\$1\"]
+      }
+    },
+    \"upstream\": {
+      \"type\": \"roundrobin\",
+      \"nodes\": {
+        \"${API_UPSTREAM}\": 1
+      }
+    }
+  }"
+
 curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-backend-redirect" \
   -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
     \"name\": \"kvasetech-backend-redirect\",
-    \"host\": \"${LEGACY_HOST}\",
+    \"hosts\": ${LEGACY_HOSTS_JSON},
     \"uri\": \"${BACKEND_PATH}*\",
     \"priority\": 500,
     \"plugins\": {
@@ -52,7 +159,7 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-skrivdet-red
   -H "Content-Type: application/json" \
   -d "{
     \"name\": \"kvasetech-skrivdet-redirect\",
-    \"host\": \"${LEGACY_HOST}\",
+    \"hosts\": ${LEGACY_HOSTS_JSON},
     \"uri\": \"${WEBSITE_PATH}*\",
     \"priority\": 400,
     \"plugins\": {
@@ -69,7 +176,7 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-ulfy-redirec
   -H "Content-Type: application/json" \
   -d "{
     \"name\": \"kvasetech-ulfy-redirect\",
-    \"host\": \"${LEGACY_HOST}\",
+    \"hosts\": ${LEGACY_HOSTS_JSON},
     \"uri\": \"${ULFY_PATH}*\",
     \"priority\": 400,
     \"plugins\": {
@@ -82,6 +189,10 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-ulfy-redirec
   }"
 
 echo "Configured legacy Kvasetech redirects:"
-echo "  https://${LEGACY_HOST}${BACKEND_PATH}* -> ${TARGET_ORIGIN}${BACKEND_PATH}*"
-echo "  https://${LEGACY_HOST}${WEBSITE_PATH}* -> ${TARGET_ORIGIN}/*"
-echo "  https://${LEGACY_HOST}${ULFY_PATH}* -> ${TARGET_ORIGIN}/*"
+echo "  https://${LEGACY_HOSTS}/api/* -> http://${API_UPSTREAM}/api/*"
+echo "  https://${LEGACY_HOSTS}${BACKEND_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
+echo "  https://${LEGACY_HOSTS}${WEBSITE_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
+echo "  https://${LEGACY_HOSTS}${ULFY_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
+echo "  https://${LEGACY_HOSTS}${BACKEND_PATH}* -> ${TARGET_ORIGIN}${BACKEND_PATH}*"
+echo "  https://${LEGACY_HOSTS}${WEBSITE_PATH}* -> ${TARGET_ORIGIN}/*"
+echo "  https://${LEGACY_HOSTS}${ULFY_PATH}* -> ${TARGET_ORIGIN}/*"
