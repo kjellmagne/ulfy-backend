@@ -2,10 +2,12 @@
 set -euo pipefail
 
 HOST="${SKRIVDET_HOST:-skrivdet.no}"
+API_HOST="${SKRIVDET_API_HOST:-api.skrivdet.no}"
 PUBLIC_PATH="${SKRIVDET_BACKEND_PUBLIC_PATH:-/backend}"
 PUBLIC_PATH="/${PUBLIC_PATH#/}"
 PUBLIC_PATH="${PUBLIC_PATH%/}"
 BASE_URL="${SKRIVDET_PUBLIC_BASE_URL:-https://${HOST}${PUBLIC_PATH}}"
+API_BASE_URL="${SKRIVDET_API_BASE_URL:-https://${API_HOST}}"
 DETAIL_PATH="${SKRIVDET_TEMPLATE_DETAIL_PATH:-/templates/designer?familyId=00000000-0000-4000-8000-000000000304&variantId=00000000-0000-4000-8000-000000000404}"
 
 TMP_DIR="$(mktemp -d)"
@@ -47,10 +49,12 @@ assert_gateway_next_assets() {
 LIST_HTML="${TMP_DIR}/templates.html"
 DETAIL_HTML="${TMP_DIR}/template-detail.html"
 HEALTH_JSON="${TMP_DIR}/health.json"
+API_HOST_HEALTH_JSON="${TMP_DIR}/api-host-health.json"
 
 fetch "${BASE_URL}/templates" "${LIST_HTML}"
 fetch "${BASE_URL}${DETAIL_PATH}" "${DETAIL_HTML}"
 fetch "${BASE_URL}/api/v1/health" "${HEALTH_JSON}"
+fetch "${API_BASE_URL}/api/v1/health" "${API_HOST_HEALTH_JSON}"
 
 assert_no_root_next_assets "${LIST_HTML}" "Template list"
 assert_no_root_next_assets "${DETAIL_HTML}" "Template designer"
@@ -63,4 +67,10 @@ if ! grep -F '"ok":true' "${HEALTH_JSON}" >/dev/null; then
   exit 1
 fi
 
-echo "skrivDET backend routing check passed for ${BASE_URL}"
+if ! grep -F '"ok":true' "${API_HOST_HEALTH_JSON}" >/dev/null; then
+  echo "API host health did not return ok=true:" >&2
+  cat "${API_HOST_HEALTH_JSON}" >&2
+  exit 1
+fi
+
+echo "skrivDET backend routing check passed for ${BASE_URL} and ${API_BASE_URL}"

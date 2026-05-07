@@ -423,13 +423,15 @@ sudo docker rm -f ulfy_api_1 ulfy_admin_1
 sudo docker-compose up -d --no-deps api admin
 ```
 
-The public skrivDET deployment serves the product website at `https://skrivdet.no/` and the backend admin/API at `https://skrivdet.no/backend/`.
+The public skrivDET deployment serves the product website at `https://skrivdet.no/`, the backend admin at `https://skrivdet.no/backend/`, and the canonical public API at `https://api.skrivdet.no/api/v1/`.
 
 Important routing rule:
 
+- Canonical API host: `api.skrivdet.no/api/*` is proxied directly to the API, so the API receives `/api/*`.
 - API route: `/backend/api/*` is proxied to the API after stripping `/backend`, so the API receives `/api/*`.
 - Admin route: `/backend` and `/backend/*` is proxied to the admin after stripping `/backend`, so Next.js receives `/`, `/templates`, and `/_next/*`. The admin image uses `NEXT_PUBLIC_BASE_PATH=/backend` as an asset/link prefix, not as a Next.js `basePath`.
 - Public product website route: `/` and `/*` on `skrivdet.no`/`www.skrivdet.no` is proxied to the website container on port `8080`.
+- Website asset compatibility route: `/skrivdet/assets/*` on `skrivdet.no`/`www.skrivdet.no` strips `/skrivdet` before proxying to the website container. This supports the current website image, which was originally built for the old `/skrivdet` mount path.
 
 ```bash
 docker compose --env-file .env -f docker-compose.yml pull
@@ -441,7 +443,7 @@ APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/skrivdet-domain-routes.sh
 APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/kvasetech-legacy-redirects.sh
 ```
 
-Issue and install the Let's Encrypt certificate after DNS for `skrivdet.no` and `www.skrivdet.no` resolves to the APISIX host:
+Issue and install the Let's Encrypt certificate after DNS for `skrivdet.no`, `www.skrivdet.no`, and `api.skrivdet.no` resolves to the APISIX host:
 
 ```bash
 sudo APISIX_ADMIN_KEY='your-admin-key' LETSENCRYPT_EMAIL='ops@example.com' bash infra/apisix/issue-skrivdet-letsencrypt.sh
@@ -459,8 +461,10 @@ This check fails if either the template list or the full template designer route
 
 Public API documentation is available through APISIX at:
 
-- Swagger UI: `https://skrivdet.no/backend/api/docs`
-- OpenAPI JSON: `https://skrivdet.no/backend/api/docs-json`
+- Swagger UI: `https://api.skrivdet.no/api/docs`
+- OpenAPI JSON: `https://api.skrivdet.no/api/docs-json`
+
+The admin same-origin API path remains available at `https://skrivdet.no/backend/api/v1/...` for the admin UI and older clients.
 
 ## GitHub Docker Images
 
@@ -471,7 +475,7 @@ GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0
 - `ghcr.io/kjellmagne/ulfy-backend-api:sha-<commit>`
 - `ghcr.io/kjellmagne/ulfy-backend-admin:sha-<commit>`
 
-The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time for public links and `_next` asset URLs, while APISIX strips `/backend` before forwarding admin requests to Next.js. It leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, include the complete public API prefix, for example `https://skrivdet.no/backend`.
+The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time for public links and `_next` asset URLs, while APISIX strips `/backend` before forwarding admin requests to Next.js. It leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, use the canonical API origin, for example `https://api.skrivdet.no`.
 
 Required deployment environment variables:
 

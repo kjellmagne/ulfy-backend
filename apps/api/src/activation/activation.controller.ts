@@ -140,7 +140,7 @@ const enterpriseConfigExample = {
   documentGenerationEndpointUrl: "https://api.openai.com/v1",
   documentGenerationModel: "gpt-5-mini",
   documentGenerationApiKey: "optional-managed-docgen-key",
-  templateRepositoryUrl: "https://skrivdet.no/backend/api/v1/templates/manifest",
+  templateRepositoryUrl: "https://api.skrivdet.no/api/v1/templates/manifest",
   telemetryEndpointUrl: "https://telemetry.example.internal/events",
   featureFlags: { developerMode: false, allowExternalProviders: false },
   allowedProviderRestrictions: ["azure", "openai_compatible", "local_heuristic"],
@@ -346,7 +346,7 @@ const mobileConfigSchema = {
     documentGenerationEndpointUrl: { type: "string", nullable: true, example: "https://api.openai.com/v1", description: "Endpoint URL for document-generation provider. Hidden/unused for Apple Intelligence." },
     documentGenerationModel: { type: "string", nullable: true, example: "gpt-5-mini", description: "Model identifier for document generation." },
     documentGenerationApiKey: { type: "string", nullable: true, description: "Optional managed document-generation credential. The app stores it securely and uses it only for the managed formatter provider." },
-    templateRepositoryUrl: { type: "string", nullable: true, example: "https://skrivdet.no/backend/api/v1/templates/manifest", description: "Enterprise template catalog URL. App should authenticate repository calls with Authorization: Bearer <activationToken>." },
+    templateRepositoryUrl: { type: "string", nullable: true, example: "https://api.skrivdet.no/api/v1/templates/manifest", description: "Enterprise template catalog URL. App should authenticate repository calls with Authorization: Bearer <activationToken>." },
     telemetryEndpointUrl: { type: "string", nullable: true, description: "Optional telemetry endpoint for enterprise deployments." },
     featureFlags: {
       type: "object",

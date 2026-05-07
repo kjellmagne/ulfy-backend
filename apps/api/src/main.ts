@@ -20,10 +20,11 @@ async function bootstrap() {
       "Mobile activation endpoints return a consistent { success, error: { code, message } } shape for errors.",
       "Enterprise config is sparse: omitted config fields mean the iOS app should keep local settings, while present fields are intentional managed policy.",
       "Admin endpoints require a bearer token from /auth/login.",
-      "Public deployment path through APISIX is /backend/api/v1; Swagger UI is available at /backend/api/docs and raw OpenAPI JSON at /backend/api/docs-json."
+      "Canonical public API base through APISIX is https://api.skrivdet.no/api/v1; the admin gateway keeps /backend/api/v1 as a same-origin compatibility path."
     ].join(" "))
     .setVersion("1.0")
-    .addServer("https://skrivdet.no/backend", "skrivDET production through APISIX")
+    .addServer("https://api.skrivdet.no", "skrivDET production API")
+    .addServer("https://skrivdet.no/backend", "skrivDET admin same-origin compatibility path")
     .addServer("http://localhost:4000", "Local development")
     .addBearerAuth()
     .build();

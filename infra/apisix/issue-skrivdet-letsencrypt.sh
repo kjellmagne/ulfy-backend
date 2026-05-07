@@ -4,7 +4,7 @@ set -euo pipefail
 : "${APISIX_ADMIN_URL:=http://127.0.0.1:9180}"
 : "${APISIX_ADMIN_KEY:?Set APISIX_ADMIN_KEY to your APISIX admin key}"
 
-DOMAINS="${SKRIVDET_CERT_DOMAINS:-skrivdet.no,www.skrivdet.no}"
+DOMAINS="${SKRIVDET_CERT_DOMAINS:-skrivdet.no,www.skrivdet.no,api.skrivdet.no}"
 WEBROOT="${SKRIVDET_CERT_WEBROOT:-/var/www/letsencrypt}"
 ACME_UPSTREAM="${SKRIVDET_ACME_UPSTREAM:-192.168.222.171:8088}"
 ACME_BIND="${SKRIVDET_ACME_BIND:-0.0.0.0}"
@@ -77,6 +77,7 @@ sleep 1
 
 # shellcheck disable=SC2086
 certbot certonly --webroot -w "${WEBROOT}" ${domain_args} \
+  --cert-name "${primary_domain}" --expand \
   --non-interactive --agree-tos ${email_args} --keep-until-expiring --no-directory-hooks
 
 cert_path="/etc/letsencrypt/live/${primary_domain}/fullchain.pem"
