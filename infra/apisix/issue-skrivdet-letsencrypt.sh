@@ -62,11 +62,6 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-acme-http01" 
     \"hosts\": ${hosts_json},
     \"uri\": \"/.well-known/acme-challenge/*\",
     \"priority\": 1000,
-    \"plugins\": {
-      \"proxy-rewrite\": {
-        \"regex_uri\": [\"^/.well-known/acme-challenge/(.*)\", \"/\$1\"]
-      }
-    },
     \"upstream\": {
       \"type\": \"roundrobin\",
       \"nodes\": {
