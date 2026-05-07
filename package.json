@@ -11,7 +11,8 @@
     "test": "corepack pnpm --filter @skrivdet/api test",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "tsx prisma/seed.ts"
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:encrypt-secrets": "tsx prisma/encrypt-config-secrets.ts"
   },
   "devDependencies": {
     "@prisma/client": "^6.7.0",

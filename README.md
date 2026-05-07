@@ -102,13 +102,15 @@ curl -X POST http://localhost:4000/api/v1/activation/refresh \
 Dedicated license details:
 
 ```bash
-curl 'http://localhost:4000/api/v1/license/details?activationToken=...'
+curl http://localhost:4000/api/v1/license/details \
+  -H "Authorization: Bearer <activation-token>"
 ```
 
 Effective config with license metadata:
 
 ```bash
-curl 'http://localhost:4000/api/v1/config/effective?activationToken=...'
+curl http://localhost:4000/api/v1/config/effective \
+  -H "Authorization: Bearer <activation-token>"
 ```
 
 Mobile-facing errors use this shape:
@@ -218,7 +220,7 @@ Sample manifest response:
 }
 ```
 
-Single-user activations are intentionally blocked from the central repository. Enterprise catalog and download calls are filtered by the tenant tied to the activation token. Internal/dev override access can be enabled with `TEMPLATE_REPOSITORY_API_KEY`.
+Single-user activations are intentionally blocked from the central repository. Enterprise catalog and download calls are filtered by the tenant tied to the activation token. Internal/dev verification can use `Authorization: Bearer <TEMPLATE_REPOSITORY_API_KEY>` when that override is explicitly configured.
 
 Config profiles keep provider domains separate:
 
@@ -349,9 +351,6 @@ route family. The supported template repository workflow is:
 Legacy compatibility endpoints still exist so old data, seed records, or
 operational scripts do not break:
 
-- `GET /api/v1/templates/manifest?tenantId=...` is a disabled-by-default
-  internal fallback and only works when `ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true`.
-  Mobile clients must use `Authorization: Bearer <activationToken>` instead.
 - `GET/POST /api/v1/admin/templates`, `PATCH /api/v1/admin/templates/{id}`,
   `POST /api/v1/admin/templates/{id}/publish/{versionId}`, and
   `PATCH /api/v1/admin/templates/{id}/archive` are the old direct
@@ -377,6 +376,7 @@ Run migrations and seed inside the deployment stack:
 
 ```bash
 docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pnpm prisma migrate deploy
+docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pnpm prisma:encrypt-secrets
 docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm api pnpm prisma db seed
 ```
 
@@ -387,6 +387,7 @@ cp infra/.env.server.example infra/.env.server
 docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml build
 docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml up -d
 docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml run --rm api pnpm prisma migrate deploy
+docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml run --rm api pnpm prisma:encrypt-secrets
 docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml run --rm api pnpm prisma db seed
 ```
 
@@ -409,6 +410,7 @@ sudo chown -R "$USER:$USER" /opt/ulfy-data
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml pull
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d postgres
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma migrate deploy
+docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma:encrypt-secrets
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml run --rm api pnpm prisma db seed
 docker compose --env-file infra/.env.server -f infra/docker-compose.ghcr.yml up -d api admin
 ```
@@ -421,6 +423,7 @@ On older Ubuntu hosts using legacy `docker-compose` 1.x, container recreation ma
 cd /opt/ulfy
 sudo docker-compose pull api admin
 sudo docker-compose run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 api pnpm prisma migrate deploy
+sudo docker-compose run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 api pnpm prisma:encrypt-secrets
 sudo docker rm -f ulfy_api_1 ulfy_admin_1
 sudo docker-compose up -d --no-deps api admin
 ```
@@ -464,7 +467,7 @@ This check fails if either the template list or the full template designer route
 
 Public API documentation is available through APISIX at:
 
-- Swagger UI: `https://api.skrivdet.no/api/docs`
+- Swagger UI: `https://api.skrivdet.no/api/docs` (protected with HTTP basic auth in production)
 - OpenAPI JSON: `https://api.skrivdet.no/api/docs-json`
 
 The admin same-origin API path remains available at `https://skrivdet.no/backend/api/v1/...` for the admin UI and older clients.
@@ -487,6 +490,9 @@ Required deployment environment variables:
 - `DATABASE_URL` for non-compose deployments
 - `JWT_SECRET`
 - `ACTIVATION_TOKEN_SECRET`
+- `CONFIG_SECRET_KEY` as a 32-byte AES key encoded as hex, base64, or base64url
+- `CORS_ALLOWED_ORIGINS` with the allowed browser origins, for example `https://skrivdet.no,https://www.skrivdet.no`
+- `SWAGGER_ENABLED` plus `SWAGGER_BASIC_AUTH_USERNAME` and `SWAGGER_BASIC_AUTH_PASSWORD` when Swagger should stay exposed in production
 - `PUBLIC_BASE_PATH` when serving the admin under a gateway prefix such as `/backend`
 - AI preview provider is normally configured in the admin portal under `Settings` by a superadmin. `TEMPLATE_PREVIEW_ENDPOINT_URL`, `TEMPLATE_PREVIEW_API_KEY`, and `TEMPLATE_PREVIEW_MODEL` remain optional deployment fallbacks.
 - optional `TEMPLATE_REPOSITORY_API_KEY` for internal repository override access
@@ -495,6 +501,7 @@ Required deployment environment variables:
 
 - Partner-admin scoping is represented in the model but not fully enforced on every admin list endpoint.
 - Config profiles are manually managed JSON-backed records, without an advanced policy engine.
-- Activation tokens are long-lived JWTs whose hashes are stored for lookup and revocation.
+- Activation tokens are short-lived signed device credentials. The API verifies signature, issuer, audience, expiry, and device/license claims on every use, then rotates the token on refresh.
+- Existing plaintext config-provider secrets should be backfilled with `pnpm prisma:encrypt-secrets` after deploy. New admin saves are encrypted automatically at rest.
 - The mobile app still owns local template forking/update behavior; the backend provides the authoritative published repository, tenant filtering, history, and preview tooling.
 - AI preview uses one centrally configured OpenAI-compatible preview provider/model. It is managed by superadmins in Settings, with environment variables kept as deployment fallbacks.

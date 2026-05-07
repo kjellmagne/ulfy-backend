@@ -20,9 +20,15 @@ services:
       context: ..
       dockerfile: infra/api.Dockerfile
     environment:
+      NODE_ENV: development
       DATABASE_URL: postgresql://ulfy:ulfy@postgres:5432/ulfy?schema=public
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      ACTIVATION_TOKEN_SECRET: ${ACTIVATION_TOKEN_SECRET:-change-me-too}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      ACTIVATION_TOKEN_SECRET: ${ACTIVATION_TOKEN_SECRET:?ACTIVATION_TOKEN_SECRET is required}
+      CONFIG_SECRET_KEY: ${CONFIG_SECRET_KEY:?CONFIG_SECRET_KEY is required}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      SWAGGER_BASIC_AUTH_USERNAME: ${SWAGGER_BASIC_AUTH_USERNAME:-}
+      SWAGGER_BASIC_AUTH_PASSWORD: ${SWAGGER_BASIC_AUTH_PASSWORD:-}
       TEMPLATE_REPOSITORY_API_KEY: ${TEMPLATE_REPOSITORY_API_KEY:-}
       TEMPLATE_PREVIEW_PROVIDER_TYPE: ${TEMPLATE_PREVIEW_PROVIDER_TYPE:-openai-compatible}
       TEMPLATE_PREVIEW_ENDPOINT_URL: ${TEMPLATE_PREVIEW_ENDPOINT_URL:-}

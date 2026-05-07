@@ -9,6 +9,7 @@ import { AdminGuard } from "../auth/admin.guard";
 import { activationKeyPrefix, createActivationKey, sha256 } from "../common/crypto";
 import { AuditService } from "../common/audit.service";
 import { TemplatesService } from "../templates/templates.service";
+import { decryptConfigProfileSecrets, decryptPreviewProviderSetting, encryptConfigProfileSecrets, encryptPreviewProviderSetting } from "../common/secret-crypto";
 
 const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
 const ADMIN_SECRET_MASK = "********";
@@ -817,10 +818,11 @@ export class AdminController {
         ? (apiKeyScopeChanged ? null : existing.apiKey)
         : this.emptyToNull(dto.apiKey)
     };
+    const storedValue = encryptPreviewProviderSetting(next);
     const setting = await this.prisma.systemSetting.upsert({
       where: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY },
-      update: { value: next },
-      create: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY, value: next }
+      update: { value: storedValue },
+      create: { key: TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY, value: storedValue }
     });
     await this.audit.log({
       actorAdminId: req.user.sub,
@@ -964,7 +966,12 @@ export class AdminController {
       throw new ConflictException("Partner admins must be assigned to a solution partner.");
     }
     if (dto.role && dto.role !== "superadmin") await this.ensureAnotherSuperadmin(id);
-    const data = await this.cleanAdminUser(dto, false);
+    const data: any = await this.cleanAdminUser(dto, false);
+    if (dto.password || dto.role !== undefined || dto.partnerId !== undefined) {
+      data.tokenVersion = { increment: 1 };
+      data.failedLoginCount = 0;
+      data.lockedUntil = null;
+    }
     const user = await this.prisma.adminUser.update({ where: { id }, data, include: { partner: true } });
     await this.audit.log({ actorAdminId: req.user.sub, actorEmail: req.user.email, action: "admin_user.update", targetType: "AdminUser", targetId: id });
     return this.withoutPassword(user);
@@ -1816,7 +1823,7 @@ export class AdminController {
   }
 
   private cleanConfig(dto: ConfigDto, existing?: { providerProfiles?: unknown }) {
-    const data: Record<string, unknown> = {
+    const data = encryptConfigProfileSecrets({
       name: dto.name,
       partnerId: this.emptyToNull(dto.partnerId),
       description: this.emptyToNull(dto.description as string | undefined),
@@ -1852,7 +1859,7 @@ export class AdminController {
       providerProfiles: this.preserveMaskedProviderSecrets(dto.providerProfiles ?? {}, existing?.providerProfiles),
       managedPolicy: this.normalizeManagedPolicy(dto.managedPolicy, dto),
       defaultTemplateId: this.emptyToNull(dto.defaultTemplateId ?? undefined)
-    };
+    });
     return data;
   }
 
@@ -1979,7 +1986,7 @@ export class AdminController {
   }
 
   private templatePreviewProviderValue(value: unknown) {
-    const source = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    const source = decryptPreviewProviderSetting(value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {});
     return {
       providerType: typeof source.providerType === "string" && source.providerType.trim() ? source.providerType.trim() : "openai-compatible",
       endpointUrl: typeof source.endpointUrl === "string" && source.endpointUrl.trim() ? source.endpointUrl.trim() : null,
@@ -2024,7 +2031,7 @@ export class AdminController {
     });
     if (!profile) return { ...dto, apiKey: providedApiKey ?? undefined };
 
-    const saved = this.savedProviderModelLookup(profile, dto);
+    const saved = this.savedProviderModelLookup(decryptConfigProfileSecrets(profile), dto);
     return {
       ...dto,
       endpointUrl: this.emptyToNull(dto.endpointUrl) ?? saved.endpointUrl ?? dto.endpointUrl,

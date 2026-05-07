@@ -1,13 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JwtService } from "@nestjs/jwt";
 import { ActivationService } from "../src/activation/activation.service";
+import { issueActivationToken } from "../src/activation/activation-token";
 import { sha256 } from "../src/common/crypto";
 
 describe("ActivationService", () => {
   let prisma: any;
   let service: ActivationService;
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   beforeEach(() => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test?schema=public");
+    vi.stubEnv("JWT_SECRET", "j".repeat(64));
+    vi.stubEnv("ACTIVATION_TOKEN_SECRET", "a".repeat(64));
+    vi.stubEnv("CONFIG_SECRET_KEY", Buffer.alloc(32, 7).toString("base64"));
     prisma = {
       singleLicenseKey: {
         findUnique: vi.fn(),
@@ -95,10 +104,17 @@ describe("ActivationService", () => {
     });
     prisma.deviceActivation.update.mockResolvedValue({});
     prisma.singleLicenseKey.update.mockResolvedValue({});
+    const activationToken = await issueActivationToken(new JwtService(), {
+      kind: "single",
+      licenseId: "key-1",
+      deviceIdentifier: "iphone-1"
+    });
 
-    const result = await service.refresh({ activationToken: "token-token-token-token", deviceIdentifier: "iphone-1", deviceSerialNumber: "SERIAL-1", appVersion: "1.1" });
+    const result = await service.refresh({ activationToken, deviceIdentifier: "iphone-1", deviceSerialNumber: "SERIAL-1", appVersion: "1.1" });
 
     expect(result.success).toBe(true);
+    expect(result.activationToken).toBeTruthy();
+    expect(result.activationToken).not.toBe(activationToken);
     expect(result.license.registeredToName).toBe("Seed User");
     expect(result.license.maintenanceUntil).toBe("2027-04-29T00:00:00.000Z");
     expect(result.device.deviceSerialNumber).toBe("SERIAL-1");
@@ -123,6 +139,7 @@ describe("ActivationService", () => {
       activatedAt: new Date("2026-04-29T08:00:00.000Z"),
       lastSeenAt: new Date("2026-04-29T09:00:00.000Z"),
       singleLicenseKeyId: null,
+      enterpriseLicenseKeyId: "enterprise-key-1",
       singleLicenseKey: null,
       enterpriseLicenseKey: {
         status: "active",
@@ -188,10 +205,17 @@ describe("ActivationService", () => {
       }
     });
     prisma.deviceActivation.update.mockResolvedValue({});
+    const activationToken = await issueActivationToken(new JwtService(), {
+      kind: "enterprise",
+      licenseId: "enterprise-key-1",
+      deviceIdentifier: "iphone-2"
+    });
 
-    const result = await service.refresh({ activationToken: "token-token-token-token", deviceIdentifier: "iphone-2", appVersion: "1.1" });
+    const result = await service.refresh({ activationToken, deviceIdentifier: "iphone-2", appVersion: "1.1" });
 
     expect(result.success).toBe(true);
+    expect(result.activationToken).toBeTruthy();
+    expect(result.activationToken).not.toBe(activationToken);
     expect(result.license).toMatchObject({
       type: "enterprise",
       registeredToName: "Acme Health AS",
@@ -303,8 +327,13 @@ describe("ActivationService", () => {
       }
     });
     prisma.deviceActivation.update.mockResolvedValue({});
+    const activationToken = await issueActivationToken(new JwtService(), {
+      kind: "enterprise",
+      licenseId: "enterprise-key-2",
+      deviceIdentifier: "iphone-3"
+    });
 
-    const result = await service.refresh({ activationToken: "token-token-token-token", deviceIdentifier: "iphone-3", appVersion: "1.1" });
+    const result = await service.refresh({ activationToken, deviceIdentifier: "iphone-3", appVersion: "1.1" });
 
     expect(result.config).not.toHaveProperty("privacyControlEnabled");
     expect(result.config).not.toHaveProperty("piiControlEnabled");

@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readdirSync, readFileSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+import { JwtService } from "@nestjs/jwt";
 import { TemplatesService } from "../src/templates/templates.service";
+import { issueActivationToken } from "../src/activation/activation-token";
 import { seedTemplates, templateYaml } from "../../../prisma/seed";
 
 const validYaml = `identity:
@@ -49,23 +51,31 @@ llm_prompting:
 
 describe("TemplatesService", () => {
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 
+  beforeEach(() => {
+    vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test?schema=public");
+    vi.stubEnv("JWT_SECRET", "j".repeat(64));
+    vi.stubEnv("ACTIVATION_TOKEN_SECRET", "a".repeat(64));
+    vi.stubEnv("CONFIG_SECRET_KEY", Buffer.alloc(32, 11).toString("base64"));
+  });
+
   it("validates the iOS app YAML schema", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
     const parsed = service.validateYamlContent(validYaml);
     expect(parsed.identity.title).toBe("Personlig diktat / logg");
     expect(parsed.structure.sections[0].title).toBe("Summary");
   });
 
   it("rejects unsupported root fields", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
     expect(() => service.validateYamlContent(`${validYaml}\nrepository_metadata:\n  tenant: acme\n`)).toThrow();
   });
 
   it("publishes YAML in the app-compatible subset without block scalar chomp indicators", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
     const multilineYaml = validYaml.replace(
       "      purpose: Summarize the transcript.",
       [
@@ -85,13 +95,20 @@ describe("TemplatesService", () => {
   });
 
   it("returns tenant-filtered manifest entries for enterprise activations", async () => {
+    const activationToken = await issueActivationToken(new JwtService(), {
+      kind: "enterprise",
+      licenseId: "enterprise-key-1",
+      deviceIdentifier: "ios-device-1"
+    });
     const prisma = {
       deviceActivation: {
         findUnique: vi.fn().mockResolvedValue({
           id: "activation-1",
           kind: "enterprise",
           status: "active",
+          deviceIdentifier: "ios-device-1",
           tenantId: "tenant-1",
+          enterpriseLicenseKeyId: "enterprise-key-1",
           enterpriseLicenseKey: { status: "active", expiresAt: null }
         })
       },
@@ -105,9 +122,9 @@ describe("TemplatesService", () => {
         ])
       }
     };
-    const service = new TemplatesService(prisma as any, { log: vi.fn() } as any);
+    const service = new TemplatesService(prisma as any, { log: vi.fn() } as any, new JwtService());
 
-    const manifest = await service.manifestForEnterpriseActivation("token-token-token-token");
+    const manifest = await service.manifestForEnterpriseActivation(activationToken);
 
     expect(manifest.templates).toHaveLength(1);
     expect(manifest.templates[0]).toMatchObject({
@@ -126,24 +143,31 @@ describe("TemplatesService", () => {
   });
 
   it("rejects repository access for single-user activations", async () => {
+    const activationToken = await issueActivationToken(new JwtService(), {
+      kind: "single",
+      licenseId: "single-key-1",
+      deviceIdentifier: "ios-device-2"
+    });
     const prisma = {
       deviceActivation: {
         findUnique: vi.fn().mockResolvedValue({
           id: "activation-1",
           kind: "single",
           status: "active",
+          deviceIdentifier: "ios-device-2",
           tenantId: null,
+          singleLicenseKeyId: "single-key-1",
           enterpriseLicenseKey: null
         })
       }
     };
-    const service = new TemplatesService(prisma as any, { log: vi.fn() } as any);
+    const service = new TemplatesService(prisma as any, { log: vi.fn() } as any, new JwtService());
 
-    await expect(service.manifestForEnterpriseActivation("token-token-token-token")).rejects.toThrow();
+    await expect(service.manifestForEnterpriseActivation(activationToken)).rejects.toThrow();
   });
 
   it("validates every backend seed template against the mobile schema", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
 
     for (const template of seedTemplates) {
       expect(() => service.validateYamlContent(templateYaml(template)), template.title).not.toThrow();
@@ -151,11 +175,11 @@ describe("TemplatesService", () => {
   });
 
   it("validates every bundled iOS template against the backend mobile schema", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
     const currentFile = fileURLToPath(import.meta.url);
     const templateDirectory = resolve(
       dirname(currentFile),
-      "../../../../ios-app/MeetingTranscribeIOS/Resources/Templates"
+      "../../../../ios-app/skrivDET/Resources/Templates"
     );
     const templateFiles = readdirSync(templateDirectory)
       .filter((fileName) => fileName.endsWith(".yaml"))
@@ -169,7 +193,7 @@ describe("TemplatesService", () => {
   });
 
   it("fills relevant assisted draft fields for a municipal health follow-up case", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
     const result = service.buildAssistedDraft({
       useCase: "A Norwegian template for follow-up conversations after municipal health meetings. It should produce a short summary, decisions, next steps, and responsible people.",
       language: "nb-NO",
@@ -196,7 +220,7 @@ describe("TemplatesService", () => {
   });
 
   it("fills relevant assisted draft fields for an HR employee check-in case", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
     const result = service.buildAssistedDraft({
       useCase: "Employee check-in between manager, employee, and HR. Capture workload, agreements, next meeting, and responsibilities.",
       language: "en-US"
@@ -213,7 +237,7 @@ describe("TemplatesService", () => {
   });
 
   it("fills relevant assisted draft fields for an incident case", () => {
-    const service = new TemplatesService({} as any, {} as any);
+    const service = new TemplatesService({} as any, {} as any, new JwtService());
     const result = service.buildAssistedDraft({
       useCase: "Incident report after a security deviation. Capture timeline, impact, immediate actions, risk, and further follow-up.",
       language: "en-US"
@@ -271,7 +295,7 @@ describe("TemplatesService", () => {
         }),
         update
       }
-    } as any, { log: vi.fn() } as any);
+    } as any, { log: vi.fn() } as any, new JwtService());
 
     const preview = await service.generatePreview("draft-1", { id: "admin-1", email: "admin@example.com" });
 
@@ -301,7 +325,7 @@ describe("TemplatesService", () => {
           value: { providerType: "openai", endpointUrl: "https://api.openai.com/v1", model: null, apiKey: null }
         })
       }
-    } as any, { log: vi.fn() } as any);
+    } as any, { log: vi.fn() } as any, new JwtService());
 
     await expect(service.previewProviderStatus()).resolves.toMatchObject({
       configured: false,

@@ -1,12 +1,15 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import * as yaml from "js-yaml";
 import { randomUUID } from "crypto";
+import { JwtService } from "@nestjs/jwt";
 import { TemplateYamlSchema } from "@skrivdet/contracts";
 import type { TemplateYaml } from "@skrivdet/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../common/audit.service";
 import { mobileError } from "../activation/activation.service";
 import { tokenHash } from "../common/crypto";
+import { appEnvironment } from "../config/environment";
+import { verifyActivationToken } from "../activation/activation-token";
 
 const TEMPLATE_PREVIEW_PROVIDER_SETTING_KEY = "templatePreviewProvider";
 
@@ -29,7 +32,7 @@ type AssistedDraftProfile = {
 
 @Injectable()
 export class TemplatesService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly jwt: JwtService) {}
 
   async manifest(tenantId?: string) {
     const templates = await this.prisma.template.findMany({
@@ -69,6 +72,13 @@ export class TemplatesService {
     const activation = await this.assertEnterpriseTemplateActivation(activationToken);
     const variants = await this.entitledPublishedVariants(activation.tenantId);
     return this.manifestFromVariants(variants, "Enterprise Templates");
+  }
+
+  async manifestForScopedBearer(bearer: string) {
+    if (this.isInternalRepositoryBearer(bearer)) {
+      return this.manifestForInternalApiKey(bearer);
+    }
+    return this.manifestForEnterpriseActivation(bearer);
   }
 
   async manifestForInternalApiKey(apiKey: string) {
@@ -118,6 +128,13 @@ export class TemplatesService {
   async downloadYamlForInternalApiKey(id: string, apiKey: string) {
     this.assertRepositoryApiKey(apiKey);
     return this.downloadYaml(id);
+  }
+
+  async downloadYamlForScopedBearer(id: string, bearer: string) {
+    if (this.isInternalRepositoryBearer(bearer)) {
+      return this.downloadYamlForInternalApiKey(id, bearer);
+    }
+    return this.downloadYamlForEnterpriseActivation(id, bearer);
   }
 
   validateYamlContent(yamlContent: string) {
@@ -440,11 +457,20 @@ export class TemplatesService {
 
   private async assertEnterpriseTemplateActivation(activationToken: string) {
     if (!activationToken) throw new UnauthorizedException(mobileError("activation_token_required", "Activation token is required"));
+    let claims;
+    try {
+      claims = await verifyActivationToken(this.jwt, activationToken);
+    } catch {
+      throw new UnauthorizedException(mobileError("activation_token_invalid", "Invalid activation token"));
+    }
     const activation = await this.prisma.deviceActivation.findUnique({
       where: { activationTokenHash: tokenHash(activationToken) },
       include: { enterpriseLicenseKey: true, tenant: true }
     });
     if (!activation) throw new UnauthorizedException(mobileError("activation_token_invalid", "Invalid activation token"));
+    if (!activation.enterpriseLicenseKeyId || claims.kind !== activation.kind || claims.licenseId !== activation.enterpriseLicenseKeyId || claims.deviceIdentifier !== activation.deviceIdentifier) {
+      throw new UnauthorizedException(mobileError("activation_token_invalid", "Invalid activation token"));
+    }
     if (activation.kind !== "enterprise" || !activation.tenantId || !activation.enterpriseLicenseKey) {
       throw new ForbiddenException(mobileError("template_repository_enterprise_required", "Template repository access requires an active enterprise activation"));
     }
@@ -457,10 +483,15 @@ export class TemplatesService {
   }
 
   private assertRepositoryApiKey(apiKey: string) {
-    const configured = process.env.TEMPLATE_REPOSITORY_API_KEY;
+    const configured = appEnvironment().TEMPLATE_REPOSITORY_API_KEY;
     if (!configured || apiKey !== configured) {
       throw new UnauthorizedException(mobileError("template_repository_unauthorized", "Template repository authorization failed"));
     }
+  }
+
+  private isInternalRepositoryBearer(bearer: string) {
+    const configured = appEnvironment().TEMPLATE_REPOSITORY_API_KEY;
+    return Boolean(configured && bearer === configured);
   }
 
   private assertActiveStatus(status: string, target: "activation" | "license") {

@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { IsEmail, IsString, MinLength } from "class-validator";
 import { ApiOkResponse, ApiOperation, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
@@ -20,6 +21,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post("login")
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } })
   @ApiOperation({ summary: "Admin login", description: "Authenticates an internal admin user. There is no public signup or self-service registration endpoint." })
   @ApiOkResponse({
     description: "Admin JWT issued.",

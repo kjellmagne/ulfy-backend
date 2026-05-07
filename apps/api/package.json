@@ -16,6 +16,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/platform-express": "^11.0.20",
     "@nestjs/swagger": "^11.1.5",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^6.7.0",
     "@skrivdet/contracts": "workspace:*",
     "bcryptjs": "^3.0.2",

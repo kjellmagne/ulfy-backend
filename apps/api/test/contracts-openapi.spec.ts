@@ -71,13 +71,12 @@ describe("API contract documentation", () => {
     }
   });
 
-  it("marks the tenantId manifest query as a disabled legacy fallback", () => {
+  it("documents bearer-only template manifest access", () => {
     const document: any = enrichOpenApiDescriptions({
       paths: {
         "/api/v1/templates/manifest": {
           get: {
             parameters: [
-              { name: "tenantId", in: "query", description: "Optional internal tenant filter." },
               { name: "Authorization", in: "header", description: "Bearer activation token." }
             ]
           }
@@ -86,12 +85,10 @@ describe("API contract documentation", () => {
     });
 
     const parameters = document.paths["/api/v1/templates/manifest"].get.parameters;
-    const tenantId = parameters.find((parameter: any) => parameter.name === "tenantId");
     const authorization = parameters.find((parameter: any) => parameter.name === "Authorization");
 
-    expect(tenantId.deprecated).toBe(true);
-    expect(tenantId["x-skrivdet-status"]).toBe("legacy");
-    expect(tenantId.description).toContain("ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true");
     expect(authorization.deprecated).toBeUndefined();
+    expect(document.paths["/api/v1/templates/manifest"].get.description).toContain("Authorization: Bearer <activationToken>");
+    expect(document.paths["/api/v1/templates/manifest"].get.description).toContain("TEMPLATE_REPOSITORY_API_KEY");
   });
 });

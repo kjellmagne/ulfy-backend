@@ -22,6 +22,7 @@ type OperationMetadata = Pick<OperationDoc, "deprecated" | "x-skrivdet-status" |
 const operationDescriptions: Record<string, string> = {
   "POST /api/v1/auth/login": [
     "Authenticates an internal skrivDET admin portal user with email and password and returns a bearer JWT plus safe user metadata.",
+    "Repeated failed login attempts are rate limited and can temporarily lock the targeted admin account.",
     "There is no public registration flow: admin users are created by superadmins from the admin portal.",
     "Use this token as Authorization: Bearer <token> for all /api/v1/admin/* endpoints."
   ].join(" "),
@@ -39,17 +40,17 @@ const operationDescriptions: Record<string, string> = {
   ].join(" "),
   "POST /api/v1/activation/refresh": [
     "Mobile check-in endpoint for an already activated device.",
-    "The app sends the activation token plus current device/app metadata; the backend verifies the token, updates lastSeenAt/lastCheckIn/appVersion/deviceSerialNumber, and returns current license status.",
+    "The app sends the activation token plus current device/app metadata; the backend verifies the signed token, rotates it, updates lastSeenAt/lastCheckIn/appVersion/deviceSerialNumber, and returns current license status.",
     "Enterprise responses include the latest effective config profile so central policy changes are picked up without reactivation, including config.templateCategories when category management is enabled."
   ].join(" "),
   "GET /api/v1/config/effective": [
-    "Returns the current effective enterprise configuration for the supplied activation token without requiring a full refresh body.",
+    "Returns the current effective enterprise configuration for the supplied Authorization: Bearer <activationToken> without requiring a full refresh body.",
     "The config payload is sparse: fields that are present are intentional managed policy, while omitted fields should leave local app settings unchanged.",
     "For single-user activations this returns no tenant and an empty config object because single licenses do not receive central policy in v1.",
     "Enterprise config may include templateCategories when managedPolicy.manageTemplateCategories is enabled so the app can use server-side category titles, SF Symbol icons and display order."
   ].join(" "),
   "GET /api/v1/license/details": [
-    "Returns the canonical mobile Settings license-details payload for an activation token.",
+    "Returns the canonical mobile Settings license-details payload for Authorization: Bearer <activationToken>.",
     "Use this when the iPhone app needs to rebuild the full license screen from server state, including registered owner, maintenance status, tenant, device and selected config profile metadata.",
     "It has no mutation side effects beyond normal token validation."
   ].join(" "),
@@ -58,7 +59,7 @@ const operationDescriptions: Record<string, string> = {
     "Mobile-facing enterprise template catalog endpoint.",
     "Requires an enterprise activation token in Authorization: Bearer <activationToken> and returns only the latest published template variants entitled to that activation's tenant.",
     "Single-user activations do not receive central repository access; tenant filtering is applied by the backend before the manifest is returned.",
-    "The optional tenantId query path is a legacy internal fallback that only works when ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true; mobile clients must not use it."
+    "Internal verification may use Authorization: Bearer <TEMPLATE_REPOSITORY_API_KEY> when that override is explicitly configured."
   ].join(" "),
   "GET /api/v1/templates/{id}/download": [
     "Downloads the raw YAML snapshot for a tenant-entitled published template variant.",
@@ -472,25 +473,8 @@ export function enrichOpenApiDescriptions<T extends OpenApiLike>(document: T): T
         const metadata = operationMetadata[operationKey];
         if (metadata) Object.assign(operationDoc, metadata);
 
-        markLegacyTemplateTenantQuery(operationDoc);
       }
     }
   }
   return document;
-}
-
-function markLegacyTemplateTenantQuery(operation: OperationDoc & { parameters?: unknown }) {
-  if (!Array.isArray(operation.parameters)) return;
-  for (const parameter of operation.parameters) {
-    if (!parameter || typeof parameter !== "object") continue;
-    const parameterDoc = parameter as ParameterDoc;
-    if (parameterDoc.in !== "query" || parameterDoc.name !== "tenantId") continue;
-    parameterDoc.deprecated = true;
-    parameterDoc["x-skrivdet-status"] = "legacy";
-    parameterDoc.description = [
-      parameterDoc.description ?? "Optional tenant filter.",
-      "Legacy internal fallback only; requires ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true.",
-      "Mobile clients must use Authorization: Bearer <activationToken> instead."
-    ].join(" ");
-  }
 }

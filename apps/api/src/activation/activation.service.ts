@@ -1,10 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { randomUUID } from "crypto";
 import { JwtService } from "@nestjs/jwt";
 import { LicenseStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../common/audit.service";
 import { sha256, tokenHash } from "../common/crypto";
+import { decryptConfigProfileSecrets } from "../common/secret-crypto";
+import { issueActivationToken, verifyActivationToken } from "./activation-token";
 
 type ActivationInput = { activationKey: string; deviceIdentifier: string; deviceSerialNumber?: string; appVersion: string };
 type RefreshInput = { activationToken: string; deviceIdentifier?: string; deviceSerialNumber?: string; appVersion?: string };
@@ -22,7 +23,11 @@ export class ActivationService {
       throw new ForbiddenException(mobileError("license_already_bound", "Activation key is already bound to another device"));
     }
 
-    const activationToken = await this.issueActivationToken("single", key.id, input.deviceIdentifier);
+    const activationToken = await issueActivationToken(this.jwt, {
+      kind: "single",
+      licenseId: key.id,
+      deviceIdentifier: input.deviceIdentifier
+    });
     const now = new Date();
     const activation = await this.prisma.deviceActivation.upsert({
       where: { singleLicenseKeyId_deviceIdentifier: { singleLicenseKeyId: key.id, deviceIdentifier: input.deviceIdentifier } },
@@ -84,7 +89,11 @@ export class ActivationService {
       throw new ForbiddenException(mobileError("enterprise_device_limit_reached", "Enterprise device limit reached"));
     }
 
-    const activationToken = await this.issueActivationToken("enterprise", key.id, input.deviceIdentifier);
+    const activationToken = await issueActivationToken(this.jwt, {
+      kind: "enterprise",
+      licenseId: key.id,
+      deviceIdentifier: input.deviceIdentifier
+    });
     const now = new Date();
     const activation = await this.prisma.deviceActivation.upsert({
       where: { enterpriseLicenseKeyId_deviceIdentifier: { enterpriseLicenseKeyId: key.id, deviceIdentifier: input.deviceIdentifier } },
@@ -129,10 +138,20 @@ export class ActivationService {
     if (input.deviceIdentifier && input.deviceIdentifier !== activation.deviceIdentifier) {
       throw new ForbiddenException(mobileError("activation_device_mismatch", "Activation token does not belong to this device"));
     }
+    const licenseId = activation.kind === "single" ? activation.singleLicenseKeyId : activation.enterpriseLicenseKeyId;
+    if (!licenseId) {
+      throw new ForbiddenException(mobileError("activation_token_invalid", "Invalid activation token"));
+    }
+    const refreshedActivationToken = await issueActivationToken(this.jwt, {
+      kind: activation.kind,
+      licenseId,
+      deviceIdentifier: activation.deviceIdentifier
+    });
     const now = new Date();
     await this.prisma.deviceActivation.update({
       where: { id: activation.id },
       data: {
+        activationTokenHash: tokenHash(refreshedActivationToken),
         lastCheckIn: now,
         lastSeenAt: now,
         appVersion: input.appVersion ?? activation.appVersion,
@@ -160,6 +179,7 @@ export class ActivationService {
     const tenant = activation.enterpriseLicenseKey?.tenant ? this.mapTenant(activation.enterpriseLicenseKey.tenant) : null;
     return {
       success: true,
+      activationToken: refreshedActivationToken,
       status: activation.status,
       kind: activation.kind,
       lastSeenAt: now.toISOString(),
@@ -200,6 +220,15 @@ export class ActivationService {
   }
 
   private async findActivationByToken(activationToken: string) {
+    if (!activationToken) throw new UnauthorizedActivation();
+
+    let claims;
+    try {
+      claims = await verifyActivationToken(this.jwt, activationToken);
+    } catch {
+      throw new UnauthorizedActivation();
+    }
+
     const activation = await this.prisma.deviceActivation.findUnique({
       where: { activationTokenHash: tokenHash(activationToken) },
       include: {
@@ -209,14 +238,11 @@ export class ActivationService {
       }
     });
     if (!activation) throw new UnauthorizedActivation();
+    const licenseId = activation.kind === "single" ? activation.singleLicenseKeyId : activation.enterpriseLicenseKeyId;
+    if (!licenseId || claims.kind !== activation.kind || claims.licenseId !== licenseId || claims.deviceIdentifier !== activation.deviceIdentifier) {
+      throw new UnauthorizedActivation();
+    }
     return activation;
-  }
-
-  private async issueActivationToken(kind: "single" | "enterprise", licenseId: string, deviceIdentifier: string) {
-    return this.jwt.signAsync(
-      { kind, licenseId, deviceIdentifier, nonce: randomUUID() },
-      { secret: process.env.ACTIVATION_TOKEN_SECRET ?? "dev-activation-secret", expiresIn: "365d" }
-    );
   }
 
   private assertUsable(status: LicenseStatus, expiresAt?: Date | null) {
@@ -310,46 +336,47 @@ export class ActivationService {
   }
 
   private async mapConfig(profile: any) {
-    const managedPolicy = this.mapManagedPolicy(profile.managedPolicy, profile);
+    const decryptedProfile = decryptConfigProfileSecrets(profile);
+    const managedPolicy = this.mapManagedPolicy(decryptedProfile.managedPolicy, decryptedProfile);
     const templateCategories = managedPolicy.manageTemplateCategories
       ? await this.templateCategoryCatalog()
       : undefined;
     return compactObject({
-      id: profile.id,
-      name: profile.name,
-      speechProviderType: profile.speechProviderType,
-      speechEndpointUrl: profile.speechEndpointUrl,
-      speechModelName: profile.speechModelName,
-      speechApiKey: profile.speechApiKey,
-      privacyControlEnabled: managedPolicy.managePrivacyControl ? profile.privacyControlEnabled : undefined,
-      piiControlEnabled: managedPolicy.managePIIControl ? profile.piiControlEnabled : undefined,
-      presidioEndpointUrl: managedPolicy.managePIIControl ? profile.presidioEndpointUrl : undefined,
-      presidioSecretRef: managedPolicy.managePIIControl ? profile.presidioSecretRef : undefined,
-      presidioApiKey: managedPolicy.managePIIControl ? profile.presidioApiKey : undefined,
-      presidioScoreThreshold: managedPolicy.managePIIControl ? profile.presidioScoreThreshold : undefined,
-      presidioFullPersonNamesOnly: managedPolicy.managePIIControl ? profile.presidioFullPersonNamesOnly : undefined,
-      presidioDetectPerson: managedPolicy.managePIIControl ? profile.presidioDetectPerson : undefined,
-      presidioDetectEmail: managedPolicy.managePIIControl ? profile.presidioDetectEmail : undefined,
-      presidioDetectPhone: managedPolicy.managePIIControl ? profile.presidioDetectPhone : undefined,
-      presidioDetectLocation: managedPolicy.managePIIControl ? profile.presidioDetectLocation : undefined,
-      presidioDetectIdentifier: managedPolicy.managePIIControl ? profile.presidioDetectIdentifier : undefined,
-      privacyReviewProviderType: managedPolicy.managePrivacyReviewProvider ? normalizeOpenAiCompatibleProvider(profile.privacyReviewProviderType) : undefined,
-      privacyReviewEndpointUrl: managedPolicy.managePrivacyReviewProvider ? profile.privacyReviewEndpointUrl : undefined,
-      privacyReviewModel: managedPolicy.managePrivacyReviewProvider ? profile.privacyReviewModel : undefined,
-      privacyReviewApiKey: managedPolicy.managePrivacyReviewProvider ? profile.privacyReviewApiKey : undefined,
-      privacyPrompt: managedPolicy.managePrivacyPrompt ? profile.privacyPrompt : undefined,
-      documentGenerationProviderType: normalizeOpenAiCompatibleProvider(profile.documentGenerationProviderType),
-      documentGenerationEndpointUrl: profile.documentGenerationEndpointUrl,
-      documentGenerationModel: profile.documentGenerationModel,
-      documentGenerationApiKey: profile.documentGenerationApiKey,
-      templateRepositoryUrl: profile.templateRepositoryUrl,
-      telemetryEndpointUrl: profile.telemetryEndpointUrl,
-      featureFlags: profile.featureFlags,
-      allowedProviderRestrictions: profile.allowedProviderRestrictions,
-      providerProfiles: mobileProviderProfiles(profile.providerProfiles),
+      id: decryptedProfile.id,
+      name: decryptedProfile.name,
+      speechProviderType: decryptedProfile.speechProviderType,
+      speechEndpointUrl: decryptedProfile.speechEndpointUrl,
+      speechModelName: decryptedProfile.speechModelName,
+      speechApiKey: decryptedProfile.speechApiKey,
+      privacyControlEnabled: managedPolicy.managePrivacyControl ? decryptedProfile.privacyControlEnabled : undefined,
+      piiControlEnabled: managedPolicy.managePIIControl ? decryptedProfile.piiControlEnabled : undefined,
+      presidioEndpointUrl: managedPolicy.managePIIControl ? decryptedProfile.presidioEndpointUrl : undefined,
+      presidioSecretRef: managedPolicy.managePIIControl ? decryptedProfile.presidioSecretRef : undefined,
+      presidioApiKey: managedPolicy.managePIIControl ? decryptedProfile.presidioApiKey : undefined,
+      presidioScoreThreshold: managedPolicy.managePIIControl ? decryptedProfile.presidioScoreThreshold : undefined,
+      presidioFullPersonNamesOnly: managedPolicy.managePIIControl ? decryptedProfile.presidioFullPersonNamesOnly : undefined,
+      presidioDetectPerson: managedPolicy.managePIIControl ? decryptedProfile.presidioDetectPerson : undefined,
+      presidioDetectEmail: managedPolicy.managePIIControl ? decryptedProfile.presidioDetectEmail : undefined,
+      presidioDetectPhone: managedPolicy.managePIIControl ? decryptedProfile.presidioDetectPhone : undefined,
+      presidioDetectLocation: managedPolicy.managePIIControl ? decryptedProfile.presidioDetectLocation : undefined,
+      presidioDetectIdentifier: managedPolicy.managePIIControl ? decryptedProfile.presidioDetectIdentifier : undefined,
+      privacyReviewProviderType: managedPolicy.managePrivacyReviewProvider ? normalizeOpenAiCompatibleProvider(decryptedProfile.privacyReviewProviderType) : undefined,
+      privacyReviewEndpointUrl: managedPolicy.managePrivacyReviewProvider ? decryptedProfile.privacyReviewEndpointUrl : undefined,
+      privacyReviewModel: managedPolicy.managePrivacyReviewProvider ? decryptedProfile.privacyReviewModel : undefined,
+      privacyReviewApiKey: managedPolicy.managePrivacyReviewProvider ? decryptedProfile.privacyReviewApiKey : undefined,
+      privacyPrompt: managedPolicy.managePrivacyPrompt ? decryptedProfile.privacyPrompt : undefined,
+      documentGenerationProviderType: normalizeOpenAiCompatibleProvider(decryptedProfile.documentGenerationProviderType),
+      documentGenerationEndpointUrl: decryptedProfile.documentGenerationEndpointUrl,
+      documentGenerationModel: decryptedProfile.documentGenerationModel,
+      documentGenerationApiKey: decryptedProfile.documentGenerationApiKey,
+      templateRepositoryUrl: decryptedProfile.templateRepositoryUrl,
+      telemetryEndpointUrl: decryptedProfile.telemetryEndpointUrl,
+      featureFlags: decryptedProfile.featureFlags,
+      allowedProviderRestrictions: decryptedProfile.allowedProviderRestrictions,
+      providerProfiles: mobileProviderProfiles(decryptedProfile.providerProfiles),
       templateCategories,
       managedPolicy,
-      defaultTemplateId: profile.defaultTemplateId
+      defaultTemplateId: decryptedProfile.defaultTemplateId
     });
   }
 

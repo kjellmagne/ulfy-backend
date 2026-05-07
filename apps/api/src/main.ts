@@ -5,13 +5,34 @@ import { ValidationPipe } from "@nestjs/common";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 import { enrichOpenApiDescriptions } from "./openapi/descriptions";
+import { appEnvironment, corsAllowedOrigins } from "./config/environment";
 
 async function bootstrap() {
+  const env = appEnvironment();
   const app = await NestFactory.create(AppModule);
+  const express = app.getHttpAdapter().getInstance();
+  express.set("trust proxy", 1);
   app.setGlobalPrefix("api/v1");
-  app.enableCors({ origin: true, credentials: true });
+  const allowedOrigins = new Set(corsAllowedOrigins(env));
+  const corsOrigin = (origin: string | undefined, callback: (error: Error | null, allow?: boolean) => void) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error("Origin not allowed by CORS"), false);
+  };
+  app.enableCors({
+    origin: corsOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"]
+  });
   app.use(helmet());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    transform: true,
+    forbidNonWhitelisted: true,
+    forbidUnknownValues: true,
+    stopAtFirstError: true
+  }));
 
   const config = new DocumentBuilder()
     .setTitle("skrivDET Backend API")
@@ -28,18 +49,44 @@ async function bootstrap() {
     .addServer("http://localhost:4000", "Local development")
     .addBearerAuth()
     .build();
-  const document = enrichOpenApiDescriptions(SwaggerModule.createDocument(app, config));
-  SwaggerModule.setup("api/docs", app, document, {
-    customSiteTitle: "skrivDET API Docs",
-    jsonDocumentUrl: "api/docs-json",
-    swaggerOptions: {
-      persistAuthorization: true,
-      tagsSorter: "alpha",
-      operationsSorter: "alpha"
-    }
-  });
+  if (env.SWAGGER_ENABLED) {
+    const swaggerGuard = createSwaggerAuthMiddleware(env.SWAGGER_BASIC_AUTH_USERNAME, env.SWAGGER_BASIC_AUTH_PASSWORD);
+    express.use("/api/docs", swaggerGuard);
+    express.use("/api/docs-json", swaggerGuard);
+    const document = enrichOpenApiDescriptions(SwaggerModule.createDocument(app, config));
+    SwaggerModule.setup("api/docs", app, document, {
+      customSiteTitle: "skrivDET API Docs",
+      jsonDocumentUrl: "api/docs-json",
+      swaggerOptions: {
+        persistAuthorization: env.NODE_ENV !== "production",
+        tagsSorter: "alpha",
+        operationsSorter: "alpha"
+      }
+    });
+  }
 
-  await app.listen(process.env.PORT ? Number(process.env.PORT) : 4000);
+  await app.listen(env.PORT);
 }
 
 bootstrap();
+
+function createSwaggerAuthMiddleware(username?: string, password?: string) {
+  if (!username || !password) {
+    return (_req: any, _res: any, next: () => void) => next();
+  }
+
+  return (req: any, res: any, next: () => void) => {
+    const header = typeof req.headers.authorization === "string" ? req.headers.authorization : "";
+    const [scheme, encoded] = header.split(" ");
+
+    if (scheme === "Basic" && encoded) {
+      const [providedUser, providedPassword] = Buffer.from(encoded, "base64").toString("utf8").split(":");
+      if (providedUser === username && providedPassword === password) {
+        return next();
+      }
+    }
+
+    res.setHeader("WWW-Authenticate", 'Basic realm="skrivDET API Docs"');
+    res.status(401).send("Swagger authentication required");
+  };
+}

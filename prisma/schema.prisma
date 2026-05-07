@@ -32,15 +32,19 @@ enum TemplateState {
 }
 
 model AdminUser {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  fullName     String
-  passwordHash String
-  role         AdminRole @default(staff_admin)
-  partnerId    String?
-  partner      Partner?  @relation(fields: [partnerId], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id               String    @id @default(uuid())
+  email            String    @unique
+  fullName         String
+  passwordHash     String
+  role             AdminRole @default(staff_admin)
+  partnerId        String?
+  partner          Partner?  @relation(fields: [partnerId], references: [id])
+  failedLoginCount Int       @default(0)
+  lockedUntil      DateTime?
+  lastLoginAt      DateTime?
+  tokenVersion     Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model Partner {

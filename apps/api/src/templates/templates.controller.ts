@@ -1,5 +1,6 @@
-import { Controller, Get, Header, Headers, Param, Query, UnauthorizedException, UseFilters } from "@nestjs/common";
-import { ApiBearerAuth, ApiHeader, ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiQuery, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
+import { Controller, Get, Header, Headers, Param, UnauthorizedException, UseFilters } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
+import { ApiBearerAuth, ApiHeader, ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import { TemplatesService } from "./templates.service";
 import { MobileExceptionFilter } from "../activation/mobile-exception.filter";
 import { mobileError } from "../activation/activation.service";
@@ -74,6 +75,7 @@ export class TemplatesController {
   constructor(private readonly templates: TemplatesService) {}
 
   @Get("manifest")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiBearerAuth()
   @ApiOperation({
     summary: "Tenant-filtered template manifest",
@@ -81,31 +83,20 @@ export class TemplatesController {
       "Lists latest published template variants available to the enterprise activation token.",
       "Normal mobile access uses Authorization: Bearer <activationToken>; single-user activations do not receive central repository access.",
       "The backend filters by tenant template-family entitlement and returns only the latest published version per language variant.",
-      "An internal X-API-Key override can be enabled with TEMPLATE_REPOSITORY_API_KEY for development and verification."
+      "Internal verification can use Authorization: Bearer <TEMPLATE_REPOSITORY_API_KEY> when that override key is explicitly configured."
     ].join(" ")
   })
-  @ApiHeader({ name: "Authorization", required: false, description: "Bearer enterprise activation token." })
-  @ApiHeader({ name: "X-API-Key", required: false, description: "Internal/developer repository override key." })
-  @ApiQuery({
-    name: "tenantId",
-    required: false,
-    deprecated: true,
-    description: "Legacy internal tenant filter. Only works when ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true; normal mobile clients must use Authorization: Bearer <activationToken>."
-  })
+  @ApiHeader({ name: "Authorization", required: true, description: "Bearer enterprise activation token, or TEMPLATE_REPOSITORY_API_KEY for internal verification." })
   @ApiOkResponse({ description: "Published template manifest filtered by tenant entitlement.", schema: templateManifestSchema })
   @ApiUnauthorizedResponse({ description: "Missing or invalid enterprise activation token.", schema: mobileUnauthorizedSchema })
-  manifest(@Headers("authorization") authorization?: string, @Headers("x-api-key") apiKey?: string, @Query("tenantId") tenantId?: string) {
+  manifest(@Headers("authorization") authorization?: string) {
     const bearer = this.bearerToken(authorization);
-    if (bearer && process.env.TEMPLATE_REPOSITORY_API_KEY && bearer === process.env.TEMPLATE_REPOSITORY_API_KEY) {
-      return this.templates.manifestForInternalApiKey(bearer);
-    }
-    if (apiKey) return this.templates.manifestForInternalApiKey(apiKey);
-    if (bearer) return this.templates.manifestForEnterpriseActivation(bearer);
-    if (tenantId && process.env.ALLOW_LEGACY_TEMPLATE_TENANT_QUERY === "true") return this.templates.manifest(tenantId);
+    if (bearer) return this.templates.manifestForScopedBearer(bearer);
     throw new UnauthorizedException(mobileError("activation_token_required", "Template repository access requires an enterprise activation token"));
   }
 
   @Get(":id/download")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Header("Content-Type", "application/x-yaml; charset=utf-8")
   @ApiBearerAuth()
   @ApiOperation({
@@ -117,8 +108,7 @@ export class TemplatesController {
     ].join(" ")
   })
   @ApiParam({ name: "id", description: "Template identity UUID from the manifest." })
-  @ApiHeader({ name: "Authorization", required: false, description: "Bearer enterprise activation token." })
-  @ApiHeader({ name: "X-API-Key", required: false, description: "Internal/developer repository override key." })
+  @ApiHeader({ name: "Authorization", required: true, description: "Bearer enterprise activation token, or TEMPLATE_REPOSITORY_API_KEY for internal verification." })
   @ApiProduces("application/x-yaml")
   @ApiOkResponse({
     description: "Raw YAML template.",
@@ -132,11 +122,9 @@ export class TemplatesController {
     }
   })
   @ApiUnauthorizedResponse({ description: "Missing or invalid enterprise activation token, or tenant is not entitled to the template family.", schema: mobileUnauthorizedSchema })
-  async download(@Param("id") id: string, @Headers("authorization") authorization?: string, @Headers("x-api-key") apiKey?: string) {
+  async download(@Param("id") id: string, @Headers("authorization") authorization?: string) {
     const bearer = this.bearerToken(authorization);
-    if (bearer && process.env.TEMPLATE_REPOSITORY_API_KEY && bearer === process.env.TEMPLATE_REPOSITORY_API_KEY) return this.templates.downloadYamlForInternalApiKey(id, bearer);
-    if (apiKey) return this.templates.downloadYamlForInternalApiKey(id, apiKey);
-    if (bearer) return this.templates.downloadYamlForEnterpriseActivation(id, bearer);
+    if (bearer) return this.templates.downloadYamlForScopedBearer(id, bearer);
     throw new UnauthorizedException(mobileError("activation_token_required", "Template download requires an enterprise activation token"));
   }
 

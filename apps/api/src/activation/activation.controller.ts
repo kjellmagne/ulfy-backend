@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Post, Query, UseFilters } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Post, UseFilters } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { IsOptional, IsString, MinLength } from "class-validator";
-import { ApiBadRequestResponse, ApiBody, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiProperty, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiForbiddenResponse, ApiHeader, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from "@nestjs/swagger";
 import { ActivationService } from "./activation.service";
 import { MobileExceptionFilter } from "./mobile-exception.filter";
 
@@ -404,6 +405,7 @@ const mobileConfigSchema = {
 
 const activationRefreshExample = {
   success: true,
+  activationToken: activationTokenExample,
   status: "active",
   kind: "enterprise",
   lastSeenAt: "2026-04-29T10:20:00.000Z",
@@ -418,7 +420,7 @@ const singleActivationResponseSchema = {
   required: ["success", "activationToken", "activationId", "license", "device", "config"],
   properties: {
     success: { type: "boolean", enum: [true] },
-    activationToken: { type: "string", description: "JWT-like activation token. Store securely on the device and send for refresh/config/template repository calls." },
+    activationToken: { type: "string", description: "Signed activation token. Store securely on the device and send it for refresh/config/template repository calls." },
     activationId: { type: "string", format: "uuid", description: "Server id for this device activation." },
     license: { ...licenseSchema, example: singleLicenseExample },
     device: { ...deviceSchema, example: { ...deviceExample, lastSeenAt: "2026-04-29T10:15:00.000Z" } },
@@ -439,7 +441,7 @@ const enterpriseActivationResponseSchema = {
   required: ["success", "activationToken", "activationId", "license", "tenant", "device", "config"],
   properties: {
     success: { type: "boolean", enum: [true] },
-    activationToken: { type: "string", description: "Activation token used by refresh/config/license-details and template repository calls." },
+    activationToken: { type: "string", description: "Signed activation token used by refresh/config/license-details and template repository calls." },
     activationId: { type: "string", format: "uuid", description: "Server id for this device activation." },
     license: { ...licenseSchema, example: enterpriseLicenseExample },
     tenant: { ...tenantSchema, example: tenantExample },
@@ -459,9 +461,10 @@ const enterpriseActivationResponseSchema = {
 
 const refreshResponseSchema = {
   type: "object",
-  required: ["success", "status", "kind", "lastSeenAt", "license", "tenant", "device", "config"],
+  required: ["success", "activationToken", "status", "kind", "lastSeenAt", "license", "tenant", "device", "config"],
   properties: {
     success: { type: "boolean", enum: [true] },
+    activationToken: { type: "string", description: "Fresh short-lived activation token. Replace the stored device token with this value after every successful refresh." },
     status: { type: "string", enum: ["active", "revoked", "expired", "disabled"], description: "Current activation status." },
     kind: { type: "string", enum: ["single", "enterprise"], description: "Activation kind." },
     lastSeenAt: { type: "string", format: "date-time", description: "Server timestamp for this refresh/check-in." },
@@ -516,10 +519,11 @@ export class ActivationController {
   constructor(private readonly activation: ActivationService) {}
 
   @Post("activate/single")
+  @Throttle({ default: { limit: 10, ttl: 15 * 60_000 } })
   @ApiOperation({
     summary: "Activate a single-user license key",
     description: [
-      "Validates a single-user activation key, binds it to one device in v1, and returns a long-lived activation token for refresh/check-in.",
+      "Validates a single-user activation key, binds it to one device in v1, and returns a signed activation token for refresh/check-in.",
       "Single-user activations do not receive an enterprise config profile; config is an empty object.",
       "The iOS app should store activationToken securely and use /activation/refresh for license validity checks."
     ].join(" ")
@@ -536,6 +540,7 @@ export class ActivationController {
   }
 
   @Post("activate/enterprise")
+  @Throttle({ default: { limit: 10, ttl: 15 * 60_000 } })
   @ApiOperation({
     summary: "Activate an enterprise license key",
     description: [
@@ -556,12 +561,14 @@ export class ActivationController {
   }
 
   @Post("activation/refresh")
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({
     summary: "Refresh/check in an activation",
     description: [
-      "Validates the activation token, updates last check-in/app version/serial, and returns current license status plus config metadata.",
+      "Validates the activation token, rotates it, updates last check-in/app version/serial, and returns current license status plus config metadata.",
       "The iOS Settings view should prefer this response over old cached license details after every successful check-in.",
-      "For enterprise activations, the config object is the current effective profile and includes tenant policy changes."
+      "For enterprise activations, the config object is the current effective profile and includes tenant policy changes.",
+      "Clients must replace their stored activation token with the new activationToken returned by this endpoint."
     ].join(" ")
   })
   @ApiBody({ type: RefreshDto })
@@ -572,32 +579,40 @@ export class ActivationController {
   }
 
   @Get("config/effective")
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiBearerAuth()
+  @ApiHeader({ name: "Authorization", required: true, description: "Bearer activation token from /activate/single or /activate/enterprise." })
   @ApiOperation({
     summary: "Get effective enterprise config",
     description: [
-      "Returns the current effective enterprise config for an activation token.",
+      "Returns the current effective enterprise config for an activation token supplied as Authorization: Bearer <activationToken>.",
       "Use this when the app wants a fresh central policy without performing a full refresh body update.",
       "Single-user activations return tenant null and an empty config object."
     ].join(" ")
   })
-  @ApiQuery({ name: "activationToken", required: true, example: activationTokenExample, description: "Activation token from /activate/single or /activate/enterprise." })
   @ApiOkResponse({ description: "Effective config returned.", schema: effectiveConfigResponseSchema })
-  @ApiBadRequestResponse({ description: "Missing activationToken query parameter.", schema: { ...mobileErrorSchema, example: { success: false, error: { code: "activation_token_required", message: "activationToken query parameter is required" } } } })
+  @ApiBadRequestResponse({ description: "Missing bearer token.", schema: { ...mobileErrorSchema, example: { success: false, error: { code: "activation_token_required", message: "Activation token is required" } } } })
   @ApiForbiddenResponse({ description: "Invalid activation token.", schema: { ...mobileErrorSchema, example: { success: false, error: { code: "activation_token_invalid", message: "Invalid activation token" } } } })
-  effectiveConfig(@Query("activationToken") activationToken: string) {
-    return this.activation.effectiveConfig(activationToken);
+  effectiveConfig(@Headers("authorization") authorization?: string) {
+    return this.activation.effectiveConfig(this.bearerToken(authorization));
   }
 
   @Get("license/details")
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiBearerAuth()
+  @ApiHeader({ name: "Authorization", required: true, description: "Bearer activation token from /activate/single or /activate/enterprise." })
   @ApiOperation({
     summary: "Get mobile license details",
-    description: "Returns complete license, tenant, device and config metadata for the iPhone Settings license status/details dialog."
+    description: "Returns complete license, tenant, device and config metadata for the iPhone Settings license status/details dialog. Supply the activation token as Authorization: Bearer <activationToken>."
   })
-  @ApiQuery({ name: "activationToken", required: true, example: activationTokenExample, description: "Activation token from /activate/single or /activate/enterprise." })
   @ApiOkResponse({ description: "License details returned.", schema: licenseDetailsResponseSchema })
-  @ApiBadRequestResponse({ description: "Missing activationToken query parameter.", schema: { ...mobileErrorSchema, example: { success: false, error: { code: "activation_token_required", message: "activationToken query parameter is required" } } } })
+  @ApiBadRequestResponse({ description: "Missing bearer token.", schema: { ...mobileErrorSchema, example: { success: false, error: { code: "activation_token_required", message: "Activation token is required" } } } })
   @ApiForbiddenResponse({ description: "Invalid activation token.", schema: { ...mobileErrorSchema, example: { success: false, error: { code: "activation_token_invalid", message: "Invalid activation token" } } } })
-  licenseDetails(@Query("activationToken") activationToken: string) {
-    return this.activation.licenseDetails(activationToken);
+  licenseDetails(@Headers("authorization") authorization?: string) {
+    return this.activation.licenseDetails(this.bearerToken(authorization));
+  }
+
+  private bearerToken(authorization?: string) {
+    return authorization?.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   }
 }
