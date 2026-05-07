@@ -10,7 +10,7 @@ RUN pnpm install --frozen-lockfile=false
 
 FROM deps AS build
 COPY . .
-RUN pnpm prisma:generate && pnpm --filter @ulfy/contracts build && pnpm --filter @ulfy/api build
+RUN pnpm prisma:generate && pnpm --filter @skrivdet/contracts build && pnpm --filter @skrivdet/api build
 
 FROM node:22-alpine AS runner
 WORKDIR /app

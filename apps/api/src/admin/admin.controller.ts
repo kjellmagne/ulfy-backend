@@ -3,7 +3,7 @@ import { IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptiona
 import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProperty, ApiTags, ApiUnauthorizedResponse } from "@nestjs/swagger";
 import * as bcrypt from "bcryptjs";
 import * as yaml from "js-yaml";
-import { TemplateSectionFormatValues } from "@ulfy/contracts";
+import { TemplateSectionFormatValues } from "@skrivdet/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { AdminGuard } from "../auth/admin.guard";
 import { activationKeyPrefix, createActivationKey, sha256 } from "../common/crypto";

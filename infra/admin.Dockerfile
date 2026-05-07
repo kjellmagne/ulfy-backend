@@ -13,7 +13,7 @@ ARG NEXT_PUBLIC_API_BASE_URL=
 ARG NEXT_PUBLIC_BASE_PATH=/backend
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_BASE_PATH=$NEXT_PUBLIC_BASE_PATH
-RUN pnpm --filter @ulfy/admin build
+RUN pnpm --filter @skrivdet/admin build
 RUN node -e 'const fs=require("fs"); const raw=process.env.NEXT_PUBLIC_BASE_PATH || ""; const trimmed=raw.trim().replace(/\/+$/,""); const expected=trimmed && trimmed !== "/" ? (trimmed.startsWith("/") ? trimmed : `/${trimmed}`) : ""; const required=JSON.parse(fs.readFileSync("apps/admin/.next/required-server-files.json","utf8")); const routes=JSON.parse(fs.readFileSync("apps/admin/.next/routes-manifest.json","utf8")); const actual=required.config?.assetPrefix || ""; if (actual !== expected) { throw new Error("Admin image assetPrefix mismatch. Expected "+expected+" got "+actual); } if (routes.basePath) { throw new Error("Admin image must not use Next basePath behind APISIX. Found "+routes.basePath); } console.log("Admin image assetPrefix verified:", actual || "/");'
 
 FROM node:22-alpine AS runner
@@ -30,4 +30,4 @@ COPY --from=build /app/apps/admin/public ./apps/admin/public
 COPY --from=build /app/apps/admin/package.json ./apps/admin/package.json
 COPY --from=build /app/apps/admin/node_modules ./apps/admin/node_modules
 EXPOSE 3000
-CMD ["pnpm", "--filter", "@ulfy/admin", "start"]
+CMD ["pnpm", "--filter", "@skrivdet/admin", "start"]

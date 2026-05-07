@@ -1,8 +1,8 @@
 type OperationDoc = {
   description?: string;
   deprecated?: boolean;
-  "x-ulfy-status"?: string;
-  "x-ulfy-replacement"?: string;
+  "x-skrivdet-status"?: string;
+  "x-skrivdet-replacement"?: string;
 };
 
 type OpenApiLike = {
@@ -14,10 +14,10 @@ type ParameterDoc = {
   in?: string;
   description?: string;
   deprecated?: boolean;
-  "x-ulfy-status"?: string;
+  "x-skrivdet-status"?: string;
 };
 
-type OperationMetadata = Pick<OperationDoc, "deprecated" | "x-ulfy-status" | "x-ulfy-replacement">;
+type OperationMetadata = Pick<OperationDoc, "deprecated" | "x-skrivdet-status" | "x-skrivdet-replacement">;
 
 const operationDescriptions: Record<string, string> = {
   "POST /api/v1/auth/login": [
@@ -430,28 +430,28 @@ const legacyDirectTemplateReplacement = "Use /api/v1/admin/template-families, /a
 const operationMetadata: Record<string, OperationMetadata> = {
   "GET /api/v1/admin/templates": {
     deprecated: true,
-    "x-ulfy-status": "legacy",
-    "x-ulfy-replacement": "GET /api/v1/admin/template-families"
+    "x-skrivdet-status": "legacy",
+    "x-skrivdet-replacement": "GET /api/v1/admin/template-families"
   },
   "POST /api/v1/admin/templates": {
     deprecated: true,
-    "x-ulfy-status": "legacy",
-    "x-ulfy-replacement": legacyDirectTemplateReplacement
+    "x-skrivdet-status": "legacy",
+    "x-skrivdet-replacement": legacyDirectTemplateReplacement
   },
   "PATCH /api/v1/admin/templates/{id}": {
     deprecated: true,
-    "x-ulfy-status": "legacy",
-    "x-ulfy-replacement": legacyDirectTemplateReplacement
+    "x-skrivdet-status": "legacy",
+    "x-skrivdet-replacement": legacyDirectTemplateReplacement
   },
   "POST /api/v1/admin/templates/{id}/publish/{versionId}": {
     deprecated: true,
-    "x-ulfy-status": "legacy",
-    "x-ulfy-replacement": "POST /api/v1/admin/template-variants/{id}/publish"
+    "x-skrivdet-status": "legacy",
+    "x-skrivdet-replacement": "POST /api/v1/admin/template-variants/{id}/publish"
   },
   "PATCH /api/v1/admin/templates/{id}/archive": {
     deprecated: true,
-    "x-ulfy-status": "legacy",
-    "x-ulfy-replacement": "PATCH /api/v1/admin/template-families/{id}/archive"
+    "x-skrivdet-status": "legacy",
+    "x-skrivdet-replacement": "PATCH /api/v1/admin/template-families/{id}/archive"
   }
 };
 
@@ -486,7 +486,7 @@ function markLegacyTemplateTenantQuery(operation: OperationDoc & { parameters?: 
     const parameterDoc = parameter as ParameterDoc;
     if (parameterDoc.in !== "query" || parameterDoc.name !== "tenantId") continue;
     parameterDoc.deprecated = true;
-    parameterDoc["x-ulfy-status"] = "legacy";
+    parameterDoc["x-skrivdet-status"] = "legacy";
     parameterDoc.description = [
       parameterDoc.description ?? "Optional tenant filter.",
       "Legacy internal fallback only; requires ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true.",

@@ -10,7 +10,7 @@ services:
       - ${POSTGRES_DATA_DIR:-/opt/ulfy-data/postgres}:/var/lib/postgresql/data
 
   api:
-    image: ${ULFY_API_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-api:latest}
+    image: ${SKRIVDET_API_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-api:latest}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://ulfy:${POSTGRES_PASSWORD}@postgres:5432/ulfy?schema=public
@@ -28,7 +28,7 @@ services:
       - postgres
 
   admin:
-    image: ${ULFY_ADMIN_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-admin:latest}
+    image: ${SKRIVDET_ADMIN_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-admin:latest}
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_BASE_URL: ""

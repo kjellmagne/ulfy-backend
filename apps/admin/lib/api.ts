@@ -5,7 +5,15 @@ import { apiUrl } from "./api-url";
 
 export function getToken() {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("skrivdet_admin_token") ?? localStorage.getItem("ulfy_admin_token") ?? "";
+  const currentToken = localStorage.getItem("skrivdet_admin_token");
+  if (currentToken) return currentToken;
+
+  const legacyToken = localStorage.getItem("ulfy_admin_token");
+  if (!legacyToken) return "";
+
+  localStorage.setItem("skrivdet_admin_token", legacyToken);
+  localStorage.removeItem("ulfy_admin_token");
+  return legacyToken;
 }
 
 export async function api(path: string, init: RequestInit = {}) {

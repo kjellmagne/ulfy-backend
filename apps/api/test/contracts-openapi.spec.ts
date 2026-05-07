@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigProfilePayload, ManagedPolicyPayload } from "@ulfy/contracts";
+import { ConfigProfilePayload, ManagedPolicyPayload } from "@skrivdet/contracts";
 import { enrichOpenApiDescriptions } from "../src/openapi/descriptions";
 
 describe("API contract documentation", () => {
@@ -65,8 +65,8 @@ describe("API contract documentation", () => {
 
     for (const operation of legacyOperations) {
       expect(operation.deprecated).toBe(true);
-      expect(operation["x-ulfy-status"]).toBe("legacy");
-      expect(operation["x-ulfy-replacement"]).toBeTruthy();
+      expect(operation["x-skrivdet-status"]).toBe("legacy");
+      expect(operation["x-skrivdet-replacement"]).toBeTruthy();
       expect(operation.description).toMatch(/Legacy|legacy/);
     }
   });
@@ -90,7 +90,7 @@ describe("API contract documentation", () => {
     const authorization = parameters.find((parameter: any) => parameter.name === "Authorization");
 
     expect(tenantId.deprecated).toBe(true);
-    expect(tenantId["x-ulfy-status"]).toBe("legacy");
+    expect(tenantId["x-skrivdet-status"]).toBe("legacy");
     expect(tenantId.description).toContain("ALLOW_LEGACY_TEMPLATE_TENANT_QUERY=true");
     expect(authorization.deprecated).toBeUndefined();
   });

@@ -1,14 +1,14 @@
 {
-  "name": "ulfy-backend",
+  "name": "skrivdet-backend",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "dev:api": "corepack pnpm --filter @ulfy/api dev",
-    "dev:admin": "corepack pnpm --filter @ulfy/admin dev",
+    "dev:api": "corepack pnpm --filter @skrivdet/api dev",
+    "dev:admin": "corepack pnpm --filter @skrivdet/admin dev",
     "build": "corepack pnpm -r build",
     "lint": "corepack pnpm -r lint",
-    "test": "corepack pnpm --filter @ulfy/api test",
+    "test": "corepack pnpm --filter @skrivdet/api test",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts"

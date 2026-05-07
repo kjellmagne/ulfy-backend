@@ -15,7 +15,7 @@ Required tools:
 Setup:
 
 ```bash
-cd /Users/kjellmagnegabrielsen/ulfy-backend
+cd /Users/kjellmagnegabrielsen/ulfy/backend
 cp .env.example .env
 pnpm install
 pnpm prisma:migrate
@@ -26,7 +26,7 @@ pnpm dev:api
 In another terminal:
 
 ```bash
-cd /Users/kjellmagnegabrielsen/ulfy-backend
+cd /Users/kjellmagnegabrielsen/ulfy/backend
 pnpm dev:admin
 ```
 
@@ -41,7 +41,7 @@ The OpenAPI document is the canonical API reference for both mobile and admin
 integrations. Every exposed operation should have a summary, a full description,
 request/response shape, authentication notes, and examples where the payload is
 part of the mobile contract. Legacy compatibility endpoints are kept in the
-spec, but marked as deprecated with `x-ulfy-status: legacy` and a replacement
+spec, but marked as deprecated with `x-skrivdet-status: legacy` and a replacement
 hint instead of being removed.
 
 Seed admin user:
@@ -367,7 +367,7 @@ by tests so their status is visible without breaking existing callers.
 Docker is included for deployment, pull-down setup, server packaging, and production-like verification. It is not the primary local development path.
 
 ```bash
-cd /Users/kjellmagnegabrielsen/ulfy-backend
+cd /Users/kjellmagnegabrielsen/ulfy/backend
 cp infra/.env.example infra/.env
 docker compose --env-file infra/.env -f infra/docker-compose.yml build
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d
@@ -393,9 +393,7 @@ docker compose --env-file infra/.env.server -f infra/docker-compose.server.yml r
 APISIX can route the same public HTTPS hostname to both services:
 
 ```bash
-APISIX_ADMIN_KEY='your-admin-key' \
-ULFY_HOST='ulfy.example.com' \
-bash infra/apisix/ulfy-routes.sh
+APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/skrivdet-domain-routes.sh
 ```
 
 To pull prebuilt app images from GitHub Container Registry instead of building on the server, use:
@@ -469,7 +467,9 @@ The admin same-origin API path remains available at `https://skrivdet.no/backend
 
 ## GitHub Docker Images
 
-GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0.0`, manual workflow runs, and pull requests. Pull requests build images for verification only. Pushes to `main` and tags publish images to GitHub Container Registry:
+GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0.0`, manual workflow runs, and pull requests. Pull requests build images for verification only. Pushes to `main` and tags publish images to GitHub Container Registry.
+
+The current registry package names still use the legacy backend repository name:
 
 - `ghcr.io/kjellmagne/ulfy-backend-api:latest`
 - `ghcr.io/kjellmagne/ulfy-backend-admin:latest`

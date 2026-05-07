@@ -1,8 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import * as yaml from "js-yaml";
 import { randomUUID } from "crypto";
-import { TemplateYamlSchema } from "@ulfy/contracts";
-import type { TemplateYaml } from "@ulfy/contracts";
+import { TemplateYamlSchema } from "@skrivdet/contracts";
+import type { TemplateYaml } from "@skrivdet/contracts";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../common/audit.service";
 import { mobileError } from "../activation/activation.service";
