@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HOST="${ULFY_HOST:-kvasetech.com}"
-PUBLIC_PATH="${ULFY_BACKEND_PUBLIC_PATH:-/backend}"
+HOST="${KVASETECH_HOST:-${SKRIVDET_LEGACY_HOST:-${ULFY_HOST:-kvasetech.com}}}"
+PUBLIC_PATH="${SKRIVDET_BACKEND_PUBLIC_PATH:-${ULFY_BACKEND_PUBLIC_PATH:-/backend}}"
 PUBLIC_PATH="/${PUBLIC_PATH#/}"
 PUBLIC_PATH="${PUBLIC_PATH%/}"
-BASE_URL="${ULFY_PUBLIC_BASE_URL:-https://${HOST}${PUBLIC_PATH}}"
-DETAIL_PATH="${ULFY_TEMPLATE_DETAIL_PATH:-/templates/designer?familyId=00000000-0000-4000-8000-000000000304&variantId=00000000-0000-4000-8000-000000000404}"
+BASE_URL="${KVASETECH_PUBLIC_BASE_URL:-${SKRIVDET_LEGACY_PUBLIC_BASE_URL:-${ULFY_PUBLIC_BASE_URL:-https://${HOST}${PUBLIC_PATH}}}}"
+DETAIL_PATH="${SKRIVDET_TEMPLATE_DETAIL_PATH:-${ULFY_TEMPLATE_DETAIL_PATH:-/templates/designer?familyId=00000000-0000-4000-8000-000000000304&variantId=00000000-0000-4000-8000-000000000404}}"
 
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "${TMP_DIR}"' EXIT
@@ -63,4 +63,4 @@ if ! grep -F '"ok":true' "${HEALTH_JSON}" >/dev/null; then
   exit 1
 fi
 
-echo "skrivDET backend routing check passed for ${BASE_URL}"
+echo "Kvasetech backend routing check passed for ${BASE_URL}"

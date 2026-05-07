@@ -7,17 +7,17 @@ set -euo pipefail
 LEGACY_HOST="${KVASETECH_LEGACY_HOST:-kvasetech.com}"
 LEGACY_HOSTS="${KVASETECH_LEGACY_HOSTS:-${LEGACY_HOST}}"
 TARGET_ORIGIN="${SKRIVDET_TARGET_ORIGIN:-https://skrivdet.no}"
-API_UPSTREAM="${ULFY_API_UPSTREAM:-192.168.222.171:4000}"
+API_UPSTREAM="${SKRIVDET_API_UPSTREAM:-${ULFY_API_UPSTREAM:-192.168.222.171:4000}}"
 BACKEND_PATH="${SKRIVDET_BACKEND_PATH:-/backend}"
 WEBSITE_PATH="${SKRIVDET_OLD_WEBSITE_PATH:-/skrivdet}"
-ULFY_PATH="${SKRIVDET_OLD_ULFY_PATH:-/ulfy}"
+OLD_ULFY_PATH="${SKRIVDET_OLD_ULFY_PATH:-/ulfy}"
 
 BACKEND_PATH="/${BACKEND_PATH#/}"
 BACKEND_PATH="${BACKEND_PATH%/}"
 WEBSITE_PATH="/${WEBSITE_PATH#/}"
 WEBSITE_PATH="${WEBSITE_PATH%/}"
-ULFY_PATH="/${ULFY_PATH#/}"
-ULFY_PATH="${ULFY_PATH%/}"
+OLD_ULFY_PATH="/${OLD_ULFY_PATH#/}"
+OLD_ULFY_PATH="${OLD_ULFY_PATH%/}"
 TARGET_ORIGIN="${TARGET_ORIGIN%/}"
 
 json_array_from_csv() {
@@ -43,6 +43,10 @@ EOF
 LEGACY_HOSTS_JSON="$(json_array_from_csv "${LEGACY_HOSTS}")"
 
 for route_id in \
+  kvasetech-backend-api \
+  kvasetech-backend-admin \
+  kvasetech-website \
+  kvasetech-website-legacy-redirect \
   ulfy-api \
   ulfy-admin \
   skrivdet-website \
@@ -122,11 +126,11 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-ulfy-api-com
   -d "{
     \"name\": \"kvasetech-ulfy-api-compat\",
     \"hosts\": ${LEGACY_HOSTS_JSON},
-    \"uri\": \"${ULFY_PATH}/api/*\",
+    \"uri\": \"${OLD_ULFY_PATH}/api/*\",
     \"priority\": 750,
     \"plugins\": {
       \"proxy-rewrite\": {
-        \"regex_uri\": [\"^${ULFY_PATH}/(.*)\", \"/\$1\"]
+        \"regex_uri\": [\"^${OLD_ULFY_PATH}/(.*)\", \"/\$1\"]
       }
     },
     \"upstream\": {
@@ -177,11 +181,11 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-ulfy-redirec
   -d "{
     \"name\": \"kvasetech-ulfy-redirect\",
     \"hosts\": ${LEGACY_HOSTS_JSON},
-    \"uri\": \"${ULFY_PATH}*\",
+    \"uri\": \"${OLD_ULFY_PATH}*\",
     \"priority\": 400,
     \"plugins\": {
       \"redirect\": {
-        \"regex_uri\": [\"^${ULFY_PATH}/?(.*)\", \"${TARGET_ORIGIN}/\$1\"],
+        \"regex_uri\": [\"^${OLD_ULFY_PATH}/?(.*)\", \"${TARGET_ORIGIN}/\$1\"],
         \"ret_code\": 308,
         \"append_query_string\": true
       }
@@ -192,7 +196,7 @@ echo "Configured legacy Kvasetech redirects:"
 echo "  https://${LEGACY_HOSTS}/api/* -> http://${API_UPSTREAM}/api/*"
 echo "  https://${LEGACY_HOSTS}${BACKEND_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
 echo "  https://${LEGACY_HOSTS}${WEBSITE_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
-echo "  https://${LEGACY_HOSTS}${ULFY_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
+echo "  https://${LEGACY_HOSTS}${OLD_ULFY_PATH}/api/* -> http://${API_UPSTREAM}/api/*"
 echo "  https://${LEGACY_HOSTS}${BACKEND_PATH}* -> ${TARGET_ORIGIN}${BACKEND_PATH}*"
 echo "  https://${LEGACY_HOSTS}${WEBSITE_PATH}* -> ${TARGET_ORIGIN}/*"
-echo "  https://${LEGACY_HOSTS}${ULFY_PATH}* -> ${TARGET_ORIGIN}/*"
+echo "  https://${LEGACY_HOSTS}${OLD_ULFY_PATH}* -> ${TARGET_ORIGIN}/*"

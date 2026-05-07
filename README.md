@@ -396,6 +396,10 @@ APISIX can route the same public HTTPS hostname to both services:
 APISIX_ADMIN_KEY='your-admin-key' bash infra/apisix/skrivdet-domain-routes.sh
 ```
 
+The APISIX helper scripts now prefer `SKRIVDET_*` environment variable names and
+still fall back to the older `ULFY_*` names where live hosts have not been
+cleaned up yet.
+
 To pull prebuilt app images from GitHub Container Registry instead of building on the server, use:
 
 ```bash

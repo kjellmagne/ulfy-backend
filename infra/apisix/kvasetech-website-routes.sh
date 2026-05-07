@@ -4,7 +4,7 @@ set -euo pipefail
 : "${APISIX_ADMIN_URL:=http://127.0.0.1:9180}"
 : "${APISIX_ADMIN_KEY:?Set APISIX_ADMIN_KEY to your APISIX admin key}"
 
-HOST="${ULFY_HOST:-kvasetech.com}"
+HOST="${KVASETECH_HOST:-${SKRIVDET_LEGACY_HOST:-${ULFY_HOST:-kvasetech.com}}}"
 WEBSITE_UPSTREAM="${SKRIVDET_WEBSITE_UPSTREAM:-192.168.222.171:8080}"
 PUBLIC_PATH="${SKRIVDET_WEBSITE_PUBLIC_PATH:-/skrivdet}"
 LEGACY_PATH="${SKRIVDET_WEBSITE_LEGACY_PATH:-/ulfy}"
@@ -13,16 +13,16 @@ PUBLIC_PATH="${PUBLIC_PATH%/}"
 LEGACY_PATH="/${LEGACY_PATH#/}"
 LEGACY_PATH="${LEGACY_PATH%/}"
 
-for route_id in ulfy skrivdet-website skrivdet-legacy-redirect skrivdet-api skrivdet-admin; do
+for route_id in kvasetech-website kvasetech-website-legacy-redirect ulfy skrivdet-website skrivdet-legacy-redirect skrivdet-api skrivdet-admin; do
   curl -fsS -X DELETE "${APISIX_ADMIN_URL}/apisix/admin/routes/${route_id}" \
     -H "X-API-KEY: ${APISIX_ADMIN_KEY}" >/dev/null || true
 done
 
-curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-website" \
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-website" \
   -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
-    \"name\": \"skrivdet-website\",
+    \"name\": \"kvasetech-website\",
     \"host\": \"${HOST}\",
     \"uris\": [\"${PUBLIC_PATH}\", \"${PUBLIC_PATH}/*\"],
     \"priority\": 50,
@@ -39,11 +39,11 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-website" \
     }
   }"
 
-curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-legacy-redirect" \
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/kvasetech-website-legacy-redirect" \
   -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
-    \"name\": \"skrivdet-legacy-redirect\",
+    \"name\": \"kvasetech-website-legacy-redirect\",
     \"host\": \"${HOST}\",
     \"uri\": \"${LEGACY_PATH}*\",
     \"priority\": 300,
