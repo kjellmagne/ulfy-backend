@@ -476,12 +476,14 @@ The admin same-origin API path remains available at `https://skrivdet.no/backend
 
 GitHub Actions builds Docker images on pushes to `main`, version tags like `v1.0.0`, manual workflow runs, and pull requests. Pull requests build images for verification only. Pushes to `main` and tags publish images to GitHub Container Registry.
 
-The current registry package names still use the legacy backend repository name:
+The current registry package names use the renamed platform repository:
 
-- `ghcr.io/kjellmagne/ulfy-backend-api:latest`
-- `ghcr.io/kjellmagne/ulfy-backend-admin:latest`
-- `ghcr.io/kjellmagne/ulfy-backend-api:sha-<commit>`
-- `ghcr.io/kjellmagne/ulfy-backend-admin:sha-<commit>`
+- `ghcr.io/kjellmagne/skrivdet-platform-api:latest`
+- `ghcr.io/kjellmagne/skrivdet-platform-admin:latest`
+- `ghcr.io/kjellmagne/skrivdet-platform-api:sha-<commit>`
+- `ghcr.io/kjellmagne/skrivdet-platform-admin:sha-<commit>`
+
+Production may still run the older `ghcr.io/kjellmagne/ulfy-backend-*` images until the deployment is migrated.
 
 The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time for public links and `_next` asset URLs, while APISIX strips `/backend` before forwarding admin requests to Next.js. It leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, use the canonical API origin, for example `https://api.skrivdet.no`.
 

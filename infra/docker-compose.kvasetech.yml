@@ -10,7 +10,7 @@ services:
       - ${POSTGRES_DATA_DIR:-/opt/ulfy-data/postgres}:/var/lib/postgresql/data
 
   api:
-    image: ${SKRIVDET_API_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-api:latest}
+    image: ${SKRIVDET_API_IMAGE:-ghcr.io/kjellmagne/skrivdet-platform-api:latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -36,7 +36,7 @@ services:
       - postgres
 
   admin:
-    image: ${SKRIVDET_ADMIN_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-admin:latest}
+    image: ${SKRIVDET_ADMIN_IMAGE:-ghcr.io/kjellmagne/skrivdet-platform-admin:latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production

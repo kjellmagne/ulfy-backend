@@ -15,7 +15,7 @@ services:
       retries: 20
 
   api:
-    image: ${SKRIVDET_API_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-api:latest}
+    image: ${SKRIVDET_API_IMAGE:-ghcr.io/kjellmagne/skrivdet-platform-api:latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
@@ -42,7 +42,7 @@ services:
       - "127.0.0.1:4000:4000"
 
   admin:
-    image: ${SKRIVDET_ADMIN_IMAGE:-ghcr.io/kjellmagne/ulfy-backend-admin:latest}
+    image: ${SKRIVDET_ADMIN_IMAGE:-ghcr.io/kjellmagne/skrivdet-platform-admin:latest}
     restart: unless-stopped
     environment:
       NODE_ENV: production
