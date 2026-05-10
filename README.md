@@ -420,11 +420,11 @@ Important: after pulling a new API image, run `pnpm prisma migrate deploy` befor
 On older Ubuntu hosts using legacy `docker-compose` 1.x, container recreation may fail after image updates. A safe pull/recreate sequence is:
 
 ```bash
-cd /opt/ulfy
+cd /opt/skrivdet-platform
 sudo docker-compose pull api admin
 sudo docker-compose run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 api pnpm prisma migrate deploy
 sudo docker-compose run --rm -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 api pnpm prisma:encrypt-secrets
-sudo docker rm -f ulfy_api_1 ulfy_admin_1
+sudo docker rm -f skrivdet-platform_api_1 skrivdet-platform_admin_1
 sudo docker-compose up -d --no-deps api admin
 ```
 
@@ -483,7 +483,7 @@ The current registry package names use the renamed platform repository:
 - `ghcr.io/kjellmagne/skrivdet-platform-api:sha-<commit>`
 - `ghcr.io/kjellmagne/skrivdet-platform-admin:sha-<commit>`
 
-Production may still run the older `ghcr.io/kjellmagne/ulfy-backend-*` images until the deployment is migrated.
+Production was migrated to these `skrivdet-platform-*` images on 2026-05-10. The production Postgres database name, user, and data path still use legacy `ulfy` identifiers to preserve the existing data volume.
 
 The GitHub admin image is built for the APISIX `/backend` mount by default. It uses `NEXT_PUBLIC_BASE_PATH=/backend` at build time for public links and `_next` asset URLs, while APISIX strips `/backend` before forwarding admin requests to Next.js. It leaves `NEXT_PUBLIC_API_BASE_URL` empty, so browser requests go to the same public origin as `/backend/api/v1/...`. If you set `NEXT_PUBLIC_API_BASE_URL`, use the canonical API origin, for example `https://api.skrivdet.no`.
 
