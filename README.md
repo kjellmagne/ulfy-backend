@@ -15,7 +15,7 @@ Required tools:
 Setup:
 
 ```bash
-cd /Users/kjellmagnegabrielsen/ulfy/backend
+cd /Users/kjellmagnegabrielsen/Kvasetech_Dev/skrivdet-platform
 cp .env.example .env
 pnpm install
 pnpm prisma:migrate
@@ -26,7 +26,7 @@ pnpm dev:api
 In another terminal:
 
 ```bash
-cd /Users/kjellmagnegabrielsen/ulfy/backend
+cd /Users/kjellmagnegabrielsen/Kvasetech_Dev/skrivdet-platform
 pnpm dev:admin
 ```
 
@@ -366,7 +366,7 @@ by tests so their status is visible without breaking existing callers.
 Docker is included for deployment, pull-down setup, server packaging, and production-like verification. It is not the primary local development path.
 
 ```bash
-cd /Users/kjellmagnegabrielsen/ulfy/backend
+cd /Users/kjellmagnegabrielsen/Kvasetech_Dev/skrivdet-platform
 cp infra/.env.example infra/.env
 docker compose --env-file infra/.env -f infra/docker-compose.yml build
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d

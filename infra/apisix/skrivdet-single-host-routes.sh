@@ -13,11 +13,16 @@ if [ -z "${HOST}" ]; then
   exit 1
 fi
 
-curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-api" \
+for route_id in skrivdet-single-host-api skrivdet-single-host-admin ulfy-api ulfy-admin; do
+  curl -fsS -X DELETE "${APISIX_ADMIN_URL}/apisix/admin/routes/${route_id}" \
+    -H "X-API-KEY: ${APISIX_ADMIN_KEY}" >/dev/null || true
+done
+
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-single-host-api" \
   -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
-    \"name\": \"ulfy-api\",
+    \"name\": \"skrivdet-single-host-api\",
     \"host\": \"${HOST}\",
     \"uri\": \"/api/*\",
     \"priority\": 100,
@@ -30,11 +35,11 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-api" \
     }
   }"
 
-curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin" \
+curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/skrivdet-single-host-admin" \
   -H "X-API-KEY: ${APISIX_ADMIN_KEY}" \
   -H "Content-Type: application/json" \
   -d "{
-    \"name\": \"ulfy-admin\",
+    \"name\": \"skrivdet-single-host-admin\",
     \"host\": \"${HOST}\",
     \"uri\": \"/*\",
     \"priority\": 1,
@@ -47,4 +52,4 @@ curl -fsS -X PUT "${APISIX_ADMIN_URL}/apisix/admin/routes/ulfy-admin" \
     }
   }"
 
-echo "Configured legacy single-host APISIX routes for https://${HOST}"
+echo "Configured skrivDET single-host APISIX routes for https://${HOST}"
