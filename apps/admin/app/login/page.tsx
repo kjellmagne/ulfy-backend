@@ -27,7 +27,6 @@ export default function LoginPage() {
       if (!res.ok) throw new Error("Email or password is incorrect.");
       const data = await res.json();
       localStorage.setItem("skrivdet_admin_token", data.accessToken);
-      localStorage.removeItem("ulfy_admin_token");
       window.location.href = appPath("/");
     } catch (err: any) {
       const message = getErrorMessage(err);
